@@ -2,4 +2,8 @@
 =======
 #include <stdio.h>
 # include "ai.h"
-test1
+
+int ai() {
+  printf("test1");
+  return 0;
+}

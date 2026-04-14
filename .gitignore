@@ -51,3 +51,5 @@ coverage/
 # =========================
 .vscode/
 .idea/
+.cache/
+compile_commands.json

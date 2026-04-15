@@ -1,6 +1,6 @@
 #include "core/position.h"
 
-#include <ctype.h>
+#include <ctype.h> /* Character type checking */
 #include <stddef.h>
 
 #include "core/board.h"
@@ -22,15 +22,18 @@ Position parsePosition(const char *input) {
     char file;
     char rank;
 
+    /* No input */
     if (input == NULL) {
         return createPosition(-1, -1);
     }
 
+    /* Dismiss whitespaces in the front */
     cursor = (const unsigned char *) input;
     while (*cursor != '\0' && isspace(*cursor)) {
         ++cursor;
     }
 
+    /* Expect algebraic-style input such as A1 or j8, ignoring outer spaces. */
     if (!isalpha(*cursor)) {
         return createPosition(-1, -1);
     }
@@ -50,10 +53,12 @@ Position parsePosition(const char *input) {
         ++cursor;
     }
 
+    /* Reject trailing characters so partially valid inputs do not slip through. */
     if (*cursor != '\0') {
         return createPosition(-1, -1);
     }
 
+    /* Board rows grow downward in the array, so rank 8 maps to row 0. */
     return createPosition(ROWS - (rank - '0'), file - 'A');
 }
 

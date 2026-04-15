@@ -6,7 +6,7 @@ static void initializeMoveArrays(Move *move) {
     int i;
 
     for (i = 0; i < MAX_CHAIN; ++i) {
-        move->path[i] = createPosition(-1, -1);
+        move->path[i] = createPosition(-1, -1); /* (-1,-1) is an invalid position */
         move->captures[i].pos = createPosition(-1, -1);
         move->captures[i].piece = createPiece(EMPTY_PIECE, EMPTY_COLOR);
     }

@@ -3,7 +3,13 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 ColumnLimit: 80
-BreakBeforeBraces: Attach
+AlignArrayOfStructures: Left
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: false
+BreakBeforeBraces: Attach
 IndentCaseLabels: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: false
+SortIncludes: false

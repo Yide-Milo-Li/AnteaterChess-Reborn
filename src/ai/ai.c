@@ -93,3 +93,81 @@ static const int PST_ANTEATER[ROWS][COLS] = {
     {0,  5,  5,  5,  5,  5,  5,  5,  5,  0 },
     {0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }
 };
+
+// Global variables for search
+static clock_t g_search_start; // Start time of the search
+static int g_time_limit_ms;    // Time limit in milliseconds
+static int g_stop_search;      // Flag to stop the search, 1 = stop, 0 = continue
+static int g_nodes;            // Number of nodes visited
+
+// Piece Value Tables
+static int piece_value(PieceType type) {
+    switch (type) {
+    case ANT:
+        return 100;
+    case KNIGHT:
+        return 320;
+    case BISHOP:
+        return 330;
+    case ROOK:
+        return 500;
+    case QUEEN:
+        return 900;
+    case KING:
+        return 20000;
+    case ANTEATER:
+        return 200;
+    case EMPTY_PIECE:
+    default:
+        return 0;
+    }
+}
+
+/* Helper function to reverse the PST for white
+   Return the corespond row for the piece*/
+static int board_row_for_pst(Color color, int row) {
+    return (color == WHITE) ? (ROWS - 1 - row) : row;
+}
+
+/* Helper function to get the PST bonus for a piece
+   Return the bonus for the piece*/
+static int pst_bonus(Piece piece, int row, int col) {
+    int pst_row; // get the corespond row
+
+    pst_row = board_row_for_pst(piece.color, row);
+    switch (piece.type) {
+    case ANT:
+        return PST_ANT[pst_row][col];
+    case KNIGHT:
+        return PST_KNIGHT[pst_row][col];
+    case BISHOP:
+        return PST_BISHOP[pst_row][col];
+    case ROOK:
+        return PST_ROOK[pst_row][col];
+    case QUEEN:
+        return PST_QUEEN[pst_row][col];
+    case KING:
+        return PST_KING_MID[pst_row][col];
+    case ANTEATER:
+        return PST_ANTEATER[pst_row][col];
+    case EMPTY_PIECE:
+    default:
+        return 0;
+    }
+}
+
+// evaluate pawns
+static int evaluate_pawns(const GameState *state, Color color) {
+    int score = 0;
+    int row;
+    int col;
+
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Piece piece = getPiece(&state->board, createPosition(row, col));
+            // init. the pawn's parameter
+            int file_has_neighbor = 0;
+            int file2;
+            int row2;
+            int is_passed = 1;
+        }

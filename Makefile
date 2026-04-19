@@ -15,6 +15,7 @@ SRC_SRCS := \
 	src/core/movelist.c \
 	src/core/gameconfig.c \
 	src/core/gamestate.c \
+	src/gameplay/execution.c \
 	src/gameplay/movegen.c \
 	src/gameplay/rules.c \
 	src/log/log.c \
@@ -22,7 +23,7 @@ SRC_SRCS := \
 
 SRC_OBJS := $(SRC_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
-TESTS := test_board test_piece test_move test_movegen test_game_state test_log test_clock
+TESTS := test_board test_piece test_move test_movegen test_move_execution test_undo test_game_state test_log test_clock
 TEST_BINS := $(TESTS:%=$(TEST_BIN_DIR)/%$(EXE))
 TEST_OBJS := $(TESTS:%=$(OBJ_DIR)/tests/%.o)
 

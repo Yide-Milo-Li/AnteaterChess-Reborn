@@ -1,6 +1,8 @@
 #include "turn/turn_timer.h"
 
+#include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "time/clock.h"
 
@@ -12,7 +14,7 @@
  */
 
 static Color timedPlayer = EMPTY_COLOR;
-static int turnStartElapsedSeconds = 0;
+static int64_t turnStartElapsedSeconds = 0;
 static int configuredTurnLengthSeconds = 0;
 static int timerEnabled = 0;
 static int timerExpired = 0;
@@ -33,8 +35,8 @@ static int validate_timer_state(const GameState *state) {
 
 /* Return the current countdown value for the actively timed player. */
 static int compute_active_remaining_time(void) {
-    int elapsedSinceTurnStart;
-    int remaining;
+    int64_t elapsedSinceTurnStart;
+    int64_t remaining;
 
     elapsedSinceTurnStart = getElapsedTimeSeconds() - turnStartElapsedSeconds;
     if (elapsedSinceTurnStart < 0) {
@@ -46,7 +48,11 @@ static int compute_active_remaining_time(void) {
         remaining = 0;
     }
 
-    return remaining;
+    if (remaining > INT_MAX) {
+        return INT_MAX;
+    }
+
+    return (int) remaining;
 }
 
 /* Start a fresh per-turn countdown for the player whose turn is active now. */

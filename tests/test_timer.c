@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "core/gameconfig.h"
@@ -16,11 +17,11 @@
  */
 
 /* Spin until the elapsed gameplay clock changes or a hard loop cap is reached. */
-static int wait_for_elapsed_change(int baseline) {
+static int64_t wait_for_elapsed_change(int64_t baseline) {
     time_t deadline = time(NULL) + 3;
 
     while (time(NULL) <= deadline) {
-        int current = getElapsedTimeSeconds();
+        int64_t current = getElapsedTimeSeconds();
 
         if (current != baseline) {
             return current;
@@ -45,7 +46,7 @@ static GameState create_timer_state(int timerEnabled, int initialTimeSeconds) {
 /* Verify initialization and countdown for the active player only. */
 static void test_turn_timer_counts_down_only_for_active_player(void) {
     GameState state = create_timer_state(1, 2);
-    int baselineElapsed;
+    int64_t baselineElapsed;
 
     assert(initClock() == 0);
     assert(initTurnTimer(&state) == 0);
@@ -64,7 +65,7 @@ static void test_turn_timer_counts_down_only_for_active_player(void) {
 static void test_turn_timer_resets_after_switch_and_undo(void) {
     GameState state = create_timer_state(1, 2);
     Move move;
-    int baselineElapsed;
+    int64_t baselineElapsed;
 
     assert(initClock() == 0);
     assert(initTurnTimer(&state) == 0);
@@ -90,7 +91,7 @@ static void test_turn_timer_resets_after_switch_and_undo(void) {
 static void test_turn_timer_disable_and_expiration_paths(void) {
     GameState disabledState = create_timer_state(0, 3);
     GameState expiringState = create_timer_state(1, 1);
-    int baselineElapsed;
+    int64_t baselineElapsed;
 
     assert(initClock() == 0);
     assert(initTurnTimer(&disabledState) == 0);

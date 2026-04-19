@@ -1,6 +1,7 @@
 #include "log/log.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -24,7 +25,7 @@
 
 static FILE *logFile = NULL;
 static char sessionLogPath[256];
-static int moveTimestampsSeconds[MAX_MOVES];
+static int64_t moveTimestampsSeconds[MAX_MOVES];
 
 /* Return the human-readable name for one piece type. */
 static const char *piece_type_to_string(PieceType type) {
@@ -151,10 +152,10 @@ static void format_position(Position pos, char buffer[4]) {
 }
 
 /* Format elapsed seconds into the HH:MM:SS layout required by the log spec. */
-static void format_elapsed_time(int elapsedSeconds, char buffer[16]) {
-    int hours;
-    int minutes;
-    int seconds;
+static void format_elapsed_time(int64_t elapsedSeconds, char buffer[32]) {
+    int64_t hours;
+    int64_t minutes;
+    int64_t seconds;
 
     if (elapsedSeconds < 0) {
         elapsedSeconds = 0;
@@ -163,7 +164,7 @@ static void format_elapsed_time(int elapsedSeconds, char buffer[16]) {
     hours = elapsedSeconds / 3600;
     minutes = (elapsedSeconds % 3600) / 60;
     seconds = elapsedSeconds % 60;
-    snprintf(buffer, 16, "%02d:%02d:%02d", hours, minutes, seconds);
+    snprintf(buffer, 32, "%02lld:%02lld:%02lld", (long long) hours, (long long) minutes, (long long) seconds);
 }
 
 /* Build the player label, explicitly tagging AI-controlled sides. */
@@ -255,8 +256,8 @@ static int write_header_section(const GameConfig *config) {
 }
 
 /* Write one move line in the strict replay-friendly format. */
-static int write_move_line(const GameState *state, int moveNumber, int elapsedSeconds, Move move) {
-    char timestamp[16];
+static int write_move_line(const GameState *state, int moveNumber, int64_t elapsedSeconds, Move move) {
+    char timestamp[32];
     char playerLabel[32];
     char from[4];
     char to[4];
@@ -295,7 +296,7 @@ static int write_move_line(const GameState *state, int moveNumber, int elapsedSe
 
 /* Append the termination summary for the current session. */
 static int write_termination_section(const GameState *state) {
-    char elapsedBuffer[16];
+    char elapsedBuffer[32];
 
     if (logFile == NULL || state == NULL) {
         return 1;

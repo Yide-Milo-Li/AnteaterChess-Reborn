@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -23,11 +24,11 @@
  */
 
 /* Spin until the elapsed gameplay clock changes or a hard loop cap is reached. */
-static int wait_for_elapsed_change(int baseline) {
+static int64_t wait_for_elapsed_change(int64_t baseline) {
     time_t deadline = time(NULL) + 3;
 
     while (time(NULL) <= deadline) {
-        int current = getElapsedTimeSeconds();
+        int64_t current = getElapsedTimeSeconds();
 
         if (current != baseline) {
             return current;
@@ -138,7 +139,7 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     char path[256];
     char buffer[4096];
     char firstMoveLine[256];
-    int baselineElapsed;
+    int64_t baselineElapsed;
 
     assert(initClock() == 0);
     assert(initLog(&state.config) == 0);

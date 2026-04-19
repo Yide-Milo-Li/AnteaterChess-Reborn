@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "time/clock.h"
@@ -11,11 +12,11 @@
  */
 
 /* Spin until the elapsed clock reading changes or a hard loop cap is reached. */
-static int wait_for_elapsed_change(int baseline) {
+static int64_t wait_for_elapsed_change(int64_t baseline) {
     time_t deadline = time(NULL) + 3;
 
     while (time(NULL) <= deadline) {
-        int current = getElapsedTimeSeconds();
+        int64_t current = getElapsedTimeSeconds();
 
         if (current != baseline) {
             return current;
@@ -27,8 +28,8 @@ static int wait_for_elapsed_change(int baseline) {
 
 /* Verify initialization guards and monotonic elapsed-time updates. */
 static void test_clock_initialization_and_progress(void) {
-    int baseline;
-    int advanced;
+    int64_t baseline;
+    int64_t advanced;
 
     assert(getElapsedTimeSeconds() == 0);
     assert(updateClock() != 0);
@@ -43,9 +44,9 @@ static void test_clock_initialization_and_progress(void) {
 
 /* Verify paused intervals do not contribute to gameplay elapsed time. */
 static void test_clock_pause_and_resume(void) {
-    int beforePause;
-    int whilePaused;
-    int afterResume;
+    int64_t beforePause;
+    int64_t whilePaused;
+    int64_t afterResume;
 
     assert(initClock() == 0);
     beforePause = getElapsedTimeSeconds();

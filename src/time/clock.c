@@ -1,5 +1,6 @@
 #include "time/clock.h"
 
+#include <stdint.h>
 #include <time.h>
 
 /*
@@ -11,7 +12,7 @@
 
 static time_t startTime;
 static time_t pauseStartTime;
-static int pausedSeconds;
+static int64_t pausedSeconds;
 static int clockInitialized = 0;
 static int clockPaused = 0;
 
@@ -21,8 +22,18 @@ static time_t get_wall_time(void) {
 }
 
 /* Convert elapsed whole seconds into a stable HH:MM:SS-friendly integer value. */
-static int compute_elapsed_seconds(time_t now) {
-    return (int) difftime(now, startTime) - pausedSeconds;
+static int64_t compute_elapsed_seconds(time_t now) {
+    double seconds = difftime(now, startTime);
+
+    if (seconds <= 0.0) {
+        return 0;
+    }
+
+    if (seconds >= (double) INT64_MAX) {
+        return INT64_MAX - pausedSeconds;
+    }
+
+    return (int64_t) seconds - pausedSeconds;
 }
 
 /* Start or restart the global gameplay stopwatch. */
@@ -92,13 +103,23 @@ int resumeClock(void) {
         return 1;
     }
 
-    pausedSeconds += (int) difftime(now, pauseStartTime);
+    {
+        double pausedDelta = difftime(now, pauseStartTime);
+
+        if (pausedDelta > 0.0) {
+            if (pausedDelta >= (double) INT64_MAX || pausedSeconds > INT64_MAX - (int64_t) pausedDelta) {
+                pausedSeconds = INT64_MAX;
+            } else {
+                pausedSeconds += (int64_t) pausedDelta;
+            }
+        }
+    }
     clockPaused = 0;
     return 0;
 }
 
 /* Return total gameplay elapsed time in seconds, excluding paused intervals. */
-int getElapsedTimeSeconds(void) {
+int64_t getElapsedTimeSeconds(void) {
     time_t now;
 
     if (!clockInitialized) {

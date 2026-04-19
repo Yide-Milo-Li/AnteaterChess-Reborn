@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "turn/turn.h"
+
 /* Applies the desired move (from and to) */
 int applyMove(GameState *state, Move move) {
     Piece currentPiece;
@@ -93,11 +95,9 @@ int applyMove(GameState *state, Move move) {
         return 1;
     }
 
-    /* A completed move switch player turn */
-    if (state->currentTurn == WHITE) {
-        state->currentTurn = BLACK;
-    } else {
-        state->currentTurn = WHITE;
+    /* A completed move hands control to the other player. */
+    if (switchTurn(state) != 0) {
+        return 1;
     }
 
     /* Until the hash module is connected to execution 
@@ -154,8 +154,10 @@ int undoMove(GameState *state) {
         return 1;
     }
 
-    /* The player who made the undone move becomes the current player again. */
-    state->currentTurn = move->movedPiece.color;
+    /* Rebuild the active turn from the remaining move history. */
+    if (restoreTurnAfterUndo(state) != 0) {
+        return 1;
+    }
 
     /* Undo backs the game out of any previously detected terminal result
      * because that result may no longer be true after the position changes */

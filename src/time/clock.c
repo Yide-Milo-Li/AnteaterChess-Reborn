@@ -1,22 +1,37 @@
 #include <time.h>
+
 #include "time/clock.h"
 
-/* Global start time for the game */
 static time_t startTime;
+/* Distinguish "clock not started yet" from a real timestamp so callers do not
+ * accidentally read a huge Unix-time delta before initialization. */
+static int clockInitialized = 0;
 
-/* Initialize the clock by recording current system time */
 int initClock(void) {
-    startTime = time(NULL);
-    return 1; // Return 1 for success
-}
+    time_t now = time(NULL);
 
-/* Update logic if needed (placeholder for this simple version) */
-int updateClock(void) {
+    if (now == (time_t) -1) {
+        clockInitialized = 0;
+        return 0;
+    }
+
+    startTime = now;
+    clockInitialized = 1;
     return 1;
 }
 
-/* Calculate and return total seconds since initClock was called */
+int updateClock(void) {
+    /* The current clock is derived from wall time on demand, so there is no
+     * per-tick state to refresh yet. Keeping the hook preserves the header API. */
+    return clockInitialized;
+}
+
 int getElapsedTimeSeconds(void) {
     time_t currentTime = time(NULL);
-    return (int)difftime(currentTime, startTime);
+
+    if (!clockInitialized || currentTime == (time_t) -1) {
+        return 0;
+    }
+
+    return (int) difftime(currentTime, startTime);
 }

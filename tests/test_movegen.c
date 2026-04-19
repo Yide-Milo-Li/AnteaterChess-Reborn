@@ -165,6 +165,46 @@ static void test_knight_and_king_moves(void) {
     assert(find_move(&kingList, createPosition(5, 5), NO_SPECIAL_MOVE) != NULL);
 }
 
+static void test_movegen_does_not_generate_king_captures(void) {
+    GameState state = create_test_state(WHITE);
+    MoveList list;
+
+    setPiece(&state.board, createPosition(6, 4), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(5, 5), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(6, 4), &list) == 0);
+    assert(find_move(&list, createPosition(5, 5), NO_SPECIAL_MOVE) == NULL);
+
+    clear_board(&state.board);
+    setPiece(&state.board, createPosition(4, 4), createPiece(ANTEATER, WHITE));
+    setPiece(&state.board, createPosition(3, 4), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+    assert(find_move(&list, createPosition(3, 4), ANTEATER_CAPTURE) == NULL);
+
+    clear_board(&state.board);
+    setPiece(&state.board, createPosition(4, 4), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(4, 7), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+    assert(find_move(&list, createPosition(4, 7), NO_SPECIAL_MOVE) == NULL);
+
+    clear_board(&state.board);
+    setPiece(&state.board, createPosition(4, 4), createPiece(QUEEN, WHITE));
+    setPiece(&state.board, createPosition(4, 7), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+    assert(find_move(&list, createPosition(4, 7), NO_SPECIAL_MOVE) == NULL);
+
+    clear_board(&state.board);
+    setPiece(&state.board, createPosition(4, 4), createPiece(KNIGHT, WHITE));
+    setPiece(&state.board, createPosition(2, 5), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+    assert(find_move(&list, createPosition(2, 5), NO_SPECIAL_MOVE) == NULL);
+
+    clear_board(&state.board);
+    setPiece(&state.board, createPosition(4, 4), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(5, 5), createPiece(KING, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+    assert(find_move(&list, createPosition(5, 5), NO_SPECIAL_MOVE) == NULL);
+}
+
 static void test_edge_counts_and_validation(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -197,6 +237,7 @@ int main(void) {
     test_sliding_piece_blocking();
     test_bishop_and_queen_generation();
     test_knight_and_king_moves();
+    test_movegen_does_not_generate_king_captures();
     test_edge_counts_and_validation();
     return 0;
 }

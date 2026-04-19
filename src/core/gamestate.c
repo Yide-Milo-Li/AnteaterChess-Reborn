@@ -86,13 +86,15 @@ int isGameOver(const GameState *state) {
     return 1;
 }
 
-/* Set game over flag to 1 */
+/* Mark the game as terminated without inventing a winner. */
 void setGameOver(GameState *state) {
     if (state == NULL) {
         return;
     }
 
-    state->gameOver = 1;
+    /* setGameResult is the single point that keeps gameOver and result
+     * synchronized for terminal states. */
+    setGameResult(state, RESULT_TERMINATED_BY_USER);
 }
 
 /* Returns a pointer of the current player */

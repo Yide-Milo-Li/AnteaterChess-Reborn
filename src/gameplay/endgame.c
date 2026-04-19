@@ -6,9 +6,136 @@
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 
+static int absolute_value(int value) {
+    if (value < 0) {
+        return -value;
+    }
+
+    return value;
+}
+
+/* Sliding attack checks must stop at the first blocker between attacker and
+ * target because legal move generation now excludes direct king captures. */
+static int is_path_clear_for_attack(const Board *board, Position from, Position to) {
+    int rowStep;
+    int colStep;
+    Position current;
+
+    rowStep = 0;
+    colStep = 0;
+    if (to.row > from.row) {
+        rowStep = 1;
+    } else if (to.row < from.row) {
+        rowStep = -1;
+    }
+
+    if (to.col > from.col) {
+        colStep = 1;
+    } else if (to.col < from.col) {
+        colStep = -1;
+    }
+
+    current = from;
+    current.row += rowStep;
+    current.col += colStep;
+    while (!positionEqual(current, to)) {
+        if (getPiece(board, current).type != EMPTY_PIECE) {
+            return 0;
+        }
+
+        current.row += rowStep;
+        current.col += colStep;
+    }
+
+    return 1;
+}
+
+/* Ants attack only on their forward diagonals. */
+static int ant_attacks_square(Position from, Piece piece, Position target) {
+    int direction;
+
+    direction = (piece.color == WHITE) ? -1 : 1;
+    return (target.row - from.row) == direction
+        && absolute_value(target.col - from.col) == 1;
+}
+
+/* Rooks attack along ranks and files when no blocker stands in between. */
+static int rook_attacks_square(const Board *board, Position from, Position target) {
+    if (from.row != target.row && from.col != target.col) {
+        return 0;
+    }
+
+    return is_path_clear_for_attack(board, from, target);
+}
+
+/* Bishops attack along diagonals when no blocker stands in between. */
+static int bishop_attacks_square(const Board *board, Position from, Position target) {
+    if (absolute_value(target.row - from.row) != absolute_value(target.col - from.col)) {
+        return 0;
+    }
+
+    return is_path_clear_for_attack(board, from, target);
+}
+
+/* Knights attack in an L-shape and ignore blockers. */
+static int knight_attacks_square(Position from, Position target) {
+    int rowDistance;
+    int colDistance;
+
+    rowDistance = absolute_value(target.row - from.row);
+    colDistance = absolute_value(target.col - from.col);
+    return (rowDistance == 2 && colDistance == 1)
+        || (rowDistance == 1 && colDistance == 2);
+}
+
+/* Kings attack adjacent squares even though legal move generation will not
+ * emit direct king captures. */
+static int king_attacks_square(Position from, Position target) {
+    int rowDistance;
+    int colDistance;
+
+    rowDistance = absolute_value(target.row - from.row);
+    colDistance = absolute_value(target.col - from.col);
+    return rowDistance <= 1 && colDistance <= 1 && !positionEqual(from, target);
+}
+
+/* Anteaters do not attack kings under this ruleset, so they never contribute
+ * to check detection. */
+static int piece_attacks_square(const Board *board, Position from, Piece piece, Position target) {
+    switch (piece.type) {
+        case ANT:
+            return ant_attacks_square(from, piece, target);
+        case ROOK:
+            return rook_attacks_square(board, from, target);
+        case KNIGHT:
+            return knight_attacks_square(from, target);
+        case BISHOP:
+            return bishop_attacks_square(board, from, target);
+        case QUEEN:
+            return rook_attacks_square(board, from, target)
+                || bishop_attacks_square(board, from, target);
+        case KING:
+            return king_attacks_square(from, target);
+        case ANTEATER:
+        case EMPTY_PIECE:
+        default:
+            return 0;
+    }
+}
+
+/* Endgame analysis works on copied states, so reset local history bookkeeping
+ * before trial moves to avoid MAX_MOVES capacity interfering with evaluation. */
+static void initialize_trial_state(GameState *trialState, const GameState *state, Color color) {
+    *trialState = *state;
+    trialState->currentTurn = color;
+    initMoveList(&trialState->moveHistory);
+    trialState->moveCount = 0;
+    trialState->gameOver = 0;
+    trialState->result = RESULT_NONE;
+}
+
 /* Check whether the specified king is currently under attack */
 int isInCheck(const GameState *state, Color color) {
-    GameState attackState;
     Position kingPosition;
     Color attackingColor;
     int kingFound;
@@ -48,23 +175,16 @@ int isInCheck(const GameState *state, Color color) {
         attackingColor = WHITE;
     }
 
-    /* Reuse the existing move validator by pretending it is the opponent's
-     * turn and asking whether any opposing piece can legally move to the king. */
-    attackState = *state;
-    attackState.currentTurn = attackingColor;
-
     for (row = 0; row < ROWS; ++row) {
         for (col = 0; col < COLS; ++col) {
             Position from = createPosition(row, col);
             Piece piece = getPiece(&state->board, from);
-            Move attackMove;
 
             if (piece.type == EMPTY_PIECE || piece.color != attackingColor) {
                 continue;
             }
 
-            attackMove = createMove(from, kingPosition, piece);
-            if (validateMove(&attackState, attackMove) == 1) {
+            if (piece_attacks_square(&state->board, from, piece, kingPosition) == 1) {
                 return 1;
             }
         }
@@ -112,8 +232,7 @@ int isCheckmate(const GameState *state, Color color) {
 
         /* Work on a copy so the original game state is never modified just to
          * answer the endgame question. */
-        trialState = *state;
-        trialState.currentTurn = color;
+        initialize_trial_state(&trialState, state, color);
 
         /* If a generated move somehow fails to apply, skip it and keep looking
          * at the rest of the move list. */
@@ -173,8 +292,7 @@ int isStalemate(const GameState *state, Color color) {
         }
 
         /* Work on a copy so stalemate detection never mutates the real game. */
-        trialState = *state;
-        trialState.currentTurn = color;
+        initialize_trial_state(&trialState, state, color);
 
         /* If a generated move cannot be applied, skip it and keep checking the
          * rest of the move list. */

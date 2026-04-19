@@ -21,6 +21,12 @@ static int is_enemy_piece(Piece mover, Piece target) {
     return target.type != EMPTY_PIECE && target.color != mover.color;
 }
 
+/* Kings cannot be captured directly, so legal move generation must exclude
+ * king squares from ordinary capture candidates. */
+static int is_capturable_enemy_piece(Piece mover, Piece target) {
+    return is_enemy_piece(mover, target) && target.type != KING;
+}
+
 static int is_friendly_piece(Piece mover, Piece target) {
     return target.type != EMPTY_PIECE && target.color == mover.color;
 }
@@ -55,9 +61,13 @@ static void scan_sliding_direction(
         }
 
         move = createMove(from, current, piece);
-        if (is_enemy_piece(piece, target)) {
+        if (is_capturable_enemy_piece(piece, target)) {
             addCapture(&move, current, target);
             add_candidate_move(list, move);
+            break;
+        }
+
+        if (target.type != EMPTY_PIECE) {
             break;
         }
 
@@ -109,7 +119,7 @@ static void generate_ant_moves(
         }
 
         target = getPiece(board, diagonal);
-        if (!is_enemy_piece(piece, target)) {
+        if (!is_capturable_enemy_piece(piece, target)) {
             continue;
         }
 
@@ -257,8 +267,12 @@ static void generate_knight_moves(
             continue;
         }
 
+        if (target.type != EMPTY_PIECE && !is_capturable_enemy_piece(piece, target)) {
+            continue;
+        }
+
         move = createMove(from, to, piece);
-        if (is_enemy_piece(piece, target)) {
+        if (is_capturable_enemy_piece(piece, target)) {
             addCapture(&move, to, target);
         }
         add_candidate_move(list, move);
@@ -296,8 +310,12 @@ static void generate_king_moves(
                 continue;
             }
 
+            if (target.type != EMPTY_PIECE && !is_capturable_enemy_piece(piece, target)) {
+                continue;
+            }
+
             move = createMove(from, to, piece);
-            if (is_enemy_piece(piece, target)) {
+            if (is_capturable_enemy_piece(piece, target)) {
                 addCapture(&move, to, target);
             }
             add_candidate_move(list, move);

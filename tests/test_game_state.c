@@ -74,9 +74,15 @@ static void test_history_and_result_helpers(void) {
 
     setGameResult(&state, RESULT_NONE);
     assert(isGameOver(&state) == 0);
+    assert(getGameResult(&state) == RESULT_NONE);
 
     setGameOver(&state);
     assert(isGameOver(&state) == 1);
+    assert(getGameResult(&state) == RESULT_TERMINATED_BY_USER);
+
+    setGameResult(&state, RESULT_WHITE_WIN);
+    assert(isGameOver(&state) == 1);
+    assert(getGameResult(&state) == RESULT_WHITE_WIN);
 }
 
 static void test_get_current_player_tracks_turn(void) {

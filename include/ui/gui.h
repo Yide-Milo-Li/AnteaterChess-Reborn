@@ -19,7 +19,6 @@ typedef struct Gui Gui;
 Gui *gui_create(int *argc, char ***argv);
 void gui_destroy(Gui *gui);
 void gui_run(Gui *gui);
-void gui_update(Gui *gui);
 
 typedef struct Gui {
 	GtkWidget *window;

@@ -132,9 +132,3 @@ void gui_run(Gui *gui) {
     gtk_main();
 }
 
-void gui_update(Gui *gui) {
-    if (gui == NULL || gui->window == NULL) {
-        return;
-    }
-    gtk_widget_queue_draw(gui->window);
-}

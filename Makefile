@@ -15,12 +15,15 @@ SRC_SRCS := \
 	src/core/gameconfig.c \
 	src/gameplay/movegen.c \
 	src/gameplay/rules.c \
+	src/input/command.c \
+	src/input/command_parser.c \
+	src/input/input.c \
 	src/log/log.c \
 	src/time/clock.c
 
 SRC_OBJS := $(SRC_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
-TESTS := test_board test_piece test_move test_movegen test_log test_clock
+TESTS := test_board test_piece test_move test_movegen test_log test_clock test_command test_input
 TEST_BINS := $(TESTS:%=$(TEST_BIN_DIR)/%$(EXE))
 TEST_OBJS := $(TESTS:%=$(OBJ_DIR)/tests/%.o)
 

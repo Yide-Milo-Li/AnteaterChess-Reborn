@@ -161,9 +161,9 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     assert(strstr(buffer, "Mode: Human vs Computer") != NULL);
     assert(strstr(buffer, "Timer Enabled: Yes") != NULL);
     assert(strstr(buffer, "AI Time Limit: 12") != NULL);
-    assert(strstr(buffer, "[Move 01] 00:00:00 | White | Ant E2 -> E3") != NULL);
+    assert(strstr(buffer, "[Move 001] 00:00:00 | White | Ant E2 -> E3") != NULL);
     assert(strstr(buffer, "Black (AI) | Ant E7 -> E6") != NULL);
-    extract_line_by_prefix(buffer, "[Move 01]", firstMoveLine, sizeof(firstMoveLine));
+    extract_line_by_prefix(buffer, "[Move 001]", firstMoveLine, sizeof(firstMoveLine));
 
     assert(removeLastMoveFromHistory(&state) == 0);
     assert(rebuildLogFromHistory(&state) == 0);
@@ -174,7 +174,7 @@ static void test_log_lifecycle_and_history_rebuild(void) {
 
     read_log_file(path, buffer, sizeof(buffer));
     assert(strstr(buffer, firstMoveLine) != NULL);
-    assert(strstr(buffer, "[Move 02]") == NULL);
+    assert(strstr(buffer, "[Move 002]") == NULL);
     assert(strstr(buffer, "Termination Summary:") != NULL);
     assert(strstr(buffer, "Result: White Win") != NULL);
     assert(strstr(buffer, "Total Elapsed Time: ") != NULL);

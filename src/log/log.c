@@ -248,8 +248,8 @@ static int write_header_section(const GameConfig *config) {
     fprintf(logFile, "AI White: %s\n", difficulty_to_string(config->aiDifficultyWhite));
     fprintf(logFile, "AI Black: %s\n", difficulty_to_string(config->aiDifficultyBlack));
     fprintf(logFile, "Timer Enabled: %s\n", config->timerEnabled ? "Yes" : "No");
-    fprintf(logFile, "Initial Time Per Turn: %d\n", config->initialTimeSeconds);
-    fprintf(logFile, "AI Time Limit: %d\n", config->aiTimeLimit);
+    fprintf(logFile, "Initial Time Per Turn: %ds\n", config->initialTimeSeconds);
+    fprintf(logFile, "AI Time Limit: %ds\n", config->aiTimeLimit);
     fprintf(logFile, "\nMove History:\n");
     return 0;
 }
@@ -272,7 +272,7 @@ static int write_move_line(const GameState *state, int moveNumber, int elapsedSe
 
     fprintf(
         logFile,
-        "[Move %02d] %s | %s | %s %s -> %s",
+        "[Move %03d] %s | %s | %s %s -> %s",
         moveNumber,
         timestamp,
         playerLabel,

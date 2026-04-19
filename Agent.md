@@ -1,162 +1,158 @@
-agent.md — Anteater Chess Agent Specification
-1. Overview
+Overview
 
-This document defines the system agents, their responsibilities, and their mappings to header files in the Anteater Chess software architecture.
+This document defines the system agents, their responsibilities, execution behavior, and mappings to header files in the Anteater Chess system.
 
-The system follows a modular, event-driven architecture in which all components interact through well-defined APIs and a centralized GameState.
+The system follows a modular, event-driven architecture where all interactions are processed through:
 
-2. Core Architecture Principles
+GameState (single source of truth)
+Event system (interaction abstraction)
+Controller/FSM (execution engine)
+Core Architecture Principles
 Single Source of Truth
-GameState is the only authoritative runtime state.
+GameState stores all runtime data.
 Event-Driven Execution
-All interactions are translated into Events and processed by the FSM.
-Strict Module Responsibility
-Each module (header file) owns a single responsibility.
+All interactions are converted into Events and processed by the Controller.
+Deterministic Execution
+System behavior is fully determined by GameState + Event.
 Layered Design
-UI → Event → Controller → Rules → Board/Data
-3. Agent Mapping to Header Files
-
-This section defines how each header file corresponds to a system agent.
+UI → Input → Event → Controller → Rules → Board/Data
+Agent Mapping to Header Files
 
 3.1 Controller Agent
 
-Header Files:
+Headers:
 
-fsm.h
 controller.h
+fsm.h
 
 Responsibilities:
 
-Main game loop
-Event dispatching
+Main execution loop
+Event polling and dispatch
 State transitions
-Coordination of all modules
+System coordination
 
-Key APIs:
+APIs:
 
 void runGameLoop(GameState *state);
 Event pollEvent();
 void processEvent(GameState *state, Event event);
 void transitionState(GameState *state, SystemState newState);
 
-Notes:
+Trigger:
 
-This is the core orchestrator of the entire system
-No business logic should exist outside this control flow
+Runs continuously during game session
+Activated after system initialization
+
 3.2 Event System Agent
 
-Header Files:
+Headers:
 
 event.h
 event_queue.h
 
 Responsibilities:
 
-Unified representation of all system inputs
-Event buffering and prioritization
-Decoupling input sources from logic
+Unified event abstraction
+Multi-queue event buffering
+Decoupling modules
 
-Key APIs:
+APIs:
 
 int enqueueEvent(EventQueue *q, Event e, QueueType type);
 Event dequeueGameplayEvent(EventQueue *q);
 Event dequeueSystemEvent(EventQueue *q);
 Event dequeueControlEvent(EventQueue *q);
 
-Notes:
+Trigger:
 
-All modules must communicate through Events
-No direct cross-module triggering
+Called whenever input, AI, or system generates an event
+
 3.3 Input Agent
 
-Header Files:
+Headers:
 
 input.h
 
 Responsibilities:
 
-Capture raw user input
-Translate input into Commands
-Provide input abstraction layer
+Capture user input
+Convert input into Command
 
-Key APIs:
+APIs:
 
 int getMoveInput(Command *cmd);
-Position getBoardClick();
 int getBoardInput(Position *pos, InputType *type);
 
-Notes:
+Trigger:
 
-Does NOT modify GameState
-Only produces Commands → converted into Events
+Called during INPUT phase of controller loop
+
 3.4 UI Agent
 
-Header Files:
+Headers:
 
 ui.h
-board_renderer.h (if separated)
 
 Responsibilities:
 
-Display board
-Display game state
-Provide visual feedback
+Render board state
+Display messages and errors
 
-Key APIs:
+APIs:
 
 void renderBoard(const Board *board);
 void displayMessage(const char *msg);
 
-Notes:
+Trigger:
 
-UI is read-only relative to GameState
-No game logic allowed
-3.5 Rules Engine Agent
+Called after GameState update
+Called when error occurs
 
-Header Files:
+3.5 Rules Agent
+
+Headers:
 
 rules.h
 
 Responsibilities:
 
-Enforce all chess + anteater rules
-Validate moves and selections
-Detect check and checkmate
+Validate moves
+Enforce all game rules
 
-Key APIs:
+APIs:
 
 SelectionResult validateSelection(GameState *state, Position pos);
 int isLegalMove(GameState *state, Move move);
 int isCheck(GameState *state, Color player);
 int isCheckmate(GameState *state, Color player);
 
-Notes:
+Trigger:
 
-Pure logic module
-No side effects (should not mutate state directly)
+Called before any move is applied
+
 3.6 Move Generation Agent
 
-Header Files:
+Headers:
 
-movegen.h (or equivalent)
+movegen.h
 
 Responsibilities:
 
-Generate possible moves
-Provide candidate move lists
+Generate all legal moves
 
-Key APIs:
+APIs:
 
 void generateMoves(GameState *state, MoveList *list);
-void generatePieceMoves(Board *board, Position pos, MoveList *list);
 
-Notes:
+Trigger:
 
-Works closely with rules.h
-Does NOT decide best move
+Called during AI turn
+Called during check/checkmate evaluation
+
 3.7 Move System Agent
 
-Header Files:
+Headers:
 
 move.h
 move_list.h
@@ -164,51 +160,32 @@ move_list.h
 Responsibilities:
 
 Represent moves
-Store move history
-Support undo functionality
+Apply moves
+Undo moves via history
 
-Key APIs:
+APIs:
 
 void applyMove(GameState *state, Move move);
 void undoMove(GameState *state);
-void addMoveToList(MoveList *list, Move move);
 
-Notes:
+Trigger:
 
-Must support special moves (castling, en passant, anteater capture)
-Must support multi-capture chains
+applyMove: after move validated
+undoMove: when undo requested
+
 3.8 GameState Agent
 
-Header Files:
+Headers:
 
 gamestate.h
 
 Responsibilities:
 
-Store all runtime data
-Provide unified access to system state
+Store complete runtime state
 
-Structure:
+3.9 Board Agent
 
-typedef struct {
-Board board;
-Player players[2];
-
-int currentTurn;
-int moveCount;
-int gameOver;
-
-SystemState systemState;
-
-} GameState;
-
-Notes:
-
-Passed to all modules
-No module should duplicate this data
-3.9 Board / Piece Agent
-
-Header Files:
+Headers:
 
 board.h
 piece.h
@@ -216,130 +193,233 @@ position.h
 
 Responsibilities:
 
-Represent core game data structures
-Provide low-level board operations
+Low-level board manipulation
 
-Key APIs:
-
-Piece getPieceAt(Board *board, Position pos);
-void setPieceAt(Board *board, Position pos, Piece piece);
-void movePiece(Board *board, Position from, Position to);
-
-Notes:
-
-No rule checking here
-Pure data manipulation only
 3.10 AI Agent
 
-Header Files:
+Headers:
 
 ai.h
 
 Responsibilities:
 
-Select best move from legal moves
-Implement strategy
+Select optimal move
 
-Key APIs:
+APIs:
 
 Move selectBestMove(MoveList *moves, GameState *state);
 
-Notes:
+Trigger:
 
-Must not modify GameState directly
-Only returns a Move
+Called when current player is AI
+Called after turn switch
+
+Behavior:
+
+Generate moves
+Select best move
+Emit AI_MOVE_EVENT
+
 3.11 Log Agent
 
-Header Files:
+Headers:
 
 log.h
 
 Responsibilities:
 
-Record move history
-Output human-readable logs
+Record gameplay in human-readable format
+Maintain consistency with move history
 
-Key APIs:
+APIs:
 
-void logMove(const Move *move);
-void saveLogToFile(const char *filename);
+int initLog(const GameConfig *config);
+int logGameStart(const GameConfig *config);
+int logMove(const GameState *state, Move move);
+int rebuildLogFromHistory(const GameState *state);
+int logGameEnd(const GameState *state);
 
-Notes:
+Trigger:
 
-Required feature
-Must support readable format
-3.12 Timer Agent (Optional / Advanced)
+logGameStart: when game begins
+logMove: after each successful move (player or AI)
+rebuildLogFromHistory: after undo or load
+logGameEnd: when game terminates
 
-Header Files:
+Important Rule:
+Undo operations are NOT logged.
+Log is always reconstructed from MoveHistory.
 
-timer.h
-turn_timer.h
+Execution Protocol
 
-Responsibilities:
+The system executes the following loop:
 
-Track player time
-Trigger timeout events
+while game is running:
 
-Key APIs:
+Event event = pollEvent()
 
-void startTimer(Player *player);
-void updateTimer(GameState *state);
-int isTimeUp(Player *player);
+if event.type == INPUT_EVENT:
+    translate input into gameplay or control event
 
-Notes:
+if event.type == GAMEPLAY_EVENT:
 
-Should integrate with Event system
-4. Event Flow Model
+    if move is invalid:
+        handleNonFatalError()
+    else:
+        applyMove()
+        logMove()
 
-User Input → Command → Event → FSM → GameState Update → UI Render
+if event.type == AI_MOVE_EVENT:
+    applyMove()
+    logMove()
 
-Important Rules:
+if event.type == CONTROL_EVENT:
+    handle menu / undo / exit
 
-UI cannot modify GameState
-Only Controller + Rules can modify GameState
-AI produces Move, not state changes
-5. Dependency Rules
+    if undo triggered:
+        undoMove()
+        rebuildLogFromHistory()
+
+if event.type == SYSTEM_EVENT:
+    handle timer / game over detection
+
+updateGameState()
+
+renderBoard()
+Error Handling Policy
+
+Errors are categorized into:
+
+Non-Fatal Errors
+Fatal Errors
+
+5.1 Non-Fatal Errors
+
+Examples:
+
+Invalid input
+Illegal move
+Selecting opponent piece
+Empty selection
+
+Behavior:
+
+Reject the action
+Do NOT modify GameState
+Generate ERROR_EVENT
+Display message via UI
+Continue game loop
+
+Implementation:
+
+void handleNonFatalError(ErrorCode code):
+displayMessage(error message)
+
+5.2 Fatal Errors
+
+Examples:
+
+System failure
+Corrupted GameState
+Unexpected runtime error
+
+Behavior:
+
+Immediately terminate gameplay loop
+Transition to GAME_TERMINATION_STATE
+Skip End Game Menu
+Display Fatal Error Window
+After confirmation, return to MAIN_MENU_STATE
+
+Implementation:
+
+void handleFatalError(ErrorCode code):
+transitionState(GAME_TERMINATION_STATE)
+displayMessage("Fatal Error")
+
+Event Flow
+
+User Input → Command → Event → Controller → Rules → GameState → UI
+
+Dependency Rules
 
 Allowed:
 
 UI → Input → Event → Controller → Rules → Board
-
 Controller → AI
 Controller → Log
 
 Forbidden:
 
 UI → Rules
-AI → GameState mutation
-Multiple modules writing Board independently
+AI → direct GameState mutation
+Multiple modules modifying Board independently
 
-6. Feature Responsibility Mapping
+Human-Readable Log Specification
 
-Move Input → Input + Event
-Move Validation → Rules
-Move Execution → Controller + Move System
-AI Move → AI
-Undo → Move System
-Logging → Log
-Timer → Timer Module
-Hint → AI
+8.1 Standard Format
 
-7. Development Guidelines
-Each header file defines one module (one agent)
-APIs must be stable before implementation
-Modules should be independently testable
-Avoid circular dependencies
-8. Summary
+[Move NN] HH:MM:SS | Player | Piece Origin -> Destination
 
-This system is:
+Example:
 
-Event-driven
-Modular
-Data-centric
-Deterministic
+[Move 01] 00:00:05 | White | Pawn F2 -> F4
+[Move 02] 00:00:12 | Black (AI) | Pawn E7 -> E5
 
-Each header file represents a clear agent with:
+8.2 Capture
 
-Defined responsibility
-Defined API
-Controlled interaction boundaries
+| Capture: Player Piece
+
+8.3 Special Move
+
+| Special: Description
+
+8.4 Anteater Multi-Capture
+
+[Move NN] ... | Anteater D6 -> G6 | Capture Chain: E6, F6, G6 | Capture Count: 3 | Special: Ant Eating
+
+8.5 Check and Checkmate
+
+| Result: Check
+| Result: Checkmate
+
+8.6 Game Start and End
+
+[Game Start] ...
+[Game End] ...
+
+Undo Consistency Guarantee
+
+Undo is NOT recorded in the log.
+
+Instead:
+
+MoveHistory is the authoritative source
+Log is derived from MoveHistory
+
+After undo:
+
+Remove last move from MoveHistory
+Restore GameState
+Rebuild log file from MoveHistory
+
+Rebuild Algorithm:
+
+clearLogFile()
+
+logGameStart()
+
+for each move in moveHistory:
+logMove(move)
+
+if game ended:
+logGameEnd()
+
+Invariant:
+
+Log equals serialized MoveHistory
+
+Final Statement:
+
+The log is not incrementally modified during undo.
+It is reconstructed from move history to ensure consistency.

@@ -21,11 +21,12 @@ SRC_SRCS := \
 	src/gameplay/rules.c \
 	src/log/log.c \
 	src/time/clock.c \
-	src/turn/turn.c
+	src/turn/turn.c \
+	src/turn/turn_timer.c
 
 SRC_OBJS := $(SRC_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
-TESTS := test_board test_piece test_move test_movegen test_move_execution test_undo test_game_state test_turn test_endgame test_log test_clock
+TESTS := test_board test_piece test_move test_movegen test_move_execution test_undo test_game_state test_turn test_endgame test_log test_clock test_timer
 TEST_BINS := $(TESTS:%=$(TEST_BIN_DIR)/%$(EXE))
 TEST_OBJS := $(TESTS:%=$(OBJ_DIR)/tests/%.o)
 

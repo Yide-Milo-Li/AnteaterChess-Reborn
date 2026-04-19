@@ -1,37 +1,122 @@
-#include <time.h>
-
 #include "time/clock.h"
 
-static time_t startTime;
-/* Distinguish "clock not started yet" from a real timestamp so callers do not
- * accidentally read a huge Unix-time delta before initialization. */
-static int clockInitialized = 0;
+#include <time.h>
 
+/*
+ * Alignment assumptions for future extensions:
+ * - The clock is a process-wide gameplay stopwatch, not GameState-owned data.
+ * - Controller/FSM must pause it outside GAMEPLAY_STATE and resume it when play returns.
+ * - Other services may read elapsed time, but only this module owns pause bookkeeping.
+ */
+
+static time_t startTime;
+static time_t pauseStartTime;
+static int pausedSeconds;
+static int clockInitialized = 0;
+static int clockPaused = 0;
+
+/* Return the current wall-clock value or an error sentinel. */
+static time_t get_wall_time(void) {
+    return time(NULL);
+}
+
+/* Convert elapsed whole seconds into a stable HH:MM:SS-friendly integer value. */
+static int compute_elapsed_seconds(time_t now) {
+    return (int) difftime(now, startTime) - pausedSeconds;
+}
+
+/* Start or restart the global gameplay stopwatch. */
 int initClock(void) {
-    time_t now = time(NULL);
+    time_t now = get_wall_time();
 
     if (now == (time_t) -1) {
         clockInitialized = 0;
-        return 0;
+        clockPaused = 0;
+        pausedSeconds = 0;
+        return 1;
     }
 
     startTime = now;
+    pauseStartTime = now;
+    pausedSeconds = 0;
     clockInitialized = 1;
-    return 1;
+    clockPaused = 0;
+    return 0;
 }
 
+/* Validate that the clock has been initialized before callers depend on it. */
 int updateClock(void) {
-    /* The current clock is derived from wall time on demand, so there is no
-     * per-tick state to refresh yet. Keeping the hook preserves the header API. */
-    return clockInitialized;
+    if (!clockInitialized || get_wall_time() == (time_t) -1) {
+        return 1;
+    }
+
+    return 0;
 }
 
-int getElapsedTimeSeconds(void) {
-    time_t currentTime = time(NULL);
+/* Freeze elapsed-time accumulation while the program is outside gameplay. */
+int pauseClock(void) {
+    time_t now;
 
-    if (!clockInitialized || currentTime == (time_t) -1) {
+    if (!clockInitialized) {
+        return 1;
+    }
+
+    if (clockPaused) {
         return 0;
     }
 
-    return (int) difftime(currentTime, startTime);
+    now = get_wall_time();
+    if (now == (time_t) -1) {
+        return 1;
+    }
+
+    pauseStartTime = now;
+    clockPaused = 1;
+    return 0;
+}
+
+/* Resume elapsed-time accumulation after the clock has been paused. */
+int resumeClock(void) {
+    time_t now;
+
+    if (!clockInitialized) {
+        return 1;
+    }
+
+    if (!clockPaused) {
+        return 0;
+    }
+
+    now = get_wall_time();
+    if (now == (time_t) -1) {
+        return 1;
+    }
+
+    pausedSeconds += (int) difftime(now, pauseStartTime);
+    clockPaused = 0;
+    return 0;
+}
+
+/* Return total gameplay elapsed time in seconds, excluding paused intervals. */
+int getElapsedTimeSeconds(void) {
+    time_t now;
+
+    if (!clockInitialized) {
+        return 0;
+    }
+
+    if (clockPaused) {
+        now = pauseStartTime;
+    } else {
+        now = get_wall_time();
+        if (now == (time_t) -1) {
+            return 0;
+        }
+    }
+
+    if (now < startTime) {
+        return 0;
+    }
+
+    return compute_elapsed_seconds(now);
 }

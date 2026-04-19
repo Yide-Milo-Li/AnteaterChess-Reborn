@@ -2,6 +2,14 @@
 
 #include <stddef.h>
 
+/*
+ * Alignment assumptions for future extensions:
+ * - This file owns GameState-level consistency helpers, not gameplay rules.
+ * - setGameResult() is the authoritative path for keeping result/gameOver aligned.
+ * - setGameOver() remains a compatibility helper for user-driven termination only.
+ * - Callers may read GameState immediately after initialization, so init must reset every field.
+ */
+
 /* Set up a brand-new game state */
 void initGameState(GameState *state, const GameConfig *config) {
     GameConfig effectiveConfig;
@@ -70,7 +78,7 @@ void initGameState(GameState *state, const GameConfig *config) {
     state->hash = 0;
 }
 
-/* Checks if game is over */
+/* Report whether the state is currently marked as terminal. */
 int isGameOver(const GameState *state) {
     /* Check is state pointer is null */
     if (state == NULL) {
@@ -86,7 +94,7 @@ int isGameOver(const GameState *state) {
     return 1;
 }
 
-/* Mark the game as terminated without inventing a winner. */
+/* Mark the game as user-terminated while preserving result/gameOver consistency. */
 void setGameOver(GameState *state) {
     if (state == NULL) {
         return;
@@ -97,7 +105,7 @@ void setGameOver(GameState *state) {
     setGameResult(state, RESULT_TERMINATED_BY_USER);
 }
 
-/* Returns a pointer of the current player */
+/* Return the player whose color matches currentTurn. */
 Player *getCurrentPlayer(GameState *state) {
     if (state == NULL) {
         return NULL;
@@ -115,7 +123,7 @@ Player *getCurrentPlayer(GameState *state) {
     return NULL;
 }
 
-/* Returns a pointer to moveHistory */
+/* Return the move history container owned by the state. */
 MoveList *getMoveHistory(GameState *state) {
     if (state == NULL) {
         return NULL;
@@ -124,8 +132,7 @@ MoveList *getMoveHistory(GameState *state) {
     return &state->moveHistory;
 }
 
-/* Append the specified move to the move history container in game state. 
- * Return 0 if operation succeeds or 1 if fail */
+/* Append one move to history and keep moveCount in sync. */
 int addMoveToHistory(GameState *state, Move move) {
     if (state == NULL) {
         return 1;
@@ -141,7 +148,7 @@ int addMoveToHistory(GameState *state, Move move) {
     return 0;
 }
 
-/* Update game result */
+/* Update the terminal result and derive the matching gameOver flag. */
 void setGameResult(GameState *state, GameResult result) {
     if (state == NULL) {
         return;
@@ -157,7 +164,7 @@ void setGameResult(GameState *state, GameResult result) {
     }
 }
 
-/* Returns game result */
+/* Return the currently stored game result. */
 GameResult getGameResult(GameState *state) {
     if (state == NULL) {
         return RESULT_NONE;
@@ -166,7 +173,7 @@ GameResult getGameResult(GameState *state) {
     return state->result;
 }
 
-/* Removes most recent move from move-history */
+/* Remove the most recent historical move and decrement moveCount if needed. */
 int removeLastMoveFromHistory(GameState *state) {
     if (state == NULL) {
         return 1;

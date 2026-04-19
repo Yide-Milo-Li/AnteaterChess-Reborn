@@ -9,6 +9,14 @@
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - These tests verify move-generation contracts from the public gameplay headers.
+ * - Direct king captures are intentionally excluded from generated candidates.
+ * - Helpers in this file set up board state only; gameplay legality still belongs to the module under test.
+ */
+
+/* Clear the whole board so each test can build a focused position. */
 static void clear_board(Board *board) {
     int row;
     int col;
@@ -20,6 +28,7 @@ static void clear_board(Board *board) {
     }
 }
 
+/* Build a minimal GameState with an empty board and an explicit side to move. */
 static GameState create_test_state(Color turn) {
     GameState state;
 
@@ -32,6 +41,7 @@ static GameState create_test_state(Color turn) {
     return state;
 }
 
+/* Find a generated move by destination square and special-move tag. */
 static Move *find_move(MoveList *list, Position to, SpecialMove specialType) {
     int index;
 
@@ -46,6 +56,7 @@ static Move *find_move(MoveList *list, Position to, SpecialMove specialType) {
     return NULL;
 }
 
+/* Check that generation only considers pieces belonging to the side to move. */
 static void test_generate_moves_only_for_current_turn(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -59,6 +70,7 @@ static void test_generate_moves_only_for_current_turn(void) {
     assert(find_move(&list, createPosition(4, 4), NO_SPECIAL_MOVE) != NULL);
 }
 
+/* Check ant forward movement, opening double-step, and diagonal capture rules. */
 static void test_ant_moves_and_capture(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -79,6 +91,7 @@ static void test_ant_moves_and_capture(void) {
     assert(find_move(&list, createPosition(5, 3), NO_SPECIAL_MOVE) == NULL);
 }
 
+/* Check anteater step moves and orthogonal chain-capture generation. */
 static void test_anteater_moves_and_chain_capture(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -109,6 +122,7 @@ static void test_anteater_moves_and_chain_capture(void) {
     assert(positionEqual(chainCapture->path[1], createPosition(4, 6)) == 1);
 }
 
+/* Check that sliding pieces stop at the first blocker in each direction. */
 static void test_sliding_piece_blocking(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -124,6 +138,7 @@ static void test_sliding_piece_blocking(void) {
     assert(find_move(&list, createPosition(4, 6), NO_SPECIAL_MOVE) == NULL);
 }
 
+/* Check combined queen movement and bishop-style diagonal generation. */
 static void test_bishop_and_queen_generation(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -139,6 +154,7 @@ static void test_bishop_and_queen_generation(void) {
     assert(find_move(&list, createPosition(6, 6), NO_SPECIAL_MOVE) != NULL);
 }
 
+/* Check knight jump captures and king single-step landing rules. */
 static void test_knight_and_king_moves(void) {
     GameState state = create_test_state(WHITE);
     MoveList knightList;
@@ -165,6 +181,7 @@ static void test_knight_and_king_moves(void) {
     assert(find_move(&kingList, createPosition(5, 5), NO_SPECIAL_MOVE) != NULL);
 }
 
+/* Check that no piece generator emits a direct capture onto an enemy king square. */
 static void test_movegen_does_not_generate_king_captures(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -205,6 +222,7 @@ static void test_movegen_does_not_generate_king_captures(void) {
     assert(find_move(&list, createPosition(5, 5), NO_SPECIAL_MOVE) == NULL);
 }
 
+/* Check edge-board counts and integration with selection/move validation helpers. */
 static void test_edge_counts_and_validation(void) {
     GameState state = create_test_state(WHITE);
     MoveList list;
@@ -230,6 +248,7 @@ static void test_edge_counts_and_validation(void) {
     assert(validateMove(&state, invalidMove) == 0);
 }
 
+/* Run the move-generation regression suite for the supported piece rules. */
 int main(void) {
     test_generate_moves_only_for_current_turn();
     test_ant_moves_and_capture();

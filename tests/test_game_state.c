@@ -4,12 +4,21 @@
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - These tests lock down GameState helper semantics, not gameplay rules.
+ * - setGameResult() and setGameOver() must keep result/gameOver synchronized.
+ * - Tests may construct state directly, but behavior expectations come from public headers.
+ */
+
+/* Verify that one player record matches the expected color and controller type. */
 static void assertPlayer(Player player, Color color, PlayerType type) {
     assert(getPlayerColor(player) == color);
     assert(isHumanPlayer(player) == (type == HUMAN));
     assert(isAIPlayer(player) == (type == AI));
 }
 
+/* Check the default initialization path for a brand-new game state. */
 static void test_game_state_initialization_defaults(void) {
     GameState state;
 
@@ -32,6 +41,7 @@ static void test_game_state_initialization_defaults(void) {
     assert(state.hash == 0);
 }
 
+/* Check that player ownership follows the configured game mode. */
 static void test_game_state_player_setup_follows_mode(void) {
     GameConfig config;
     GameState state;
@@ -50,6 +60,7 @@ static void test_game_state_player_setup_follows_mode(void) {
     assertPlayer(state.players[BLACK], BLACK, AI);
 }
 
+/* Check history bookkeeping and result/gameOver consistency helpers. */
 static void test_history_and_result_helpers(void) {
     GameState state;
     Move move;
@@ -85,6 +96,7 @@ static void test_history_and_result_helpers(void) {
     assert(getGameResult(&state) == RESULT_WHITE_WIN);
 }
 
+/* Check that currentTurn selects the matching player slot. */
 static void test_get_current_player_tracks_turn(void) {
     GameState state;
 
@@ -98,6 +110,7 @@ static void test_get_current_player_tracks_turn(void) {
     assert(getCurrentPlayer(&state) == NULL);
 }
 
+/* Run the GameState regression tests for initialization and helper behavior. */
 int main(void) {
     test_game_state_initialization_defaults();
     test_game_state_player_setup_follows_mode();

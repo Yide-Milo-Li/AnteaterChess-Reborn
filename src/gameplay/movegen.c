@@ -7,16 +7,26 @@
 #include "core/piece.h"
 #include "core/position.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - This file generates move candidates for gameplay; it does not mutate GameState.
+ * - Public behavior must stay aligned with include/gameplay/movegen.h.
+ * - Legal move generation excludes direct king captures; check detection belongs elsewhere.
+ * - Piece-specific helpers may grow, but shared boundary checks should stay centralized.
+ */
+
 /* Centralize coordinate math so every generator rejects out-of-bounds targets
  * before touching board accessors. */
 static int position_is_reachable(Position pos) {
     return isValidPosition(pos);
 }
 
+/* Append one generated candidate and normalize the addMove return contract. */
 static int add_candidate_move(MoveList *list, Move move) {
     return addMove(list, move) == 0;
 }
 
+/* Check whether the landing square holds any opposing piece. */
 static int is_enemy_piece(Piece mover, Piece target) {
     return target.type != EMPTY_PIECE && target.color != mover.color;
 }
@@ -27,10 +37,12 @@ static int is_capturable_enemy_piece(Piece mover, Piece target) {
     return is_enemy_piece(mover, target) && target.type != KING;
 }
 
+/* Check whether the landing square is occupied by the moving side. */
 static int is_friendly_piece(Piece mover, Piece target) {
     return target.type != EMPTY_PIECE && target.color == mover.color;
 }
 
+/* Identify the only rank where an ant may attempt its opening double-step. */
 static int is_starting_ant_row(Piece piece, Position from) {
     return (piece.color == WHITE && from.row == 6)
         || (piece.color == BLACK && from.row == 1);
@@ -323,6 +335,7 @@ static void generate_king_moves(
     }
 }
 
+/* Dispatch piece-specific generation without exposing helper functions publicly. */
 static void generate_piece_moves(
     const Board *board,
     Position from,
@@ -357,6 +370,7 @@ static void generate_piece_moves(
     }
 }
 
+/* Reject empty, off-turn, and out-of-bounds origins before generation begins. */
 static int can_generate_from_position(const GameState *state, Position from, Piece *pieceOut) {
     Piece piece;
 
@@ -376,6 +390,7 @@ static int can_generate_from_position(const GameState *state, Position from, Pie
     return 1;
 }
 
+/* Generate every candidate move for the side whose turn is stored in state. */
 int generateMoves(const GameState *state, MoveList *list) {
     int row;
     int col;
@@ -401,10 +416,12 @@ int generateMoves(const GameState *state, MoveList *list) {
     return 0;
 }
 
+/* Reuse the same generator until stricter legality semantics are introduced. */
 int generateLegalMoves(const GameState *state, MoveList *list) {
     return generateMoves(state, list);
 }
 
+/* Generate moves for one origin square if it belongs to the side to move. */
 int generateLegalMovesForPosition(const GameState *state, Position from, MoveList *list) {
     Piece piece;
 

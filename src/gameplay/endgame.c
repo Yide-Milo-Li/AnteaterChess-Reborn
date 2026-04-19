@@ -6,6 +6,15 @@
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - This file owns endgame evaluation, including direct attack detection for kings.
+ * - Legal move generation excludes direct king captures, so check detection must not rely on them.
+ * - Trial states used for mate/stalemate analysis are analysis-only copies with reset history bookkeeping.
+ * - Public behavior must stay aligned with include/gameplay/endgame.h.
+ */
+
+/* Return the non-negative magnitude of an integer delta. */
 static int absolute_value(int value) {
     if (value < 0) {
         return -value;

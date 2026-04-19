@@ -1,6 +1,8 @@
+
 #include <gtk/gtk.h>
 #include "ui/gui.h"
 #include "ui/dialog.h"
+#include "ui/main_menu.h"
 
 
 
@@ -10,11 +12,13 @@ static void setup_main_menu(Gui *gui);
 static void on_new_game_clicked(GtkButton *button, gpointer user_data) {
     (void)button;
     (void)user_data;
+    setMainMenuSelection(0);
     g_print("New Game button clicked\n");
 }
 
 static void on_quit_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *)user_data;
+    setMainMenuSelection(1);
     g_print("Quit Game button clicked\n");
     setup_quit_confirmation(gui);
 }

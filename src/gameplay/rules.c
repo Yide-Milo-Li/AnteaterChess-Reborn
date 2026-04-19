@@ -1,5 +1,7 @@
 #include "gameplay/validation.h"
 
+#include <stddef.h>
+
 #include "gameplay/movegen.h"
 
 static int moves_match_exactly(Move expected, Move candidate) {

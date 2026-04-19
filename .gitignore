@@ -51,3 +51,5 @@ coverage/
 # =========================
 .vscode/
 .idea/
+.codex
+

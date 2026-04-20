@@ -62,6 +62,9 @@ static int transition_is_allowed(SystemState from, SystemState to) {
 static int find_command_move(const GameState *state, Command command, Move *resolvedMove) {
     MoveList candidates;
     Piece movingPiece;
+    Move *promotionQueenCandidate;
+    int matchingCount;
+    int allMatchesArePromotions;
     int index;
 
     if (state == NULL || resolvedMove == NULL || command.type != CMD_MOVE) {
@@ -81,6 +84,9 @@ static int find_command_move(const GameState *state, Command command, Move *reso
         return 1;
     }
 
+    promotionQueenCandidate = NULL;
+    matchingCount = 0;
+    allMatchesArePromotions = 1;
     for (index = 0; index < getMoveCount(&candidates); ++index) {
         Move *candidate = getMove(&candidates, index);
 
@@ -89,9 +95,28 @@ static int find_command_move(const GameState *state, Command command, Move *reso
             && positionEqual(candidate->to, command.to)
             && candidate->movedPiece.type == movingPiece.type
             && candidate->movedPiece.color == movingPiece.color) {
-            *resolvedMove = *candidate;
-            return 0;
+            ++matchingCount;
+            if (candidate->specialType == PROMOTION_QUEEN) {
+                promotionQueenCandidate = candidate;
+            } else if (candidate->specialType != PROMOTION_ROOK
+                && candidate->specialType != PROMOTION_BISHOP
+                && candidate->specialType != PROMOTION_KNIGHT) {
+                allMatchesArePromotions = 0;
+            }
+
+            if (matchingCount == 1) {
+                *resolvedMove = *candidate;
+            }
         }
+    }
+
+    if (matchingCount == 1) {
+        return 0;
+    }
+
+    if (matchingCount > 1 && allMatchesArePromotions && promotionQueenCandidate != NULL) {
+        *resolvedMove = *promotionQueenCandidate;
+        return 0;
     }
 
     return 1;

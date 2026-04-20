@@ -5,6 +5,7 @@
 #include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/movelist.h"
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
 #include "gameplay/validation.h"
@@ -77,6 +78,13 @@ static GameState create_ai_ready_state(void) {
     initGameState(&state, &config);
     state.systemState = GAMEPLAY_STATE;
     return state;
+}
+
+static int is_promotion_move(SpecialMove type) {
+    return type == PROMOTION_QUEEN
+        || type == PROMOTION_ROOK
+        || type == PROMOTION_BISHOP
+        || type == PROMOTION_KNIGHT;
 }
 
 static void assert_move_is_playable_and_safe(const GameState *state,
@@ -166,11 +174,58 @@ static void test_ai_fails_cleanly_when_no_legal_move_exists(void) {
     assert(generateHintMove(&state, &move) != 0);
 }
 
+/* When promotion is the only move family available, the AI should still
+ * choose one legal promotion variant. */
+static void test_ai_can_choose_promotion_move(void) {
+    GameState state = create_ai_ready_state();
+    Move move;
+
+    clear_board(&state.board);
+    state.currentTurn = WHITE;
+    initMoveList(&state.moveHistory);
+    state.moveCount = 0;
+
+    setPiece(&state.board, createPosition(1, 2), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(0, 2), createPiece(BISHOP, BLACK));
+    setPiece(&state.board, createPosition(0, 3), createPiece(ROOK, BLACK));
+
+    assert(generateAIMove(&state, &move) == 0);
+    assert(positionEqual(move.from, createPosition(1, 2)) == 1);
+    assert(positionEqual(move.to, createPosition(0, 3)) == 1);
+    assert(is_promotion_move(move.specialType) == 1);
+}
+
+/* When en passant is the only legal continuation, the AI should emit that
+ * special move rather than fabricating an ordinary ant move. */
+static void test_ai_can_choose_en_passant(void) {
+    GameState state = create_ai_ready_state();
+    Move move;
+
+    clear_board(&state.board);
+    state.currentTurn = WHITE;
+    initMoveList(&state.moveHistory);
+    state.moveCount = 0;
+
+    setPiece(&state.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(2, 4), createPiece(ROOK, BLACK));
+    assert(addMove(&state.moveHistory,
+        createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK))) == 0);
+    state.moveCount = 1;
+
+    assert(generateAIMove(&state, &move) == 0);
+    assert(positionEqual(move.from, createPosition(3, 4)) == 1);
+    assert(positionEqual(move.to, createPosition(2, 5)) == 1);
+    assert(move.specialType == EN_PASSANT);
+}
+
 int main(void) {
     test_ai_rejects_null_arguments();
     test_ai_returns_legal_move_without_mutating_initial_state();
     test_ai_resolves_check_with_safe_move();
     test_hint_returns_legal_move_without_mutating_state();
     test_ai_fails_cleanly_when_no_legal_move_exists();
+    test_ai_can_choose_promotion_move();
+    test_ai_can_choose_en_passant();
     return 0;
 }

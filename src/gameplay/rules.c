@@ -40,6 +40,16 @@ static int move_requests_explicit_special_semantics(Move move) {
     return move.specialType != NO_SPECIAL_MOVE || move.captureCount > 0 || move.pathLength > 0;
 }
 
+/* Promotion ambiguity is resolved internally to the queen variant when callers
+ * only know from/to and the only competing moves are the four promotion
+ * choices. */
+static int is_promotion_move(SpecialMove type) {
+    return type == PROMOTION_QUEEN
+        || type == PROMOTION_ROOK
+        || type == PROMOTION_BISHOP
+        || type == PROMOTION_KNIGHT;
+}
+
 /* Callers sometimes only know from/to before special-move metadata is derived.
  * In that common case, matching the destination against generated candidates is
  * enough; detailed requests still require an exact semantic match. */
@@ -82,6 +92,9 @@ SelectionResult validateSelection(const GameState *state, Position pos) {
 int validateMove(const GameState *state, Move move) {
     MoveList candidates;
     int index;
+    int simpleMatchCount;
+    int allSimpleMatchesArePromotions;
+    int queenVariantFound;
 
     if (state == NULL || !isValidPosition(move.from) || !isValidPosition(move.to)) {
         return 0;
@@ -91,12 +104,40 @@ int validateMove(const GameState *state, Move move) {
         return 0;
     }
 
+    simpleMatchCount = 0;
+    allSimpleMatchesArePromotions = 1;
+    queenVariantFound = 0;
     for (index = 0; index < getMoveCount(&candidates); ++index) {
         Move *candidate = getMove(&candidates, index);
 
-        if (candidate != NULL && generated_move_matches_request(move, *candidate)) {
-            return 1;
+        if (candidate == NULL) {
+            continue;
         }
+
+        if (move_requests_explicit_special_semantics(move)) {
+            if (generated_move_matches_request(move, *candidate)) {
+                return 1;
+            }
+            continue;
+        }
+
+        if (generated_move_matches_request(move, *candidate)) {
+            ++simpleMatchCount;
+            if (!is_promotion_move(candidate->specialType)) {
+                allSimpleMatchesArePromotions = 0;
+            }
+            if (candidate->specialType == PROMOTION_QUEEN) {
+                queenVariantFound = 1;
+            }
+        }
+    }
+
+    if (simpleMatchCount == 1) {
+        return 1;
+    }
+
+    if (simpleMatchCount > 1 && allSimpleMatchesArePromotions && queenVariantFound) {
+        return 1;
     }
 
     return 0;

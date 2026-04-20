@@ -3,6 +3,8 @@
 #include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/move.h"
+#include "core/movelist.h"
 #include "core/piece.h"
 #include "input/command.h"
 #include "system/event.h"
@@ -35,6 +37,33 @@ static void seed_simple_ant_position(GameState *state) {
     state->moveCount = 0;
     state->gameOver = 0;
     state->result = RESULT_NONE;
+}
+
+/* Rebuild a minimal gameplay position directly on the public state. */
+static void seed_empty_gameplay_position(GameState *state, Color turn) {
+    int row;
+    int col;
+
+    assert(state != NULL);
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            setPiece(&state->board, createPosition(row, col),
+                createPiece(EMPTY_PIECE, EMPTY_COLOR));
+        }
+    }
+
+    state->currentTurn = turn;
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->gameOver = 0;
+    state->result = RESULT_NONE;
+}
+
+/* Record one historical move without mutating the current board state. */
+static void push_history_move(GameState *state, Move move) {
+    assert(state != NULL);
+    assert(addMove(&state->moveHistory, move) == 0);
+    ++state->moveCount;
 }
 
 /* Check that a valid move command is applied through the public FSM path. */
@@ -84,10 +113,70 @@ static void test_process_event_undo_restores_position(void) {
     assert(state.moveHistory.count == 0);
 }
 
+/* Check that public move input auto-promotes to queen without changing the
+ * command interface. */
+static void test_process_event_auto_promotes_to_queen(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    setPiece(&state.board, createPosition(1, 2), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+
+    assert(createMoveCommand(&command, createPosition(1, 2),
+        createPosition(0, 2)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&state.board, createPosition(0, 2)).type == QUEEN);
+    assert(getPiece(&state.board, createPosition(0, 2)).color == WHITE);
+}
+
+/* Check that castling resolves correctly from the existing from/to command
+ * input format. */
+static void test_process_event_applies_castling(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+
+    assert(createMoveCommand(&command, createPosition(7, 5),
+        createPosition(7, 7)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&state.board, createPosition(7, 7)).type == KING);
+    assert(getPiece(&state.board, createPosition(7, 6)).type == ROOK);
+}
+
+/* Check that en passant resolves correctly from the existing from/to command
+ * input format and latest move history. */
+static void test_process_event_applies_en_passant(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&state,
+        createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK)));
+
+    assert(createMoveCommand(&command, createPosition(3, 4),
+        createPosition(2, 5)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&state.board, createPosition(2, 5)).type == ANT);
+    assert(getPiece(&state.board, createPosition(3, 5)).type == EMPTY_PIECE);
+}
+
 /* Run the Phase E control-flow integration tests. */
 int main(void) {
     test_process_event_applies_valid_move();
     test_process_event_rejects_illegal_move();
     test_process_event_undo_restores_position();
+    test_process_event_auto_promotes_to_queen();
+    test_process_event_applies_castling();
+    test_process_event_applies_en_passant();
     return 0;
 }

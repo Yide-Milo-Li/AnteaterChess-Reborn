@@ -56,6 +56,13 @@ static Move *find_move(MoveList *list, Position to, SpecialMove specialType) {
     return NULL;
 }
 
+/* Record one historical move without mutating the current board state. */
+static void push_history_move(GameState *state, Move move) {
+    assert(state != NULL);
+    assert(addMove(&state->moveHistory, move) == 0);
+    ++state->moveCount;
+}
+
 /* Check that generation only considers pieces belonging to the side to move. */
 static void test_generate_moves_only_for_current_turn(void) {
     GameState state = create_test_state(WHITE);
@@ -181,6 +188,106 @@ static void test_knight_and_king_moves(void) {
     assert(find_move(&kingList, createPosition(5, 5), NO_SPECIAL_MOVE) != NULL);
 }
 
+/* Check that promotion candidates are generated as four variants for forward
+ * and capture cases, for both colors. */
+static void test_promotion_generation(void) {
+    GameState whiteState = create_test_state(WHITE);
+    GameState blackState = create_test_state(BLACK);
+    MoveList list;
+    Move *move;
+
+    setPiece(&whiteState.board, createPosition(1, 4), createPiece(ANT, WHITE));
+    setPiece(&whiteState.board, createPosition(0, 5), createPiece(ROOK, BLACK));
+
+    assert(generateLegalMovesForPosition(&whiteState, createPosition(1, 4), &list) == 0);
+    assert(find_move(&list, createPosition(0, 4), NO_SPECIAL_MOVE) == NULL);
+    assert(find_move(&list, createPosition(0, 4), PROMOTION_QUEEN) != NULL);
+    assert(find_move(&list, createPosition(0, 4), PROMOTION_ROOK) != NULL);
+    assert(find_move(&list, createPosition(0, 4), PROMOTION_BISHOP) != NULL);
+    assert(find_move(&list, createPosition(0, 4), PROMOTION_KNIGHT) != NULL);
+
+    move = find_move(&list, createPosition(0, 5), PROMOTION_QUEEN);
+    assert(move != NULL);
+    assert(move->captureCount == 1);
+    assert(move->captures[0].piece.type == ROOK);
+
+    setPiece(&blackState.board, createPosition(6, 4), createPiece(ANT, BLACK));
+    assert(generateLegalMovesForPosition(&blackState, createPosition(6, 4), &list) == 0);
+    assert(find_move(&list, createPosition(7, 4), PROMOTION_QUEEN) != NULL);
+    assert(find_move(&list, createPosition(7, 4), PROMOTION_ROOK) != NULL);
+    assert(find_move(&list, createPosition(7, 4), PROMOTION_BISHOP) != NULL);
+    assert(find_move(&list, createPosition(7, 4), PROMOTION_KNIGHT) != NULL);
+}
+
+/* Check castling generation, plus the main blocking and attack-based rejection
+ * cases reconstructed from board state and history. */
+static void test_castling_generation(void) {
+    GameState state = create_test_state(WHITE);
+    MoveList list;
+
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(7, 0), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+
+    assert(generateLegalMovesForPosition(&state, createPosition(7, 5), &list) == 0);
+    assert(find_move(&list, createPosition(7, 7), CASTLING_KINGSIDE) != NULL);
+    assert(find_move(&list, createPosition(7, 3), CASTLING_QUEENSIDE) != NULL);
+
+    setPiece(&state.board, createPosition(7, 6), createPiece(BISHOP, WHITE));
+    assert(generateLegalMovesForPosition(&state, createPosition(7, 5), &list) == 0);
+    assert(find_move(&list, createPosition(7, 7), CASTLING_KINGSIDE) == NULL);
+
+    clear_board(&state.board);
+    initMoveList(&state.moveHistory);
+    state.moveCount = 0;
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(7, 0), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(5, 6), createPiece(ROOK, BLACK));
+    assert(generateLegalMovesForPosition(&state, createPosition(7, 5), &list) == 0);
+    assert(find_move(&list, createPosition(7, 7), CASTLING_KINGSIDE) == NULL);
+
+    clear_board(&state.board);
+    initMoveList(&state.moveHistory);
+    state.moveCount = 0;
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(7, 0), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    push_history_move(&state, createMove(createPosition(7, 9), createPosition(7, 8), createPiece(ROOK, WHITE)));
+    assert(generateLegalMovesForPosition(&state, createPosition(7, 5), &list) == 0);
+    assert(find_move(&list, createPosition(7, 7), CASTLING_KINGSIDE) == NULL);
+}
+
+/* Check en passant generation from the latest double-step ant move only. */
+static void test_en_passant_generation(void) {
+    GameState state = create_test_state(WHITE);
+    MoveList list;
+    Move lastMove;
+    Move *epMove;
+
+    setPiece(&state.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+
+    lastMove = createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&state, lastMove);
+
+    assert(generateLegalMovesForPosition(&state, createPosition(3, 4), &list) == 0);
+    epMove = find_move(&list, createPosition(2, 5), EN_PASSANT);
+    assert(epMove != NULL);
+    assert(epMove->captureCount == 1);
+    assert(positionEqual(epMove->captures[0].pos, createPosition(3, 5)) == 1);
+
+    initMoveList(&state.moveHistory);
+    state.moveCount = 0;
+    lastMove = createMove(createPosition(2, 5), createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&state, lastMove);
+    assert(generateLegalMovesForPosition(&state, createPosition(3, 4), &list) == 0);
+    assert(find_move(&list, createPosition(2, 5), EN_PASSANT) == NULL);
+}
+
 /* Check that no piece generator emits a direct capture onto an enemy king square. */
 static void test_movegen_does_not_generate_king_captures(void) {
     GameState state = create_test_state(WHITE);
@@ -256,6 +363,9 @@ int main(void) {
     test_sliding_piece_blocking();
     test_bishop_and_queen_generation();
     test_knight_and_king_moves();
+    test_promotion_generation();
+    test_castling_generation();
+    test_en_passant_generation();
     test_movegen_does_not_generate_king_captures();
     test_edge_counts_and_validation();
     return 0;

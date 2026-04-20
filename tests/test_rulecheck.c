@@ -4,6 +4,7 @@
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "core/move.h"
+#include "core/movelist.h"
 #include "gameplay/validation.h"
 
 /* Clear the whole board so each test can build one focused validation case. */
@@ -29,6 +30,13 @@ static GameState create_test_state(Color turn) {
     clear_board(&state.board);
     state.currentTurn = turn;
     return state;
+}
+
+/* Record one historical move without mutating the current board state. */
+static void push_history_move(GameState *state, Move move) {
+    assert(state != NULL);
+    assert(addMove(&state->moveHistory, move) == 0);
+    ++state->moveCount;
 }
 
 /* Verify selection results differentiate empty, opponent, and invalid squares. */
@@ -119,11 +127,68 @@ static void test_validate_move_checks_explicit_capture_metadata(void) {
     assert(validateMove(&state, wrongCaptureRequest) == 0);
 }
 
+/* Verify special move validation accepts castling, en passant, and both
+ * explicit and implicit promotion requests. */
+static void test_validate_move_accepts_supported_special_moves(void) {
+    GameState promotionState = create_test_state(WHITE);
+    GameState castlingState = create_test_state(WHITE);
+    GameState enPassantState = create_test_state(WHITE);
+    Move move;
+
+    setPiece(&promotionState.board, createPosition(1, 2), createPiece(ANT, WHITE));
+    move = createMove(createPosition(1, 2), createPosition(0, 2), createPiece(ANT, WHITE));
+    assert(validateMove(&promotionState, move) == 1);
+    setSpecialMove(&move, PROMOTION_ROOK);
+    assert(validateMove(&promotionState, move) == 1);
+
+    setPiece(&castlingState.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&castlingState.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&castlingState.board, createPosition(0, 5), createPiece(KING, BLACK));
+    move = createMove(createPosition(7, 5), createPosition(7, 7), createPiece(KING, WHITE));
+    setSpecialMove(&move, CASTLING_KINGSIDE);
+    assert(validateMove(&castlingState, move) == 1);
+
+    setPiece(&enPassantState.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&enPassantState.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&enPassantState,
+        createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK)));
+    move = createMove(createPosition(3, 4), createPosition(2, 5), createPiece(ANT, WHITE));
+    addCapture(&move, createPosition(3, 5), createPiece(ANT, BLACK));
+    setSpecialMove(&move, EN_PASSANT);
+    assert(validateMove(&enPassantState, move) == 1);
+}
+
+/* Verify illegal special moves and mismatched metadata are rejected. */
+static void test_validate_move_rejects_illegal_special_moves(void) {
+    GameState castlingState = create_test_state(WHITE);
+    GameState enPassantState = create_test_state(WHITE);
+    Move move;
+
+    setPiece(&castlingState.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&castlingState.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&castlingState.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&castlingState.board, createPosition(5, 6), createPiece(ROOK, BLACK));
+    move = createMove(createPosition(7, 5), createPosition(7, 7), createPiece(KING, WHITE));
+    setSpecialMove(&move, CASTLING_KINGSIDE);
+    assert(validateMove(&castlingState, move) == 0);
+
+    setPiece(&enPassantState.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&enPassantState.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&enPassantState,
+        createMove(createPosition(2, 5), createPosition(3, 5), createPiece(ANT, BLACK)));
+    move = createMove(createPosition(3, 4), createPosition(2, 5), createPiece(ANT, WHITE));
+    addCapture(&move, createPosition(2, 5), createPiece(ANT, BLACK));
+    setSpecialMove(&move, EN_PASSANT);
+    assert(validateMove(&enPassantState, move) == 0);
+}
+
 int main(void) {
     test_validate_selection_reports_expected_result_codes();
     test_validate_move_accepts_basic_ant_advance();
     test_validate_move_rejects_invalid_origin_and_target_inputs();
     test_validate_move_rejects_blocked_rook_path();
     test_validate_move_checks_explicit_capture_metadata();
+    test_validate_move_accepts_supported_special_moves();
+    test_validate_move_rejects_illegal_special_moves();
     return 0;
 }

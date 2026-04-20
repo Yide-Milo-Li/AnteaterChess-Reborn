@@ -86,9 +86,55 @@ void test_undo_move_reverts_promotion_to_original_piece(void) {
     assert(getPiece(&state.board, createPosition(0, 2)).type == EMPTY_PIECE);
 }
 
+void test_undo_move_reverts_castling(void) {
+    GameState state;
+    Move move;
+
+    initGameState(&state, NULL);
+    clearBoardForUndoTest(&state.board);
+    state.currentTurn = WHITE;
+
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    move = createMove(createPosition(7, 5), createPosition(7, 7), createPiece(KING, WHITE));
+    setSpecialMove(&move, CASTLING_KINGSIDE);
+
+    assert(applyMove(&state, move) == 0);
+    assert(undoMove(&state) == 0);
+    assert(getPiece(&state.board, createPosition(7, 5)).type == KING);
+    assert(getPiece(&state.board, createPosition(7, 9)).type == ROOK);
+    assert(getPiece(&state.board, createPosition(7, 7)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(7, 6)).type == EMPTY_PIECE);
+}
+
+void test_undo_move_reverts_en_passant(void) {
+    GameState state;
+    Move move;
+
+    initGameState(&state, NULL);
+    clearBoardForUndoTest(&state.board);
+    state.currentTurn = WHITE;
+
+    setPiece(&state.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    move = createMove(createPosition(3, 4), createPosition(2, 5), createPiece(ANT, WHITE));
+    addCapture(&move, createPosition(3, 5), createPiece(ANT, BLACK));
+    setSpecialMove(&move, EN_PASSANT);
+
+    assert(applyMove(&state, move) == 0);
+    assert(undoMove(&state) == 0);
+    assert(getPiece(&state.board, createPosition(3, 4)).type == ANT);
+    assert(getPiece(&state.board, createPosition(3, 4)).color == WHITE);
+    assert(getPiece(&state.board, createPosition(3, 5)).type == ANT);
+    assert(getPiece(&state.board, createPosition(3, 5)).color == BLACK);
+    assert(getPiece(&state.board, createPosition(2, 5)).type == EMPTY_PIECE);
+}
+
 int main(void) {
     test_undo_move_restores_simple_move();
     test_undo_move_restores_chain_captures();
     test_undo_move_reverts_promotion_to_original_piece();
+    test_undo_move_reverts_castling();
+    test_undo_move_reverts_en_passant();
     return 0;
 }

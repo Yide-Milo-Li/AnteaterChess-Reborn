@@ -419,49 +419,11 @@ static MoveList *allocate_move_list(void) {
 }
 
 static int collect_fully_legal_moves(const GameState *state, MoveList *legal) {
-    MoveList *pseudo;
-    int index;
-
     if (state == NULL || legal == NULL) {
         return 1;
     }
 
-    initMoveList(legal);
-    pseudo = allocate_move_list();
-    if (pseudo == NULL) {
-        return 1;
-    }
-
-    if (generateMoves(state, pseudo) != 0) {
-        free(pseudo);
-        return 1;
-    }
-
-    for (index = 0; index < pseudo->count; ++index) {
-        Move candidate = pseudo->moves[index];
-        GameState *next = clone_state(state);
-        Color moving_side = state->currentTurn;
-
-        if (next == NULL) {
-            free(pseudo);
-            return 1;
-        }
-
-        if (applyMove(next, candidate) != 0) {
-            free(next);
-            continue;
-        }
-        // if got checked, then it's not a legal move
-        if (isInCheck(next, moving_side)) {
-            free(next);
-            continue;
-        }
-        free(next);
-        addMove(legal, candidate);
-    }
-
-    free(pseudo);
-    return 0;
+    return generateLegalMoves(state, legal);
 }
 
 // collect noisy legal moves

@@ -1,6 +1,7 @@
 
 
 #include <gtk/gtk.h>
+#include "ui/game_setup_menu.h"
 #include "ui/gui.h"
 
 
@@ -135,9 +136,13 @@ void gui_run(Gui *gui) {
 }
 
 // --- Game Mode Menu Setup ---
-static void on_game_mode_button_clicked(GtkButton *button, gpointer user_data) {
+static void on_game_mode_selected(GtkButton *button, gpointer user_data) {
     int index = GPOINTER_TO_INT(user_data);
     setGameModeSelection(index);
+}
+
+static void on_game_mode_back_clicked(GtkButton *button, gpointer user_data) {
+    setBackButtonClicked(1);
 }
 
 void setup_game_mode_menu(Gui *gui) {
@@ -156,8 +161,8 @@ void setup_game_mode_menu(Gui *gui) {
     gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
 
     const char *button_labels[] = {
-        "Human vs. Computer",
         "Human vs. Human",
+        "Human vs. Computer",
         "Computer vs. Computer",
         "Back"
     };
@@ -165,7 +170,11 @@ void setup_game_mode_menu(Gui *gui) {
         GtkWidget *button = gtk_button_new_with_label(button_labels[i]);
         gtk_widget_set_hexpand(button, TRUE);
         gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
-        g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_button_clicked), GINT_TO_POINTER(i));
+        if (i < 3) {
+            g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_selected), GINT_TO_POINTER(i));
+        } else {
+            g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_back_clicked), NULL);
+        }
         gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
     }
 
@@ -173,8 +182,9 @@ void setup_game_mode_menu(Gui *gui) {
 }
 
 void gui_reset_selections(void) {
-    setMainMenuSelection(-1);
-    setGameModeSelection(-1);
+    resetMainMenuSelection();
+    resetGameModeSelection();
+    resetBackButtonClicked();
 }
 
 void gui_process_events(void) {
@@ -200,6 +210,71 @@ static void on_turn_timer_toggled(GtkToggleButton *toggle, gpointer user_data) {
 }
 static void on_back_clicked(GtkButton *button, gpointer user_data) {
     g_print("Back button clicked\n");
+    setBackButtonClicked(1);
+}
+
+static void on_side_selected(GtkToggleButton *button, gpointer user_data) {
+    if (gtk_toggle_button_get_active(button)) {
+        Color color = (Color)user_data;
+        GameConfig config;
+        getGameSetupConfig(&config);
+        setPlayerColor(color);
+        if (color == WHITE) {
+            // Human white, AI black, set AI difficulty to previous white
+            AIDifficulty ai_diff = config.aiDifficultyWhite;
+            if (ai_diff == DIFFICULTY_NONE) ai_diff = DIFFICULTY_EASY;
+            setAIDifficultyWhite(DIFFICULTY_NONE);
+            setAIDifficultyBlack(ai_diff);
+        } else {
+            // Human black, AI white, set AI difficulty to previous black
+            AIDifficulty ai_diff = config.aiDifficultyBlack;
+            if (ai_diff == DIFFICULTY_NONE) ai_diff = DIFFICULTY_EASY;
+            setAIDifficultyBlack(DIFFICULTY_NONE);
+            setAIDifficultyWhite(ai_diff);
+        }
+    }
+}
+
+static void on_difficulty_selected(GtkToggleButton *button, gpointer user_data) {
+    if (gtk_toggle_button_get_active(button)) {
+        AIDifficulty diff = (AIDifficulty)user_data;
+        GameConfig config;
+        getGameSetupConfig(&config);
+        if (config.mode == MODE_HUMAN_VS_COMPUTER) {
+            if (config.playerColor == WHITE) {
+                setAIDifficultyBlack(diff);
+                setAIDifficultyWhite(DIFFICULTY_NONE);
+            } else {
+                setAIDifficultyWhite(diff);
+                setAIDifficultyBlack(DIFFICULTY_NONE);
+            }
+        } else {
+            // computer vs computer
+            int which = (int)(long)g_object_get_data(G_OBJECT(button), "which");
+            if (which == 0) {
+                setAIDifficultyWhite(diff);
+            } else {
+                setAIDifficultyBlack(diff);
+            }
+        }
+    }
+}
+
+static void on_timer_toggled_config(GtkToggleButton *button, gpointer user_data) {
+    int active = gtk_toggle_button_get_active(button);
+    setTimerEnabled(active);
+}
+
+static void on_time_changed(GtkSpinButton *spin, gpointer user_data) {
+    // Assume user_data is the hours spin
+    GtkSpinButton *hours_spin = GTK_SPIN_BUTTON(user_data);
+    GtkSpinButton *minutes_spin = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(spin), "minutes"));
+    GtkSpinButton *seconds_spin = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(spin), "seconds"));
+    int hours = gtk_spin_button_get_value_as_int(hours_spin);
+    int minutes = gtk_spin_button_get_value_as_int(minutes_spin);
+    int seconds = gtk_spin_button_get_value_as_int(seconds_spin);
+    int total_seconds = hours * 3600 + minutes * 60 + seconds;
+    setInitialTimeSeconds(total_seconds);
 }
 
 static void on_start_clicked(GtkButton *button, gpointer user_data) {
@@ -250,6 +325,24 @@ void setup_game_setup_menu_human_vs_human(Gui *gui) {
     GtkWidget *seconds_label = gtk_label_new("Seconds:");
     GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
     gtk_widget_set_size_request(seconds_spin, 50, -1);
+    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
+    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
+    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
 
     // Pack into timer_box
     gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
@@ -275,6 +368,8 @@ void setup_game_setup_menu_human_vs_human(Gui *gui) {
 
     // Connect signal
     g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
 
     // Add buttons at the bottom
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
@@ -335,6 +430,9 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
     GtkWidget *black_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_radio), "Black");
     gtk_box_pack_start(GTK_BOX(side_box), black_radio, FALSE, FALSE, 0);
 
+    g_signal_connect(white_radio, "toggled", G_CALLBACK(on_side_selected), (gpointer)WHITE);
+    g_signal_connect(black_radio, "toggled", G_CALLBACK(on_side_selected), (gpointer)BLACK);
+
     // Select Difficulty
     GtkWidget *diff_label = gtk_label_new("Select Difficulty");
     gtk_widget_set_halign(diff_label, GTK_ALIGN_CENTER);
@@ -352,6 +450,13 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
 
     GtkWidget *hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(easy_radio), "Hard");
     gtk_box_pack_start(GTK_BOX(diff_box), hard_radio, FALSE, FALSE, 0);
+
+    g_object_set_data(G_OBJECT(easy_radio), "which", (gpointer)1);
+    g_object_set_data(G_OBJECT(medium_radio), "which", (gpointer)1);
+    g_object_set_data(G_OBJECT(hard_radio), "which", (gpointer)1);
+    g_signal_connect(easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
+    g_signal_connect(medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
+    g_signal_connect(hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
 
     // Turn timer toggle
     GtkWidget *timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
@@ -377,6 +482,24 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
     GtkWidget *seconds_label = gtk_label_new("Seconds:");
     GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
     gtk_widget_set_size_request(seconds_spin, 50, -1);
+    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
+    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
+    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
+    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
+    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
 
     // Pack into timer_box
     gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
@@ -402,6 +525,8 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
 
     // Connect signal
     g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
 
     // Add buttons at the bottom
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
@@ -465,6 +590,13 @@ void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
     GtkWidget *white_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_easy_radio), "Hard");
     gtk_box_pack_start(GTK_BOX(white_diff_box), white_hard_radio, FALSE, FALSE, 0);
 
+    g_object_set_data(G_OBJECT(white_easy_radio), "which", (gpointer)0);
+    g_object_set_data(G_OBJECT(white_medium_radio), "which", (gpointer)0);
+    g_object_set_data(G_OBJECT(white_hard_radio), "which", (gpointer)0);
+    g_signal_connect(white_easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
+    g_signal_connect(white_medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
+    g_signal_connect(white_hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
+
     // Black AI Difficulty
     GtkWidget *black_diff_label = gtk_label_new("Black AI Difficulty");
     gtk_widget_set_halign(black_diff_label, GTK_ALIGN_CENTER);
@@ -482,6 +614,13 @@ void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
 
     GtkWidget *black_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(black_easy_radio), "Hard");
     gtk_box_pack_start(GTK_BOX(black_diff_box), black_hard_radio, FALSE, FALSE, 0);
+
+    g_object_set_data(G_OBJECT(black_easy_radio), "which", (gpointer)1);
+    g_object_set_data(G_OBJECT(black_medium_radio), "which", (gpointer)1);
+    g_object_set_data(G_OBJECT(black_hard_radio), "which", (gpointer)1);
+    g_signal_connect(black_easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
+    g_signal_connect(black_medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
+    g_signal_connect(black_hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
 
     // Add buttons at the bottom
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);

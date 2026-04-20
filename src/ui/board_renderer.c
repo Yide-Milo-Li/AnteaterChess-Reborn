@@ -2,6 +2,7 @@
 #include "ui/board_renderer.h"
 #include "core/gamestate.h"
 #include "system/system_state.h"
+#include "ui/game_setup_menu.h"
 #include "ui/gui.h"
 
 // Static GUI pointer for the application window
@@ -59,6 +60,7 @@ int renderBoard(const GameState *state){
 			}
 			break;
 		case GAME_SETUP_STATE:
+                        initGameSetupConfig(state->config.mode);
 			// Handle game setup rendering, should display options for configuring the game (e.g., choosing player colors, setting AI difficulty, enabling timers)
 			if (gui && gui->window) {
 				switch (state->config.mode) {
@@ -82,6 +84,7 @@ int renderBoard(const GameState *state){
 						render_success = -1;
 						break;
 				}
+				gui_reset_selections();
 			} else {
 				render_success = -1;
 			}
@@ -90,7 +93,7 @@ int renderBoard(const GameState *state){
 			// Handle gameplay rendering, should display the chess board, pieces, and any relevant game information (e.g., current turn, move history, timers), some buttons including undo, leave game, and hint will also be included in gameplay rendering
 			break;
         case GAME_TERMINATION_STATE:
-			// Handle game termination rendering, this happens after GAMEPLAY_STATE when a game ends but before END_GAME_MENU_STATE, clear board, pieces, and other gui elements, and prepare for end game menu rendering
+			// Handle game termination rendering, this happens after GAMEPLAY_STATE when a game ends but before END_GAME_MENU_STATE, user is no longer able to interact with the gui elements, and prepare for end game menu rendering
             break;
 		case END_GAME_MENU_STATE:
 			// Handle end game menu rendering, should display the result of the game, and options to start a new game or return to the main menu

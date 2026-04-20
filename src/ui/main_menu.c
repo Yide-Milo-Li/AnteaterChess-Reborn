@@ -13,3 +13,7 @@ int getMainMenuSelection(int *selection){
 	*selection = main_menu_selection;
 	return 0;
 }
+
+void resetMainMenuSelection() {
+	main_menu_selection = -1;
+}

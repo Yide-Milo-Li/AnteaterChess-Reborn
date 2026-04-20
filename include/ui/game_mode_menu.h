@@ -6,5 +6,7 @@
 void setGameModeSelection(int index);
 // Gets the last game mode selection, returns 0 on success, -1 on error, stores GameMode enum value or 3 for Back
 int getGameModeSelection(int *selection);
+void resetGameModeSelection();
+
 
 #endif

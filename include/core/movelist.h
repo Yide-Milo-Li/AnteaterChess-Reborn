@@ -3,7 +3,8 @@
 
 #include "core/move.h"
 
-#define MAX_MOVES 1024
+/* Increased to 2048 so longer sessions and analysis paths do not hit history capacity as early. */
+#define MAX_MOVES 2048
 
 typedef struct {
     Move moves[MAX_MOVES];

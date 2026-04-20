@@ -91,6 +91,12 @@ int renderBoard(const GameState *state){
 			break;
 		case GAMEPLAY_STATE:
 			// Handle gameplay rendering, should display the chess board, pieces, and any relevant game information (e.g., current turn, move history, timers), some buttons including undo, leave game, and hint will also be included in gameplay rendering
+			if (gui && gui->window) {
+				setup_gameplay_ui(gui, state);
+				g_print("Gameplay UI rendered (GAMEPLAY_STATE).\n");
+			} else {
+				render_success = -1;
+			}
 			break;
         case GAME_TERMINATION_STATE:
 			// Handle game termination rendering, this happens after GAMEPLAY_STATE when a game ends but before END_GAME_MENU_STATE, user is no longer able to interact with the gui elements, and prepare for end game menu rendering

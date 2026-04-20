@@ -3,7 +3,22 @@
 #include <gtk/gtk.h>
 #include "ui/game_setup_menu.h"
 #include "ui/gui.h"
+#include "time/clock.h"
 
+
+// Callback for square clicks
+static void on_square_clicked(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    int index = GPOINTER_TO_INT(data);
+    int row = index / 10;
+    int col = index % 10;
+    int rank = 8 - row;
+    char file = 'A' + col;
+    if (event->button == 1) {
+        g_print("Left click on square %c%d\n", file, rank);
+    } else if (event->button == 3) {
+        g_print("Right click on square %c%d\n", file, rank);
+    }
+}
 
 // main menu setup function
 static void setup_quit_confirmation(Gui *gui);
@@ -112,6 +127,17 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_window_set_resizable(GTK_WINDOW(gui->window), FALSE);
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
+
+    // Load CSS for styling
+    GtkCssProvider *provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(provider, 
+        "GtkWindow { background-color: #2c3e50; } "
+        ".light-square { background-color: #f0d9b5; } "
+        ".dark-square { background-color: #b58863; }", -1, NULL);
+    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), 
+        GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
+
     // Note: destroy signal connection moved to gui_run
 
 
@@ -181,6 +207,177 @@ void setup_game_mode_menu(Gui *gui) {
     gtk_widget_show_all(gui->window);
 }
 
+void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
+    if (gui->main_box) {
+        gtk_widget_destroy(gui->main_box);
+        gui->main_box = NULL;
+    }
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    // Top: Turn label
+    GtkWidget *turn_label = gtk_label_new("White's Turn"); // Placeholder, should be based on gameState->currentPlayer
+    gtk_widget_set_halign(turn_label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), turn_label, FALSE, FALSE, 0);
+
+    // Middle: Horizontal box for utility and board
+    GtkWidget *middle_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), middle_box, TRUE, TRUE, 0);
+
+    // Left panel: Utility (1/3 width)
+    GtkWidget *left_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_widget_set_size_request(left_box, 400, -1);
+    gtk_box_pack_start(GTK_BOX(middle_box), left_box, FALSE, FALSE, 0);
+
+    // Time Elapsed
+    // Time Elapsed
+    GtkWidget *time_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(left_box), time_box, FALSE, FALSE, 0);
+    GtkWidget *time_label = gtk_label_new("Time Elapsed:");
+    gtk_box_pack_start(GTK_BOX(time_box), time_label, FALSE, FALSE, 0);
+    // Time display in HH:MM:SS format
+    int64_t elapsed = getElapsedTimeSeconds();
+    int hours = elapsed / 3600;
+    int mins = (elapsed % 3600) / 60;
+    int secs = elapsed % 60;
+    char time_str[20];
+    sprintf(time_str, "%02d:%02d:%02d", hours, mins, secs);
+    GtkWidget *time_display = gtk_label_new(time_str);
+    gtk_box_pack_start(GTK_BOX(time_box), time_display, FALSE, FALSE, 0);
+
+    // Move History
+    GtkWidget *history_label = gtk_label_new("Move History");
+    gtk_box_pack_start(GTK_BOX(left_box), history_label, FALSE, FALSE, 0);
+
+    GtkWidget *history_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(history_view), FALSE);
+    gtk_widget_set_size_request(history_view, -1, 300);
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(history_view));
+    gtk_text_buffer_set_text(buffer, "Move 1: e2-e4\nMove 2: e7-e5\n", -1);
+    gtk_box_pack_start(GTK_BOX(left_box), history_view, TRUE, TRUE, 0);
+
+    // Enter Move section
+    GtkWidget *enter_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_box_pack_start(GTK_BOX(left_box), enter_box, FALSE, FALSE, 0);
+
+    GtkWidget *enter_label = gtk_label_new("Enter Move");
+    gtk_box_pack_start(GTK_BOX(enter_box), enter_label, FALSE, FALSE, 0);
+
+    GtkWidget *move_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(enter_box), move_box, FALSE, FALSE, 0);
+
+    GtkWidget *from_entry = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(from_entry), "From:");
+    gtk_box_pack_start(GTK_BOX(move_box), from_entry, TRUE, TRUE, 0);
+
+    GtkWidget *to_entry = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(to_entry), "To:");
+    gtk_box_pack_start(GTK_BOX(move_box), to_entry, TRUE, TRUE, 0);
+
+    GtkWidget *submit_button = gtk_button_new_with_label("Submit");
+    gtk_box_pack_start(GTK_BOX(move_box), submit_button, FALSE, FALSE, 0);
+
+    // Undo button at bottom of left
+    GtkWidget *undo_button = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(undo_button), gtk_image_new_from_icon_name("gtk-undo", GTK_ICON_SIZE_BUTTON));
+    gtk_widget_set_size_request(undo_button, 60, 60);
+
+    // Hint button underneath undo
+    GtkWidget *hint_button = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(hint_button), gtk_image_new_from_icon_name("gtk-info", GTK_ICON_SIZE_BUTTON));
+    gtk_widget_set_size_request(hint_button, 60, 60);
+
+    // Button box for horizontal layout
+    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(button_box), undo_button, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(button_box), hint_button, TRUE, TRUE, 0);
+    gtk_box_pack_end(GTK_BOX(left_box), button_box, TRUE, FALSE, 0);
+
+    // Right panel: Board area
+    GtkWidget *right_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_box_pack_start(GTK_BOX(middle_box), right_box, TRUE, TRUE, 0);
+
+    // Top: Black Timer
+    GtkWidget *black_timer_label = gtk_label_new("Black Timer: 00:00");
+    gtk_widget_set_halign(black_timer_label, GTK_ALIGN_END);
+    gtk_box_pack_start(GTK_BOX(right_box), black_timer_label, FALSE, FALSE, 0);
+
+    // Middle: Board grid with rank labels
+    GtkWidget *board_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(right_box), board_box, TRUE, TRUE, 0);
+
+    // Left: Rank labels (8 to 1)
+    GtkWidget *rank_grid = gtk_grid_new();
+    gtk_grid_set_row_homogeneous(GTK_GRID(rank_grid), TRUE);
+    gtk_grid_set_column_homogeneous(GTK_GRID(rank_grid), TRUE);
+    gtk_widget_set_size_request(rank_grid, 30, -1); // fixed width, height expands
+    gtk_box_pack_start(GTK_BOX(board_box), rank_grid, FALSE, FALSE, 0);
+    for (int r = 0; r < 8; ++r) {
+        int rank_num = 8 - r;
+        char label[2];
+        sprintf(label, "%d", rank_num);
+        GtkWidget *rank_label = gtk_label_new(label);
+        gtk_grid_attach(GTK_GRID(rank_grid), rank_label, 0, r, 1, 1);
+    }
+
+    // Center: 8x10 grid for pieces
+    GtkWidget *board_grid = gtk_grid_new();
+    gtk_grid_set_row_homogeneous(GTK_GRID(board_grid), TRUE);
+    gtk_grid_set_column_homogeneous(GTK_GRID(board_grid), TRUE);
+    gtk_box_pack_start(GTK_BOX(board_box), board_grid, TRUE, TRUE, 0);
+
+    // Create images for each cell (8 rows x 10 columns)
+    for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 10; ++col) {
+            GtkWidget *image = gtk_image_new(); // Empty for now
+            // Place image holders in some random squares
+            if ((row + col) % 3 == 0) {
+                gtk_image_set_from_icon_name(GTK_IMAGE(image), "gtk-dialog-info", GTK_ICON_SIZE_BUTTON);
+            }
+            gui->board_images[row][col] = image;
+
+            GtkWidget *eventbox = gtk_event_box_new();
+            gtk_container_add(GTK_CONTAINER(eventbox), image);
+            gtk_style_context_add_class(gtk_widget_get_style_context(eventbox), 
+                (row + col) % 2 == 0 ? "light-square" : "dark-square");
+            gtk_grid_attach(GTK_GRID(board_grid), eventbox, col, row, 1, 1);
+
+            // Connect click signals
+            g_signal_connect(eventbox, "button-press-event", G_CALLBACK(on_square_clicked), GINT_TO_POINTER(row * 10 + col));
+        }
+    }
+
+    // Bottom: File labels (A to J)
+    GtkWidget *file_grid = gtk_grid_new();
+    // Not homogeneous to allow fixed width for empty
+    gtk_widget_set_size_request(file_grid, -1, 50); // width expands, fixed height
+    gtk_widget_set_hexpand(file_grid, TRUE);
+    gtk_box_pack_start(GTK_BOX(right_box), file_grid, FALSE, FALSE, 0);
+    // Empty space for rank labels
+    GtkWidget *empty_left = gtk_label_new("");
+    gtk_widget_set_size_request(empty_left, 30, -1);
+    gtk_grid_attach(GTK_GRID(file_grid), empty_left, 0, 0, 1, 1);
+    for (int c = 0; c < 10; ++c) {
+        char label[2] = {'A' + c, '\0'};
+        GtkWidget *file_label = gtk_label_new(label);
+        gtk_widget_set_hexpand(file_label, TRUE);
+        gtk_grid_attach(GTK_GRID(file_grid), file_label, c + 1, 0, 1, 1);
+    }
+
+    // Bottom: White Timer
+    GtkWidget *white_timer_label = gtk_label_new("White Timer: 00:00");
+    gtk_widget_set_halign(white_timer_label, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(right_box), white_timer_label, FALSE, FALSE, 0);
+
+    // Bottom: Leave Game button
+    GtkWidget *leave_button = gtk_button_new_with_label("Leave Game");
+    gtk_widget_set_halign(leave_button, GTK_ALIGN_CENTER);
+    gtk_box_pack_end(GTK_BOX(gui->main_box), leave_button, FALSE, FALSE, 0);
+
+    gtk_widget_show_all(gui->window);
+}
+
 void gui_reset_selections(void) {
     resetMainMenuSelection();
     resetGameModeSelection();
@@ -196,6 +393,11 @@ void gui_process_events(void) {
 
 int gui_window_is_valid(Gui *gui) {
     return gui && GTK_IS_WIDGET(gui->window);
+}
+
+void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf) {
+    if (!gui || row < 0 || row >= 8 || col < 0 || col >= 10) return;
+    gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
 }
 
 static void on_turn_timer_toggled(GtkToggleButton *toggle, gpointer user_data) {

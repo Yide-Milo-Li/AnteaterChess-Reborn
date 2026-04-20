@@ -169,8 +169,10 @@ run: $(CHESS_BIN)
 	./$(CHESS_BIN)
 
 clean:
-	$(RMDIR) $(BUILD_DIR) $(BIN_DIR)
-	$(RM) $(SRC_ARCHIVE)
+	$(RMDIR) $(BUILD_DIR)
+	$(RM) $(SRC_ARCHIVE) $(CHESS_BIN) $(TEST_BINS) $(wildcard *.o) $(wildcard *.d)
+	$(RM) $(wildcard $(LOG_DIR)/*) $(wildcard $(TEST_BIN_DIR)/*)
+	$(MKDIR_P) $(BIN_DIR) $(LOG_DIR) $(TEST_BIN_DIR)
 
 tar: $(SRC_ARCHIVE)
 
@@ -178,7 +180,7 @@ help:
 	@echo "Targets:"
 	@echo "  make / make all   Build bin/chess and create bin/logs"
 	@echo "  make test         Build and run the maintained test suite"
-	@echo "  make clean        Remove generated binaries, objects, logs, and tarball"
+	@echo "  make clean        Remove generated binaries, objects, logs, and tarball while preserving bin/"
 	@echo "  make tar          Create Chess_Alpha_src.tar.gz"
 	@echo "  make list-tests   Print the maintained test binary names"
 

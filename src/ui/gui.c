@@ -186,3 +186,63 @@ void gui_process_events(void) {
 int gui_window_is_valid(Gui *gui) {
     return gui && GTK_IS_WIDGET(gui->window);
 }
+
+void setup_game_setup_menu_human_vs_human(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
+    if (gui->main_box) {
+        gtk_widget_destroy(gui->main_box);
+        gui->main_box = NULL;
+    }
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    GtkWidget *label = gtk_label_new("Human vs. Human");
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+
+    // Add setup options here, e.g., color selection, timer settings
+
+    gtk_widget_show_all(gui->window);
+}
+
+void setup_game_setup_menu_human_vs_computer(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
+    if (gui->main_box) {
+        gtk_widget_destroy(gui->main_box);
+        gui->main_box = NULL;
+    }
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    GtkWidget *label = gtk_label_new("Human vs. Computer");
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+
+    // Add setup options here, e.g., player color, AI difficulty
+
+    gtk_widget_show_all(gui->window);
+}
+
+void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
+    if (gui->main_box) {
+        gtk_widget_destroy(gui->main_box);
+        gui->main_box = NULL;
+    }
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    GtkWidget *label = gtk_label_new("Computer vs. Computer");
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+
+    // Add setup options here, e.g., AI difficulties for both
+
+    gtk_widget_show_all(gui->window);
+}

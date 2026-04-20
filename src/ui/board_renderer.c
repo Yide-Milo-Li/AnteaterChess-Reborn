@@ -16,10 +16,12 @@ void br_process_events(void) {
     gui_process_events();
 }
 
+// Wrapper for GUI window validation, returns 1 if the window is valid and 0 otherwise
 int br_window_is_valid(Gui *gui) {
     return gui_window_is_valid(gui);
 }
 
+// Main rendering function for the board and UI, takes in the current GameState to determine what to render based on the systemState field. Returns 0 on success and -1 on failure (e.g., invalid state or rendering error)
 int renderBoard(const GameState *state){
 	if (!state) return -1;
 	int render_success = 0;
@@ -27,7 +29,7 @@ int renderBoard(const GameState *state){
 		case INIT_STATE:
 			g_print("Window initialized (INIT_STATE).\n");
 			// Initialize the window if not already done, but do not add widgets yet.
-			// This state will also be used to load resources (e.g., images for pieces) in the future.
+			// This state will also be used to load resources (e.g., images for pieces), to be implemented in the future.
 			if (!gui) {
 				int argc = 0;
 				char **argv = NULL;
@@ -58,6 +60,31 @@ int renderBoard(const GameState *state){
 			break;
 		case GAME_SETUP_STATE:
 			// Handle game setup rendering, should display options for configuring the game (e.g., choosing player colors, setting AI difficulty, enabling timers)
+			if (gui && gui->window) {
+				switch (state->config.mode) {
+					case MODE_HUMAN_VS_HUMAN:
+						// Render setup for Human vs. Human
+						setup_game_setup_menu_human_vs_human(gui);
+						g_print("Game setup rendered for Human vs. Human (GAME_SETUP_STATE).\n");
+						break;
+					case MODE_HUMAN_VS_COMPUTER:
+						// Render setup for Human vs. Computer
+						setup_game_setup_menu_human_vs_computer(gui);
+						g_print("Game setup rendered for Human vs. Computer (GAME_SETUP_STATE).\n");
+						break;
+					case MODE_COMPUTER_VS_COMPUTER:
+						// Render setup for Computer vs. Computer
+						setup_game_setup_menu_computer_vs_computer(gui);
+						g_print("Game setup rendered for Computer vs. Computer (GAME_SETUP_STATE).\n");
+						break;
+					default:
+						g_print("Unknown game mode in setup (GAME_SETUP_STATE).\n");
+						render_success = -1;
+						break;
+				}
+			} else {
+				render_success = -1;
+			}
 			break;
 		case GAMEPLAY_STATE:
 			// Handle gameplay rendering, should display the chess board, pieces, and any relevant game information (e.g., current turn, move history, timers), some buttons including undo, leave game, and hint will also be included in gameplay rendering

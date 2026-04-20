@@ -1,7 +1,11 @@
 
 #ifndef CHESS_UI_GUI_H
 #define CHESS_UI_GUI_H
-
+/*
+* Declaration of the main GUI struct and functions for creating, destroying, and running the GUI, as well as setting up the menus, and processing events. This file also includes getters and setters for menu selections.
+* The functions in this file should not be needed outside of the UI module
+* All external interaction with the GUI should be done through the board renderer interface (e.g., renderBoard, br_process_events) and the menu selection getters (e.g., getMainMenuSelection, getGameModeSelection).
+*/
 #include <gtk/gtk.h>
 
 #include "dialog.h"
@@ -30,6 +34,9 @@ typedef struct Gui {
 
 void setup_main_menu(Gui *gui);
 void setup_game_mode_menu(Gui *gui);
+void setup_game_setup_menu_human_vs_human(Gui *gui);
+void setup_game_setup_menu_human_vs_computer(Gui *gui);
+void setup_game_setup_menu_computer_vs_computer(Gui *gui);
 void gui_reset_selections(void);
 void gui_process_events(void);
 int gui_window_is_valid(Gui *gui);

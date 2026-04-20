@@ -4,7 +4,7 @@
 
 // Sets the game mode selection index (0=Human vs. Computer, 1=Human vs. Human, 2=Computer vs. Computer, 3=Back)
 void setGameModeSelection(int index);
-// Gets the last game mode selection index, returns 0 on success, -1 on error
+// Gets the last game mode selection, returns 0 on success, -1 on error, stores GameMode enum value or 3 for Back
 int getGameModeSelection(int *selection);
 
 #endif

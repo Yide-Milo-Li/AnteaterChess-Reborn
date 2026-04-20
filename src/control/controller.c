@@ -3,22 +3,19 @@
 #include <stddef.h>
 
 #include "system/event.h"
-#include "system/event_queue.h"
 #include "system/fsm.h"
-#include "system/system_state.h"
 #include "turn/turn_timer.h"
 
 /*
  * Alignment assumptions for future extensions:
- * - controller.h is the truth source for the public loop entrypoints.
- * - This file owns queue polling and priority draining, not gameplay rule decisions.
- * - FSM remains the authority on state transitions while controller orchestrates event flow.
+ * - controller.h is the truth source for the public loop entrypoint.
+ * - This file owns queue draining and priority ordering, not gameplay rule decisions.
+ * - Queue helpers that are not declared in headers remain private to the controller.
  */
 
-/* Map one event type to the queue priority class expected by the controller. */
-QueueType queueForEvent(EventType type) {
+/* Map one public event type to the private queue priority used by the controller. */
+static QueueType queue_type_for_event(EventType type) {
     switch (type) {
-        /* Control events */
         case EVENT_LEAVE_GAME:
         case EVENT_BACK:
         case EVENT_NEW_GAME:
@@ -26,94 +23,92 @@ QueueType queueForEvent(EventType type) {
         case EVENT_ERROR:
         case EVENT_FATAL_ERROR:
             return QUEUE_CONTROL;
-
-        /* System events */
         case EVENT_TIMER_EXPIRED:
             return QUEUE_SYSTEM;
-
-        /* Gameplay events */
         case EVENT_MOVE_INPUT:
         case EVENT_AI_MOVE:
         case EVENT_UNDO:
         case EVENT_HINT:
-            return QUEUE_GAMEPLAY;
-
+        case EVENT_NONE:
         default:
             return QUEUE_GAMEPLAY;
     }
 }
 
-/* Poll one source once and enqueue any non-empty event it produces. */
-static void pollAndEnqueue(EventPollerFn poller,
-                           GameState *state,
-                           EventQueue *queue)
-{
-    if (!poller) return;
-    Event e;
-    if (poller(state, &e) == 1) {
-        if (e.type != EVENT_NONE) {
-            enqueueEvent(queue, e, queueForEvent(e.type));
-        }
-    }
+/* Report whether the composite queue has any pending work left to drain. */
+static int all_queues_empty(const EventQueue *queue) {
+    return isControlQueueEmpty(queue)
+        && isSystemQueueEmpty(queue)
+        && isGameplayQueueEmpty(queue);
 }
 
-/* Single-tick body */
-/* Execute one controller tick: poll sources, synthesize timer events, then drain queues. */
-int tickGameLoop(GameState *state, EventQueue *queue, const EventSources *src) {
-
-    if (getSystemState() == INIT_STATE) {
-        Event none = createSystemEvent(EVENT_NONE);
-        processEvent(state, none, queue);
+/* Remove the highest-priority available event from the local controller queue. */
+static Event dequeue_next_event(EventQueue *queue) {
+    if (!isControlQueueEmpty(queue)) {
+        return dequeueControlEvent(queue);
     }
 
-    if (src) {
-        pollAndEnqueue(src->pollUI,     state, queue);
-        pollAndEnqueue(src->pollAI,     state, queue);
-        pollAndEnqueue(src->pollTimer,  state, queue);
-        pollAndEnqueue(src->pollSystem, state, queue);
+    if (!isSystemQueueEmpty(queue)) {
+        return dequeueSystemEvent(queue);
     }
 
-    if (getSystemState() == GAMEPLAY_STATE) {
-        updateTurnTimer(state);
+    return dequeueGameplayEvent(queue);
+}
+
+/* Enqueue controller-synthesized work such as boot and termination handshakes. */
+static int seed_internal_events(GameState *state, EventQueue *queue) {
+    Event event;
+
+    if (state == NULL || queue == NULL) {
+        return 1;
+    }
+
+    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
+        event = createSystemEvent(EVENT_NONE);
+        return enqueueEvent(queue, event, queue_type_for_event(event.type));
+    }
+
+    if (state->systemState == GAMEPLAY_STATE) {
+        if (updateTurnTimer(state) != 0) {
+            return 1;
+        }
+
         if (isTimeUp(state) == 1) {
-            Event te = createSystemEvent(EVENT_TIMER_EXPIRED);
-            enqueueEvent(queue, te, QUEUE_SYSTEM);
+            event = createSystemEvent(EVENT_TIMER_EXPIRED);
+            return enqueueEvent(queue, event, queue_type_for_event(event.type));
         }
     }
 
-    const int MAX_PROCESS_PER_TICK = MAX_EVENTS * 3;
-    int processed = 0;
-
-    while (!isEventQueueEmpty(queue) && processed < MAX_PROCESS_PER_TICK) {
-        Event ev;
-
-        if (!isControlQueueEmpty(queue)) {
-            ev = dequeueControlEvent(queue);
-        } else if (!isSystemQueueEmpty(queue)) {
-            ev = dequeueSystemEvent(queue);
-        } else {
-            ev = dequeueGameplayEvent(queue);
-        }
-
-        if (processEvent(state, ev, queue) != 0) {
-            return (int)getSystemState();
-        }
-        ++processed;
-
-        if (getSystemState() == EXIT_STATE) break;
-    }
-
-    return (int)getSystemState();
+    return 0;
 }
 
-/* Main loop */
+/* Drain the available event work until the queue empties or a terminal condition is reached. */
+int runGameLoop(GameState *state) {
+    EventQueue queue = {0};
 
-/* Run the controller loop until the FSM reaches EXIT_STATE. */
-int runGameLoop(GameState *state, EventQueue *queue, const EventSources *src) {
-    if (!state || !queue) return 1;
-
-    while (getSystemState() != EXIT_STATE) {
-        tickGameLoop(state, queue, src);
+    if (state == NULL) {
+        return 1;
     }
+
+    while (state->systemState != EXIT_STATE) {
+        if (all_queues_empty(&queue)) {
+            if (seed_internal_events(state, &queue) != 0) {
+                return 1;
+            }
+
+            if (all_queues_empty(&queue)) {
+                break;
+            }
+        }
+
+        if (processEvent(state, dequeue_next_event(&queue)) != 0) {
+            return 1;
+        }
+
+        if (state->gameOver && state->systemState == END_GAME_MENU_STATE) {
+            break;
+        }
+    }
+
     return 0;
 }

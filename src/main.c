@@ -1,33 +1,28 @@
 #include <stdio.h>
 
+#include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "system/controller.h"
-#include "system/event_queue.h"
-#include "system/fsm.h"
-#include "system/system_state.h"
 
-static const EventSources EMPTY_SOURCES = {0};
+/*
+ * Alignment assumptions for future extensions:
+ * - main only wires together public contracts and should not depend on controller internals.
+ * - controller.h is the truth source for the system loop entrypoint.
+ * - Initial system state comes from GameState initialization, not hidden FSM globals.
+ */
 
+/* Boot one default game state and hand control to the public controller loop. */
 int main(void) {
-    GameState  state;
-    EventQueue queue;
+    GameConfig config;
+    GameState state;
+    int result;
 
-    initGameState(&state);
-    initEventQueue(&queue);
-    initFSM();
+    initDefaultGameConfig(&config);
+    initGameState(&state, &config);
 
-    printf("[AnteaterChess] Phase E skeleton starting.\n");
-    printf("[AnteaterChess] Initial state: %s\n",
-           systemStateName(getSystemState()));
+    printf("[AnteaterChess] Phase E controller starting in state %d.\n", (int)state.systemState);
+    result = runGameLoop(&state);
+    printf("[AnteaterChess] Controller stopped in state %d with rc=%d.\n", (int)state.systemState, result);
 
-    {
-        Event exitEvt = createSystemEvent(EVENT_EXIT_PROGRAM);
-        enqueueEvent(&queue, exitEvt, queueForEvent(EVENT_EXIT_PROGRAM));
-    }
-
-    int rc = runGameLoop(&state, &queue, &EMPTY_SOURCES);
-
-    printf("[AnteaterChess] Final state: %s (rc=%d)\n",
-           systemStateName(getSystemState()), rc);
-    return rc;
+    return result;
 }

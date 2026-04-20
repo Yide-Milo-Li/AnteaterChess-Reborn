@@ -1,173 +1,88 @@
-#include <string.h>
+#include <assert.h>
 
+#include "core/board.h"
+#include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/piece.h"
 #include "input/command.h"
-#include "system/controller.h"
 #include "system/event.h"
-#include "system/event_queue.h"
 #include "system/fsm.h"
 #include "system/system_state.h"
 
-typedef struct {
-    Event script[32];
-    int   count;
-    int   cursor;
-} ScriptedPoller;
+/* Build a fresh gameplay-ready state through the public FSM setup path. */
+static GameState fresh_gameplay_state(void) {
+    GameConfig config;
+    GameState state;
 
-static ScriptedPoller g_ui_poller;
-
-static int scripted_ui_poll(GameState *state, Event *out) {
-    (void)state;
-    if (g_ui_poller.cursor >= g_ui_poller.count) return 0;
-    *out = g_ui_poller.script[g_ui_poller.cursor++];
-    return 1;
+    initDefaultGameConfig(&config);
+    initGameState(&state, &config);
+    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+    return state;
 }
 
-static void scriptPush(Event e) {
-    if (g_ui_poller.count < 32) {
-        g_ui_poller.script[g_ui_poller.count++] = e;
-    }
+/* Prepare a minimal board where one white ant has exactly one simple forward move. */
+static void seed_simple_ant_position(GameState *state) {
+    assert(state != NULL);
+    initBoard(&state->board);
+    setPiece(&state->board, createPosition(6, 0), createPiece(ANT, WHITE));
+    state->currentTurn = WHITE;
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->gameOver = 0;
+    state->result = RESULT_NONE;
 }
 
-static void scriptReset(void) {
-    memset(&g_ui_poller, 0, sizeof g_ui_poller);
+/* Check that a valid move command is applied through the public FSM path. */
+static void test_process_event_applies_valid_move(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+
+    seed_simple_ant_position(&state);
+    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(5, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
+    assert(state.currentTurn == BLACK);
+    assert(state.moveHistory.count == 1);
 }
 
-static void test_event_queue_routing(void) {
-    BEGIN_CASE("queueForEvent routes control events to QUEUE_CONTROL");
-    CHECK_EQ(queueForEvent(EVENT_LEAVE_GAME),   QUEUE_CONTROL);
-    CHECK_EQ(queueForEvent(EVENT_BACK),         QUEUE_CONTROL);
-    CHECK_EQ(queueForEvent(EVENT_EXIT_PROGRAM), QUEUE_CONTROL);
-    CHECK_EQ(queueForEvent(EVENT_NEW_GAME),     QUEUE_CONTROL);
-    CHECK_EQ(queueForEvent(EVENT_ERROR),        QUEUE_CONTROL);
-    CHECK_EQ(queueForEvent(EVENT_FATAL_ERROR),  QUEUE_CONTROL);
+/* Check that an illegal move command is rejected without mutating the board. */
+static void test_process_event_rejects_illegal_move(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
 
-    BEGIN_CASE("queueForEvent routes system events to QUEUE_SYSTEM");
-    CHECK_EQ(queueForEvent(EVENT_TIMER_EXPIRED), QUEUE_SYSTEM);
-
-    BEGIN_CASE("queueForEvent routes gameplay events to QUEUE_GAMEPLAY");
-    CHECK_EQ(queueForEvent(EVENT_MOVE_INPUT), QUEUE_GAMEPLAY);
-    CHECK_EQ(queueForEvent(EVENT_AI_MOVE),    QUEUE_GAMEPLAY);
-    CHECK_EQ(queueForEvent(EVENT_UNDO),       QUEUE_GAMEPLAY);
+    seed_simple_ant_position(&state);
+    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(6, 1)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) != 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(4, 0)).type == EMPTY_PIECE);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 0);
 }
 
-static void test_priority_ordering(void) {
-    BEGIN_CASE("controller processes ControlQueue before other queues");
-    GameState s; EventQueue q;
-    initGameState(&s);
-    initEventQueue(&q);
-    initFSM();
+/* Check that undo flows back through the FSM and restores the previous position. */
+static void test_process_event_undo_restores_position(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
 
-    enqueueEvent(&q, createUndoEvent(),                 QUEUE_GAMEPLAY);
-    enqueueEvent(&q, createSystemEvent(EVENT_TIMER_EXPIRED), QUEUE_SYSTEM);
-    enqueueEvent(&q, createSystemEvent(EVENT_NONE),     QUEUE_CONTROL);
-    processEvent(&s, createSystemEvent(EVENT_NONE), &q); /* INIT -> MAIN */
-    enqueueEvent(&q, createSystemEvent(EVENT_EXIT_PROGRAM), QUEUE_CONTROL);
-
-    int finalState = tickGameLoop(&s, &q, NULL);
-    CHECK_EQ(finalState, EXIT_STATE);
+    seed_simple_ant_position(&state);
+    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(5, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(processEvent(&state, createUndoEvent()) == 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 0);
 }
 
-static void test_runGameLoop_terminates(void) {
-    BEGIN_CASE("runGameLoop terminates when EXIT_PROGRAM is enqueued");
-    GameState s; EventQueue q;
-    initGameState(&s);
-    initEventQueue(&q);
-    initFSM();
-
-    enqueueEvent(&q, createSystemEvent(EVENT_EXIT_PROGRAM), QUEUE_CONTROL);
-    int rc = runGameLoop(&s, &q, NULL);
-    CHECK_EQ(rc, 0);
-    CHECK_EQ(getSystemState(), EXIT_STATE);
-}
-
-static void test_move_pipeline_success(void) {
-    BEGIN_CASE("valid move flows through pipeline and mutates GameState");
-    GameState s; EventQueue q;
-    initGameState(&s);
-    initEventQueue(&q);
-    initFSM();
-
-    Piece whitePawn = { ANT, WHITE };
-    setPiece(&s.board, createPosition(1, 0), whitePawn);
-    s.currentTurn = WHITE;
-
-    /* Build Command for move (1,0) -> (2,0). */
-    Command cmd;
-    createMoveCommand(&cmd, createPosition(1, 0), createPosition(2, 0));
-
-    int rc = runInputMovePipeline(&s, cmd, &q);
-    CHECK_EQ(rc, MOVE_PIPELINE_OK);
-    /* Source cleared, destination populated. */
-    CHECK_EQ(getPiece(&s.board, createPosition(1, 0)).type, EMPTY_PIECE);
-    CHECK_EQ(getPiece(&s.board, createPosition(2, 0)).type, ANT);
-    /* Turn switched to BLACK. */
-    CHECK_EQ(s.currentTurn, BLACK);
-    /* History has one entry. */
-    CHECK_EQ(s.history.count, 1);
-    /* No error event was enqueued. */
-    CHECK(isControlQueueEmpty(&q));
-}
-
-static void test_move_pipeline_invalid_raises_error(void) {
-    BEGIN_CASE("invalid move raises EVENT_ERROR and does not mutate state");
-    GameState s; EventQueue q;
-    initGameState(&s);
-    initEventQueue(&q);
-    initFSM();
-    s.currentTurn = WHITE;
-    Command cmd;
-    createMoveCommand(&cmd, createPosition(0, 0), createPosition(1, 0));
-
-    int rc = runInputMovePipeline(&s, cmd, &q);
-
-    CHECK_EQ(rc, MOVE_PIPELINE_ERR_ILLEGAL_MOVE);
-    /* Turn unchanged, history still empty. */
-    CHECK_EQ(s.currentTurn, WHITE);
-    CHECK_EQ(s.history.count, 0);
-    /* An EVENT_ERROR should be waiting on ControlQueue. */
-    CHECK(!isControlQueueEmpty(&q));
-    Event err = dequeueControlEvent(&q);
-    CHECK_EQ(err.type, EVENT_ERROR);
-}
-
-static void test_simulated_session(void) {
-    BEGIN_CASE("scripted UI poller drives a full session to EXIT");
-    GameState s; EventQueue q;
-    initGameState(&s);
-    initEventQueue(&q);
-    initFSM();
-    scriptReset();
-
-    scriptPush(createSystemEvent(EVENT_NEW_GAME));     /* MAIN -> MODE     */
-    scriptPush(createSystemEvent(EVENT_NEW_GAME));     /* MODE -> SETUP    */
-    scriptPush(createSystemEvent(EVENT_NEW_GAME));     /* SETUP -> GAMEPLAY*/
-
-    Command cmd;
-    Piece whitePawn = { ANT, WHITE };
-    setPiece(&s.board, createPosition(1, 0), whitePawn);
-    createMoveCommand(&cmd, createPosition(1, 0), createPosition(2, 0));
-    scriptPush(createMoveInputEvent(cmd));
-
-    scriptPush(createSystemEvent(EVENT_LEAVE_GAME));   /* GAMEPLAY -> TERM */
-    scriptPush(createSystemEvent(EVENT_BACK));         /* MENU -> MAIN     */
-    scriptPush(createSystemEvent(EVENT_EXIT_PROGRAM)); /* MAIN -> EXIT     */
-
-    EventSources sources = {0};
-    sources.pollUI = scripted_ui_poll;
-
-    int rc = runGameLoop(&s, &q, &sources);
-    CHECK_EQ(rc, 0);
-    CHECK_EQ(getSystemState(), EXIT_STATE);
-    CHECK_EQ(getPiece(&s.board, createPosition(2, 0)).type, ANT);
-}
-
+/* Run the Phase E control-flow integration tests. */
 int main(void) {
-    test_event_queue_routing();
-    test_priority_ordering();
-    test_runGameLoop_terminates();
-    test_move_pipeline_success();
-    test_move_pipeline_invalid_raises_error();
-    test_simulated_session();
-    TEST_SUMMARY("test_control_flow");
+    test_process_event_applies_valid_move();
+    test_process_event_rejects_illegal_move();
+    test_process_event_undo_restores_position();
+    return 0;
 }

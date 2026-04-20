@@ -10,120 +10,125 @@
  * - Control/system/gameplay priority is enforced by the controller, not inside these primitives.
  */
 
-/* Single-queue primitives */
-/* Reset one circular queue to its empty state. */
-static void seqInit(SingleEventQueue *q) {
-    q->front = 0;
-    q->rear  = 0;
-    q->count = 0;
+/* Return an explicit EVENT_NONE sentinel for empty-dequeue paths. */
+static Event none_event(void) {
+    Event event;
+
+    memset(&event, 0, sizeof(event));
+    event.type = EVENT_NONE;
+    return event;
 }
 
 /* Report whether one circular queue currently holds no events. */
-static int seqIsEmpty(const SingleEventQueue *q) {
-    return q->count == 0;
+static int single_queue_is_empty(const SingleEventQueue *queue) {
+    return queue->front == queue->rear;
 }
 
 /* Report whether one circular queue has reached MAX_EVENTS capacity. */
-static int seqIsFull(const SingleEventQueue *q) {
-    return q->count >= MAX_EVENTS;
+static int single_queue_is_full(const SingleEventQueue *queue) {
+    return (queue->rear - queue->front) >= MAX_EVENTS;
 }
 
-/* Append one event to a single circular queue if capacity remains. */
-static int seqEnqueue(SingleEventQueue *q, Event e) {
-    if (seqIsFull(q)) {
-        return 1; /* queue full */
+/* Append one event to a single queue while preserving FIFO order. */
+static int single_queue_enqueue(SingleEventQueue *queue, Event event) {
+    if (single_queue_is_full(queue)) {
+        return 1;
     }
-    q->events[q->rear] = e;
-    q->rear = (q->rear + 1) % MAX_EVENTS;
-    q->count += 1;
+
+    queue->events[queue->rear % MAX_EVENTS] = event;
+    queue->rear += 1;
     return 0;
 }
 
-/* Remove and return the oldest event from one circular queue. */
-static Event seqDequeue(SingleEventQueue *q) {
-    Event none;
-    memset(&none, 0, sizeof none);
-    none.type = EVENT_NONE;
+/* Remove and return the oldest event from one queue. */
+static Event single_queue_dequeue(SingleEventQueue *queue) {
+    Event event;
 
-    if (seqIsEmpty(q)) {
-        return none;
+    if (single_queue_is_empty(queue)) {
+        return none_event();
     }
-    Event e = q->events[q->front];
-    q->front = (q->front + 1) % MAX_EVENTS;
-    q->count -= 1;
-    return e;
+
+    event = queue->events[queue->front % MAX_EVENTS];
+    queue->front += 1;
+
+    /* Rebase counters after the queue becomes empty so long sessions do not
+     * let the monotonic indices grow without bound. */
+    if (queue->front == queue->rear) {
+        queue->front = 0;
+        queue->rear = 0;
+    }
+
+    return event;
 }
 
-/* Public API */
+/* Route one event into the requested public subqueue. */
+int enqueueEvent(EventQueue *queue, Event event, QueueType type) {
+    if (queue == NULL) {
+        return 1;
+    }
 
-/* Reset all three priority queues in one EventQueue container. */
-void initEventQueue(EventQueue *q) {
-    if (!q) return;
-    seqInit(&q->controlQueue);
-    seqInit(&q->systemQueue);
-    seqInit(&q->gameplayQueue);
-}
-
-/* Route an event into the requested subqueue. */
-int enqueueEvent(EventQueue *q, Event e, QueueType type) {
-    if (!q) return 1;
     switch (type) {
-        case QUEUE_CONTROL: return seqEnqueue(&q->controlQueue,  e);
-        case QUEUE_SYSTEM: return seqEnqueue(&q->systemQueue,   e);
-        case QUEUE_GAMEPLAY: return seqEnqueue(&q->gameplayQueue, e);
-        default: return 1; /* invalid queue type */
+        case QUEUE_CONTROL:
+            return single_queue_enqueue(&queue->controlQueue, event);
+        case QUEUE_SYSTEM:
+            return single_queue_enqueue(&queue->systemQueue, event);
+        case QUEUE_GAMEPLAY:
+            return single_queue_enqueue(&queue->gameplayQueue, event);
+        default:
+            return 1;
     }
 }
 
 /* Remove the next control-priority event or EVENT_NONE if unavailable. */
-Event dequeueControlEvent(EventQueue *q) {
-    Event none;
-    memset(&none, 0, sizeof none);
-    none.type = EVENT_NONE;
-    if (!q) return none;
-    return seqDequeue(&q->controlQueue);
+Event dequeueControlEvent(EventQueue *queue) {
+    if (queue == NULL) {
+        return none_event();
+    }
+
+    return single_queue_dequeue(&queue->controlQueue);
 }
 
 /* Remove the next system-priority event or EVENT_NONE if unavailable. */
-Event dequeueSystemEvent(EventQueue *q) {
-    Event none;
-    memset(&none, 0, sizeof none);
-    none.type = EVENT_NONE;
-    if (!q) return none;
-    return seqDequeue(&q->systemQueue);
+Event dequeueSystemEvent(EventQueue *queue) {
+    if (queue == NULL) {
+        return none_event();
+    }
+
+    return single_queue_dequeue(&queue->systemQueue);
 }
 
 /* Remove the next gameplay-priority event or EVENT_NONE if unavailable. */
-Event dequeueGameplayEvent(EventQueue *q) {
-    Event none;
-    memset(&none, 0, sizeof none);
-    none.type = EVENT_NONE;
-    if (!q) return none;
-    return seqDequeue(&q->gameplayQueue);
+Event dequeueGameplayEvent(EventQueue *queue) {
+    if (queue == NULL) {
+        return none_event();
+    }
+
+    return single_queue_dequeue(&queue->gameplayQueue);
 }
 
 /* Report whether the control queue currently has no pending events. */
-int isControlQueueEmpty(const EventQueue *q) {
-    if (!q) return 1;
-    return seqIsEmpty(&q->controlQueue);
+int isControlQueueEmpty(const EventQueue *queue) {
+    if (queue == NULL) {
+        return 1;
+    }
+
+    return single_queue_is_empty(&queue->controlQueue);
 }
 
 /* Report whether the system queue currently has no pending events. */
-int isSystemQueueEmpty(const EventQueue *q) {
-    if (!q) return 1;
-    return seqIsEmpty(&q->systemQueue);
+int isSystemQueueEmpty(const EventQueue *queue) {
+    if (queue == NULL) {
+        return 1;
+    }
+
+    return single_queue_is_empty(&queue->systemQueue);
 }
 
 /* Report whether the gameplay queue currently has no pending events. */
-int isGameplayQueueEmpty(const EventQueue *q) {
-    if (!q) return 1;
-    return seqIsEmpty(&q->gameplayQueue);
-}
+int isGameplayQueueEmpty(const EventQueue *queue) {
+    if (queue == NULL) {
+        return 1;
+    }
 
-/* Report whether all three queues are empty at the same time. */
-int isEventQueueEmpty(const EventQueue *q) {
-    if (!q) return 1;
-    return seqIsEmpty(&q->controlQueue)
-        && seqIsEmpty(&q->systemQueue)
-        && seqIsEmpty(&q->gameplayQueue);
+    return single_queue_is_empty(&queue->gameplayQueue);
 }

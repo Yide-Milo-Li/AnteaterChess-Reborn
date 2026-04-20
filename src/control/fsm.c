@@ -3,272 +3,287 @@
 #include <stddef.h>
 
 #include "gameplay/endgame.h"
-#include "system/controller.h"
+#include "gameplay/execution.h"
+#include "gameplay/movegen.h"
+#include "gameplay/validation.h"
+#include "log/log.h"
+#include "time/clock.h"
+#include "turn/turn_timer.h"
 
 /*
  * Alignment assumptions for future extensions:
  * - fsm.h is the truth source for public FSM entrypoints and transition helpers.
  * - This file owns system-state transitions, not event polling or queue priority policy.
- * - Gameplay pipelines may mutate GameState, but transition legality remains centralized here.
+ * - Helpers that are not declared in headers stay private to the FSM implementation.
  */
-
-enum {
-    MOVE_PIPELINE_OK                 = 0,
-    MOVE_PIPELINE_ERR_NULL_ARG       = 1,
-    MOVE_PIPELINE_ERR_INVALID_CMD    = 2,
-    MOVE_PIPELINE_ERR_ILLEGAL_MOVE   = 3,
-    MOVE_PIPELINE_ERR_APPLY_FAILED   = 4
-};
-int runAIMovePipeline   (GameState *state, Move move,      EventQueue *outQueue);
-int runInputMovePipeline(GameState *state, Command cmd,    EventQueue *outQueue);
-int runUndoPipeline     (GameState *state,                 EventQueue *outQueue);
-
-int logGameStart(const GameState *state);
-int logGameEnd  (const GameState *state);
-
-/* Internal state */
-static SystemState g_systemState = INIT_STATE;
-
-/* Valid-transitions table */
 
 typedef struct {
     SystemState from;
     SystemState to;
 } Transition;
 
-static const Transition VALID[] = {
-    /* Initialization */
-    { INIT_STATE,                MAIN_MENU_STATE            },
-
-    /* Main menu */
-    { MAIN_MENU_STATE,           GAME_MODE_SELECTION_STATE  },
-    { MAIN_MENU_STATE,           EXIT_STATE                 },
-
-    /* Game setup path */
-    { GAME_MODE_SELECTION_STATE, GAME_SETUP_STATE           },
-    { GAME_MODE_SELECTION_STATE, MAIN_MENU_STATE            },
-    { GAME_SETUP_STATE,          GAMEPLAY_STATE             },
-    { GAME_SETUP_STATE,          GAME_MODE_SELECTION_STATE  },
-
-    /* Gameplay -> termination */
-    { GAMEPLAY_STATE,            GAME_TERMINATION_STATE     },
-
-    /* Termination -> end-game menu */
-    { GAME_TERMINATION_STATE,    END_GAME_MENU_STATE        },
-
-    /* End-game menu branches */
-    { END_GAME_MENU_STATE,       GAME_MODE_SELECTION_STATE  },
-    { END_GAME_MENU_STATE,       MAIN_MENU_STATE            },
-    { END_GAME_MENU_STATE,       EXIT_STATE                 },
-
-    /* EXIT_STATE */
-    { MAIN_MENU_STATE,           EXIT_STATE                 },
-    { GAME_MODE_SELECTION_STATE, EXIT_STATE                 },
-    { GAME_SETUP_STATE,          EXIT_STATE                 },
-    { GAMEPLAY_STATE,            EXIT_STATE                 },
-    { GAME_TERMINATION_STATE,    EXIT_STATE                 },
+static const Transition VALID_TRANSITIONS[] = {
+    {INIT_STATE, MAIN_MENU_STATE},
+    {MAIN_MENU_STATE, GAME_MODE_SELECTION_STATE},
+    {MAIN_MENU_STATE, EXIT_STATE},
+    {GAME_MODE_SELECTION_STATE, GAME_SETUP_STATE},
+    {GAME_MODE_SELECTION_STATE, MAIN_MENU_STATE},
+    {GAME_MODE_SELECTION_STATE, EXIT_STATE},
+    {GAME_SETUP_STATE, GAMEPLAY_STATE},
+    {GAME_SETUP_STATE, GAME_MODE_SELECTION_STATE},
+    {GAME_SETUP_STATE, EXIT_STATE},
+    {GAMEPLAY_STATE, GAME_TERMINATION_STATE},
+    {GAMEPLAY_STATE, EXIT_STATE},
+    {GAME_TERMINATION_STATE, END_GAME_MENU_STATE},
+    {GAME_TERMINATION_STATE, EXIT_STATE},
+    {END_GAME_MENU_STATE, GAME_MODE_SELECTION_STATE},
+    {END_GAME_MENU_STATE, MAIN_MENU_STATE},
+    {END_GAME_MENU_STATE, EXIT_STATE}
 };
 
-static const int VALID_COUNT = (int)(sizeof(VALID) / sizeof(VALID[0]));
-
 /* Check whether one state transition is permitted by the FSM table. */
-static int transitionIsAllowed(SystemState from, SystemState to) {
-    if (from == to) return 1;
-    for (int i = 0; i < VALID_COUNT; ++i) {
-        if (VALID[i].from == from && VALID[i].to == to) return 1;
-    }
-    return 0;
-}
+static int transition_is_allowed(SystemState from, SystemState to) {
+    int index;
 
-/* Reset the FSM singleton back to its boot state. */
-void initFSM(void) {
-    g_systemState = INIT_STATE;
-}
-
-/* Expose the currently active FSM state for controller and tests. */
-SystemState getSystemState(void) {
-    return g_systemState;
-}
-
-/* Attempt one state transition if the table allows it. */
-int transitionState(GameState *state, SystemState newState) {
-    (void)state;
-    if (!transitionIsAllowed(g_systemState, newState)) {
+    if (from == to) {
         return 1;
     }
-    g_systemState = newState;
+
+    for (index = 0; index < (int)(sizeof(VALID_TRANSITIONS) / sizeof(VALID_TRANSITIONS[0])); ++index) {
+        if (VALID_TRANSITIONS[index].from == from && VALID_TRANSITIONS[index].to == to) {
+            return 1;
+        }
+    }
+
     return 0;
 }
 
-/* Emit a recoverable error event into the outgoing queue when possible. */
-static int raiseError(EventQueue *outQueue, ErrorCode code) {
-    if (!outQueue) return 0;
-    Event err = createErrorEvent(code);
-    return enqueueEvent(outQueue, err, queueForEvent(EVENT_ERROR));
-}
+/* Build the exact legal move candidate that matches one move command. */
+static int find_command_move(const GameState *state, Command command, Move *resolvedMove) {
+    MoveList candidates;
+    Piece movingPiece;
+    int index;
 
-/* Handle the boot state by advancing into the main menu. */
-static int handleInit(GameState *state, Event e, EventQueue *out) {
-    (void)e; (void)out;
-    return transitionState(state, MAIN_MENU_STATE);
-}
+    if (state == NULL || resolvedMove == NULL || command.type != CMD_MOVE) {
+        return 1;
+    }
 
-/* Handle top-level main-menu control events. */
-static int handleMainMenu(GameState *state, Event e, EventQueue *out) {
-    (void)out;
-    switch (e.type) {
-        case EVENT_NEW_GAME:
-            return transitionState(state, GAME_MODE_SELECTION_STATE);
-        case EVENT_EXIT_PROGRAM:
-            return transitionState(state, EXIT_STATE);
-        default:
+    if (validateSelection(state, command.from) != SELECT_VALID || !isValidPosition(command.to)) {
+        return 1;
+    }
+
+    movingPiece = getPiece(&state->board, command.from);
+    if (movingPiece.type == EMPTY_PIECE) {
+        return 1;
+    }
+
+    if (generateLegalMovesForPosition(state, command.from, &candidates) != 0) {
+        return 1;
+    }
+
+    for (index = 0; index < getMoveCount(&candidates); ++index) {
+        Move *candidate = getMove(&candidates, index);
+
+        if (candidate != NULL
+            && positionEqual(candidate->from, command.from)
+            && positionEqual(candidate->to, command.to)
+            && candidate->movedPiece.type == movingPiece.type
+            && candidate->movedPiece.color == movingPiece.color) {
+            *resolvedMove = *candidate;
             return 0;
+        }
     }
+
+    return 1;
 }
 
-/* Handle game-mode-selection menu events. */
-static int handleGameModeSelection(GameState *state, Event e, EventQueue *out) {
-    (void)out;
-    switch (e.type) {
-        case EVENT_NEW_GAME:  /* mode chosen -> proceed to setup */
-            return transitionState(state, GAME_SETUP_STATE);
-        case EVENT_BACK:
-            return transitionState(state, MAIN_MENU_STATE);
-        case EVENT_EXIT_PROGRAM:
-            return transitionState(state, EXIT_STATE);
-        default:
-            return 0;
-    }
-}
-
-/* Handle setup confirmation and setup-menu navigation events. */
-static int handleGameSetup(GameState *state, Event e, EventQueue *out) {
-    (void)out;
-    switch (e.type) {
-        case EVENT_NEW_GAME:  /* setup confirmed -> start gameplay */
-            logGameStart(state);
-            return transitionState(state, GAMEPLAY_STATE);
-        case EVENT_BACK:
-            return transitionState(state, GAME_MODE_SELECTION_STATE);
-        case EVENT_EXIT_PROGRAM:
-            return transitionState(state, EXIT_STATE);
-        default:
-            return 0;
-    }
-}
-
-/* Handle gameplay-time events, including move pipelines and timeout termination. */
-static int handleGameplay(GameState *state, Event e, EventQueue *out) {
-    int rc = 0;
-
-    switch (e.type) {
-        case EVENT_MOVE_INPUT:
-            rc = runInputMovePipeline(state, e.data.command, out);
-            if (rc == MOVE_PIPELINE_ERR_APPLY_FAILED) {
-                return raiseError(out, ERR_FATAL_STATE_CORRUPT) ? 1 : 0;
-            }
-            break;
-
-        case EVENT_AI_MOVE:
-            rc = runAIMovePipeline(state, e.data.move, out);
-            if (rc == MOVE_PIPELINE_ERR_APPLY_FAILED) {
-                return raiseError(out, ERR_FATAL_STATE_CORRUPT) ? 1 : 0;
-            }
-            break;
-
-        case EVENT_UNDO:
-            rc = runUndoPipeline(state, out);
-            (void)rc;
-            break;
-
-        case EVENT_TIMER_EXPIRED:
-            /* Current player is out of time -> game ends. */
-            state->gameOver = 1;
-            state->result   = (state->currentTurn == WHITE)
-                                ? RESULT_BLACK_WIN
-                                : RESULT_WHITE_WIN;
-            return transitionState(state, GAME_TERMINATION_STATE);
-
-        case EVENT_LEAVE_GAME:
-            state->result = RESULT_TERMINATED;
-            return transitionState(state, GAME_TERMINATION_STATE);
-
-        case EVENT_EXIT_PROGRAM:
-            return transitionState(state, EXIT_STATE);
-
-        default:
-            break;
+/* Apply one already validated move and update logging, timer, and endgame state. */
+static int apply_resolved_move(GameState *state, Move move) {
+    if (state == NULL) {
+        return 1;
     }
 
-    if (state->gameOver) {
+    if (!validateMove(state, move)) {
+        return 1;
+    }
+
+    if (applyMove(state, move) != 0) {
+        return 1;
+    }
+
+    if (logMove(state, move) != 0) {
+        return 1;
+    }
+
+    if (detectGameResult(state) != 0) {
         return transitionState(state, GAME_TERMINATION_STATE);
     }
-    return 0;
+
+    return resetTurnTimer(state);
 }
 
-/* Handle the transient termination state before the end-game menu is shown. */
-static int handleGameTermination(GameState *state, Event e, EventQueue *out) {
-    (void)e; (void)out;
-    logGameEnd(state);
+/* Handle a player-entered move command while gameplay is active. */
+static int handle_move_input(GameState *state, Command command) {
+    Move move;
+
+    if (find_command_move(state, command, &move) != 0) {
+        return 1;
+    }
+
+    return apply_resolved_move(state, move);
+}
+
+/* Handle an AI-selected move while gameplay is active. */
+static int handle_ai_move(GameState *state, Move move) {
+    return apply_resolved_move(state, move);
+}
+
+/* Handle undo by restoring board, timers, and persisted move log state. */
+static int handle_undo(GameState *state) {
+    if (undoMove(state) != 0) {
+        return 1;
+    }
+
+    if (resetTurnTimer(state) != 0) {
+        return 1;
+    }
+
+    return rebuildLogFromHistory(state);
+}
+
+/* Handle gameplay-state events, including move application and timeouts. */
+static int handle_gameplay_event(GameState *state, Event event) {
+    if (state == NULL) {
+        return 1;
+    }
+
+    switch (event.type) {
+        case EVENT_MOVE_INPUT:
+            return handle_move_input(state, event.data.command);
+        case EVENT_AI_MOVE:
+            return handle_ai_move(state, event.data.move);
+        case EVENT_UNDO:
+            return handle_undo(state);
+        case EVENT_TIMER_EXPIRED:
+            if (state->currentTurn == WHITE) {
+                setGameResult(state, RESULT_BLACK_WIN);
+            } else {
+                setGameResult(state, RESULT_WHITE_WIN);
+            }
+            return transitionState(state, GAME_TERMINATION_STATE);
+        case EVENT_LEAVE_GAME:
+            setGameOver(state);
+            return transitionState(state, GAME_TERMINATION_STATE);
+        case EVENT_HINT:
+            return 1;
+        case EVENT_EXIT_PROGRAM:
+            return transitionState(state, EXIT_STATE);
+        default:
+            return 0;
+    }
+}
+
+/* Advance a termination state into the end-game menu after final logging. */
+static int handle_game_termination(GameState *state) {
+    if (state == NULL) {
+        return 1;
+    }
+
+    /* Termination should still advance even if logging was never initialized
+     * in a narrow test harness path. */
+    (void)logGameEnd(state);
     return transitionState(state, END_GAME_MENU_STATE);
 }
 
-/* Handle end-game menu navigation events. */
-static int handleEndGameMenu(GameState *state, Event e, EventQueue *out) {
-    (void)out;
-    switch (e.type) {
-        case EVENT_NEW_GAME:
-            return transitionState(state, GAME_MODE_SELECTION_STATE);
-        case EVENT_BACK:
-            return transitionState(state, MAIN_MENU_STATE);
-        case EVENT_EXIT_PROGRAM:
-            return transitionState(state, EXIT_STATE);
-        default:
-            return 0;
+/* Process one event according to the current FSM state stored in GameState. */
+int processEvent(GameState *state, Event event) {
+    if (state == NULL) {
+        return 1;
     }
-}
 
-/* Short-circuit the FSM into EXIT_STATE after a fatal error. */
-static int handleFatalError(GameState *state, Event e, EventQueue *out) {
-    (void)e; (void)out;
-    g_systemState = EXIT_STATE; 
-    (void)state;
-    return 0;
-}
-
-/* Dispatch one event to the handler for the current FSM state. */
-int processEvent(GameState *state, Event event, EventQueue *outQueue) {
-    if (!state) return 1;
     if (event.type == EVENT_FATAL_ERROR) {
-        return handleFatalError(state, event, outQueue);
+        state->systemState = EXIT_STATE;
+        return 0;
     }
 
-    switch (g_systemState) {
-        case INIT_STATE:                return handleInit              (state, event, outQueue);
-        case MAIN_MENU_STATE:           return handleMainMenu          (state, event, outQueue);
-        case GAME_MODE_SELECTION_STATE: return handleGameModeSelection (state, event, outQueue);
-        case GAME_SETUP_STATE:          return handleGameSetup         (state, event, outQueue);
-        case GAMEPLAY_STATE:            return handleGameplay          (state, event, outQueue);
-        case GAME_TERMINATION_STATE:    return handleGameTermination   (state, event, outQueue);
-        case END_GAME_MENU_STATE:       return handleEndGameMenu       (state, event, outQueue);
-        case EXIT_STATE:                return 0; /* terminal */
-        default:                        return 1;
+    switch (state->systemState) {
+        case INIT_STATE:
+            return transitionState(state, MAIN_MENU_STATE);
+        case MAIN_MENU_STATE:
+            switch (event.type) {
+                case EVENT_NEW_GAME:
+                    return transitionState(state, GAME_MODE_SELECTION_STATE);
+                case EVENT_EXIT_PROGRAM:
+                    return transitionState(state, EXIT_STATE);
+                default:
+                    return 0;
+            }
+        case GAME_MODE_SELECTION_STATE:
+            switch (event.type) {
+                case EVENT_NEW_GAME:
+                    return transitionState(state, GAME_SETUP_STATE);
+                case EVENT_BACK:
+                    return transitionState(state, MAIN_MENU_STATE);
+                case EVENT_EXIT_PROGRAM:
+                    return transitionState(state, EXIT_STATE);
+                default:
+                    return 0;
+            }
+        case GAME_SETUP_STATE:
+            switch (event.type) {
+                case EVENT_NEW_GAME:
+                    if (initClock() != 0) {
+                        return 1;
+                    }
+                    if (initTurnTimer(state) != 0) {
+                        return 1;
+                    }
+                    if (initLog(&state->config) != 0) {
+                        return 1;
+                    }
+                    if (logGameStart(&state->config) != 0) {
+                        return 1;
+                    }
+                    return transitionState(state, GAMEPLAY_STATE);
+                case EVENT_BACK:
+                    return transitionState(state, GAME_MODE_SELECTION_STATE);
+                case EVENT_EXIT_PROGRAM:
+                    return transitionState(state, EXIT_STATE);
+                default:
+                    return 0;
+            }
+        case GAMEPLAY_STATE:
+            return handle_gameplay_event(state, event);
+        case GAME_TERMINATION_STATE:
+            return handle_game_termination(state);
+        case END_GAME_MENU_STATE:
+            switch (event.type) {
+                case EVENT_NEW_GAME:
+                    return transitionState(state, GAME_MODE_SELECTION_STATE);
+                case EVENT_BACK:
+                    return transitionState(state, MAIN_MENU_STATE);
+                case EVENT_EXIT_PROGRAM:
+                    return transitionState(state, EXIT_STATE);
+                default:
+                    return 0;
+            }
+        case EXIT_STATE:
+            return 0;
+        default:
+            return 1;
     }
 }
 
-/* Debug */
-
-/* Convert one FSM state into a stable debug label. */
-const char *systemStateName(SystemState s) {
-    switch (s) {
-        case INIT_STATE:                return "INIT_STATE";
-        case MAIN_MENU_STATE:           return "MAIN_MENU_STATE";
-        case GAME_MODE_SELECTION_STATE: return "GAME_MODE_SELECTION_STATE";
-        case GAME_SETUP_STATE:          return "GAME_SETUP_STATE";
-        case GAMEPLAY_STATE:            return "GAMEPLAY_STATE";
-        case GAME_TERMINATION_STATE:    return "GAME_TERMINATION_STATE";
-        case END_GAME_MENU_STATE:       return "END_GAME_MENU_STATE";
-        case EXIT_STATE:                return "EXIT_STATE";
-        default:                        return "UNKNOWN";
+/* Attempt one explicit state transition if the FSM table allows it. */
+int transitionState(GameState *state, SystemState newState) {
+    if (state == NULL) {
+        return 1;
     }
+
+    if (!transition_is_allowed(state->systemState, newState)) {
+        return 1;
+    }
+
+    state->systemState = newState;
+    return 0;
 }

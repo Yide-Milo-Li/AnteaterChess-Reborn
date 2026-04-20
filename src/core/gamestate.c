@@ -5,9 +5,12 @@
 /*
  * Alignment assumptions for future extensions:
  * - This file owns GameState-level consistency helpers, not gameplay rules.
- * - setGameResult() is the authoritative path for keeping result/gameOver aligned.
- * - setGameOver() remains a compatibility helper for user-driven termination only.
- * - Callers may read GameState immediately after initialization, so init must reset every field.
+ * - setGameResult() is the authoritative path for keeping result/gameOver
+ * aligned.
+ * - setGameOver() remains a compatibility helper for user-driven termination
+ * only.
+ * - Callers may read GameState immediately after initialization, so init must
+ * reset every field.
  */
 
 /* Set up a brand-new game state */
@@ -60,7 +63,8 @@ void initGameState(GameState *state, const GameConfig *config) {
     initBoard(&state->board);
     state->config = effectiveConfig;
 
-    /* The players array is stored by color: index 0 is white, index 1 is black */
+    /* The players array is stored by color: index 0 is white, index 1 is
+     * black*/
     state->players[WHITE] = createPlayer(WHITE, whiteType);
     state->players[BLACK] = createPlayer(BLACK, blackType);
 
@@ -69,6 +73,7 @@ void initGameState(GameState *state, const GameConfig *config) {
     state->moveCount = 0;
     state->gameOver = 0;
     state->result = RESULT_NONE;
+    state->terminationReason = TERMINATION_NONE;
     state->systemState = INIT_STATE;
 
     /* No moves have happened yet, so initialize move history */
@@ -94,7 +99,8 @@ int isGameOver(const GameState *state) {
     return 1;
 }
 
-/* Mark the game as user-terminated while preserving result/gameOver consistency. */
+/* Mark the game as user-terminated while preserving result/gameOver
+ * consistency. */
 void setGameOver(GameState *state) {
     if (state == NULL) {
         return;
@@ -162,6 +168,17 @@ void setGameResult(GameState *state, GameResult result) {
     } else {
         state->gameOver = 1;
     }
+}
+
+/* Set result and termination reason together so both fields stay consistent. */
+void setGameTermination(GameState *state, GameResult result,
+                        TerminationReason reason) {
+    if (state == NULL) {
+        return;
+    }
+
+    setGameResult(state, result);
+    state->terminationReason = reason;
 }
 
 /* Return the currently stored game result. */

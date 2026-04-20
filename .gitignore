@@ -52,4 +52,5 @@ coverage/
 .vscode/
 .idea/
 .codex
+compile_commands.json
 

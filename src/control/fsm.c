@@ -5,6 +5,13 @@
 #include "gameplay/endgame.h"
 #include "system/controller.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - fsm.h is the truth source for public FSM entrypoints and transition helpers.
+ * - This file owns system-state transitions, not event polling or queue priority policy.
+ * - Gameplay pipelines may mutate GameState, but transition legality remains centralized here.
+ */
+
 enum {
     MOVE_PIPELINE_OK                 = 0,
     MOVE_PIPELINE_ERR_NULL_ARG       = 1,
@@ -64,6 +71,7 @@ static const Transition VALID[] = {
 
 static const int VALID_COUNT = (int)(sizeof(VALID) / sizeof(VALID[0]));
 
+/* Check whether one state transition is permitted by the FSM table. */
 static int transitionIsAllowed(SystemState from, SystemState to) {
     if (from == to) return 1;
     for (int i = 0; i < VALID_COUNT; ++i) {
@@ -72,14 +80,17 @@ static int transitionIsAllowed(SystemState from, SystemState to) {
     return 0;
 }
 
+/* Reset the FSM singleton back to its boot state. */
 void initFSM(void) {
     g_systemState = INIT_STATE;
 }
 
+/* Expose the currently active FSM state for controller and tests. */
 SystemState getSystemState(void) {
     return g_systemState;
 }
 
+/* Attempt one state transition if the table allows it. */
 int transitionState(GameState *state, SystemState newState) {
     (void)state;
     if (!transitionIsAllowed(g_systemState, newState)) {
@@ -89,17 +100,20 @@ int transitionState(GameState *state, SystemState newState) {
     return 0;
 }
 
+/* Emit a recoverable error event into the outgoing queue when possible. */
 static int raiseError(EventQueue *outQueue, ErrorCode code) {
     if (!outQueue) return 0;
     Event err = createErrorEvent(code);
     return enqueueEvent(outQueue, err, queueForEvent(EVENT_ERROR));
 }
 
+/* Handle the boot state by advancing into the main menu. */
 static int handleInit(GameState *state, Event e, EventQueue *out) {
     (void)e; (void)out;
     return transitionState(state, MAIN_MENU_STATE);
 }
 
+/* Handle top-level main-menu control events. */
 static int handleMainMenu(GameState *state, Event e, EventQueue *out) {
     (void)out;
     switch (e.type) {
@@ -112,6 +126,7 @@ static int handleMainMenu(GameState *state, Event e, EventQueue *out) {
     }
 }
 
+/* Handle game-mode-selection menu events. */
 static int handleGameModeSelection(GameState *state, Event e, EventQueue *out) {
     (void)out;
     switch (e.type) {
@@ -126,6 +141,7 @@ static int handleGameModeSelection(GameState *state, Event e, EventQueue *out) {
     }
 }
 
+/* Handle setup confirmation and setup-menu navigation events. */
 static int handleGameSetup(GameState *state, Event e, EventQueue *out) {
     (void)out;
     switch (e.type) {
@@ -141,6 +157,7 @@ static int handleGameSetup(GameState *state, Event e, EventQueue *out) {
     }
 }
 
+/* Handle gameplay-time events, including move pipelines and timeout termination. */
 static int handleGameplay(GameState *state, Event e, EventQueue *out) {
     int rc = 0;
 
@@ -189,12 +206,14 @@ static int handleGameplay(GameState *state, Event e, EventQueue *out) {
     return 0;
 }
 
+/* Handle the transient termination state before the end-game menu is shown. */
 static int handleGameTermination(GameState *state, Event e, EventQueue *out) {
     (void)e; (void)out;
     logGameEnd(state);
     return transitionState(state, END_GAME_MENU_STATE);
 }
 
+/* Handle end-game menu navigation events. */
 static int handleEndGameMenu(GameState *state, Event e, EventQueue *out) {
     (void)out;
     switch (e.type) {
@@ -209,6 +228,7 @@ static int handleEndGameMenu(GameState *state, Event e, EventQueue *out) {
     }
 }
 
+/* Short-circuit the FSM into EXIT_STATE after a fatal error. */
 static int handleFatalError(GameState *state, Event e, EventQueue *out) {
     (void)e; (void)out;
     g_systemState = EXIT_STATE; 
@@ -216,6 +236,7 @@ static int handleFatalError(GameState *state, Event e, EventQueue *out) {
     return 0;
 }
 
+/* Dispatch one event to the handler for the current FSM state. */
 int processEvent(GameState *state, Event event, EventQueue *outQueue) {
     if (!state) return 1;
     if (event.type == EVENT_FATAL_ERROR) {
@@ -237,6 +258,7 @@ int processEvent(GameState *state, Event event, EventQueue *outQueue) {
 
 /* Debug */
 
+/* Convert one FSM state into a stable debug label. */
 const char *systemStateName(SystemState s) {
     switch (s) {
         case INIT_STATE:                return "INIT_STATE";

@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := all
 
 CC ?= gcc
-CPPFLAGS ?= -Iinclude
+CPPFLAGS ?= -Iinclude -D_POSIX_C_SOURCE=200809L
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror
 LDFLAGS ?=
 LDLIBS ?=

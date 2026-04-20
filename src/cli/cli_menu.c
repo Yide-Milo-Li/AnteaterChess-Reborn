@@ -27,7 +27,7 @@ static int read_selection_in_range(int minValue, int maxValue, int *selection) {
         }
 
         if (parsedSelection < minValue || parsedSelection > maxValue) {
-            cliShowErrorMessage(ERR_INVALID_INPUT);
+            cliShowErrorMessage(ERR_INVALID_MENU_SELECTION);
             continue;
         }
 
@@ -66,7 +66,7 @@ static int read_initial_time_seconds(int *seconds) {
     for (;;) {
         printf("Enter per-turn time in seconds (1-3600):\n");
         if (getMenuSelection(&parsedSeconds) != 0 || parsedSeconds < 1 || parsedSeconds > 3600) {
-            cliShowErrorMessage(ERR_INVALID_INPUT);
+            cliShowErrorMessage(ERR_INVALID_TIMER_SETTING);
             continue;
         }
 

@@ -9,6 +9,8 @@
 #include "cli/cli_renderer.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/position.h"
+#include "gameplay/validation.h"
 #include "system/event.h"
 #include "system/event_queue.h"
 #include "system/fsm.h"
@@ -180,7 +182,7 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
     switch (action) {
         case 1:
             if (cliGetMoveCommand(&command) != 0) {
-                cliShowErrorMessage(ERR_INVALID_INPUT);
+                cliShowErrorMessage(ERR_INVALID_MOVE_FORMAT);
                 return 0;
             }
             return enqueue_cli_event(queue, createMoveInputEvent(command));
@@ -218,6 +220,36 @@ static int collect_endgame_event(const GameState *state, EventQueue *queue) {
             return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
         default:
             return 1;
+    }
+}
+
+/* Classify one rejected move command into the most precise current public error code. */
+static ErrorCode classify_move_error(const GameState *state, Command command) {
+    SelectionResult selectionResult;
+
+    if (state == NULL) {
+        return ERR_FATAL;
+    }
+
+    if (command.type != CMD_MOVE) {
+        return ERR_INVALID_MOVE_FORMAT;
+    }
+
+    if (!isValidPosition(command.from) || !isValidPosition(command.to)) {
+        return ERR_POSITION_OUT_OF_BOUNDS;
+    }
+
+    selectionResult = validateSelection(state, command.from);
+    switch (selectionResult) {
+        case SELECT_EMPTY:
+            return ERR_EMPTY_SELECTION;
+        case SELECT_OPPONENT_PIECE:
+            return ERR_OPPONENT_PIECE;
+        case SELECT_OUT_OF_BOUNDS:
+            return ERR_POSITION_OUT_OF_BOUNDS;
+        case SELECT_VALID:
+        default:
+            return ERR_ILLEGAL_MOVE;
     }
 }
 
@@ -269,7 +301,7 @@ static int collect_next_cli_event(GameState *state, EventQueue *queue) {
 /* Translate common FSM failures into user-visible CLI feedback. */
 static void report_processing_error(const GameState *state, Event event) {
     if (event.type == EVENT_MOVE_INPUT) {
-        cliShowErrorMessage(ERR_ILLEGAL_MOVE);
+        cliShowErrorMessage(classify_move_error(state, event.data.command));
         return;
     }
 

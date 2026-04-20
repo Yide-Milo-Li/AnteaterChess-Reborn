@@ -32,7 +32,7 @@ int cliGetGameplayAction(int *selection) {
 
     for (;;) {
         if (getMenuSelection(selection) != 0 || *selection < 1 || *selection > 5) {
-            cliShowErrorMessage(ERR_INVALID_INPUT);
+            cliShowErrorMessage(ERR_INVALID_MENU_SELECTION);
             continue;
         }
 

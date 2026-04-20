@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "cli/cli_feedback.h"
 #include "cli/cli_gameplay.h"
+#include "error/error.h"
 
 #define CLI_FIXTURE_DIR "tests/fixtures/cli/"
 #define CLI_CAPTURE_FILE CLI_FIXTURE_DIR "capture_gameplay.txt"
@@ -44,6 +46,11 @@ static void show_hint_wrapper(void) {
     assert(cliShowMoveFormatHint() == 0);
 }
 
+/* Provide a wrapper so stdout capture can verify shared CLI error rendering. */
+static void show_error_wrapper(void) {
+    assert(cliShowErrorMessage(ERR_ILLEGAL_MOVE) == 0);
+}
+
 /* Check that gameplay action selection reprompts until it receives a valid choice. */
 static void test_gameplay_action_selection(void) {
     int selection;
@@ -77,10 +84,20 @@ static void test_move_format_hint_output(void) {
     assert(strstr(buffer, "\x1b[") != NULL);
 }
 
+/* Check that CLI error output delegates its message text to the shared error module. */
+static void test_cli_error_output_uses_shared_error_message(void) {
+    char buffer[256];
+
+    captureStdout(show_error_wrapper, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
+    assert(strstr(buffer, "[Error]") != NULL);
+    assert(strstr(buffer, getErrorMessage(ERR_ILLEGAL_MOVE)) != NULL);
+}
+
 /* Run the CLI gameplay regression suite. */
 int main(void) {
     test_gameplay_action_selection();
     test_gameplay_move_command();
     test_move_format_hint_output();
+    test_cli_error_output_uses_shared_error_message();
     return 0;
 }

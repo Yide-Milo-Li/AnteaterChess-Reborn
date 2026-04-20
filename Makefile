@@ -144,7 +144,7 @@ DEP_FILES := \
 	$(TEST_OBJS:.o=.d)
 
 .PHONY: all help cli tests test test-core test-system test-cli test-ai list-tests \
-	rebuild clean clean-deps maybe-clean-deps run-cli print-vars
+	rebuild clean clean-exe clean-deps maybe-clean-deps run-cli print-vars
 
 all: tests cli maybe-clean-deps
 
@@ -160,6 +160,7 @@ help:
 	@echo "  test-ai     Build and run AI tests"
 	@echo "  run-cli     Build and launch the CLI executable"
 	@echo "  list-tests  Print all maintained test target names"
+	@echo "  clean-exe   Remove generated .exe files only"
 	@echo "  clean       Remove generated build and binary artifacts"
 	@echo "  clean-deps  Remove generated .d dependency files only"
 	@echo "  rebuild     Clean and rebuild everything"
@@ -192,6 +193,9 @@ rebuild: clean all
 
 clean:
 	$(RMDIR) $(BUILD_DIR) $(BIN_DIR)
+
+clean-exe:
+	$(RM) $(CLI_APP_BIN) $(TEST_BINS) $(wildcard *.exe)
 
 clean-deps:
 	$(RM) $(DEP_FILES)

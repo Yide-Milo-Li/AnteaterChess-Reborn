@@ -51,6 +51,14 @@ static void show_error_wrapper(void) {
     assert(cliShowErrorMessage(ERR_ILLEGAL_MOVE) == 0);
 }
 
+/* Provide a wrapper so stdout capture can verify the human-turn action menu. */
+static void show_action_menu_wrapper(void) {
+    int selection;
+
+    assert(cliGetGameplayAction(&selection) == 0);
+    assert(selection == 5);
+}
+
 /* Check that gameplay action selection reprompts until it receives a valid choice. */
 static void test_gameplay_action_selection(void) {
     int selection;
@@ -72,6 +80,16 @@ static void test_gameplay_move_command(void) {
 
     writeFixtureAndRedirect(CLI_FIXTURE_DIR "gameplay_move_invalid.txt", "Z9 E4\n");
     assert(cliGetMoveCommand(&command) != 0);
+}
+
+/* Check that the gameplay action menu advertises AI suggestions on human turns. */
+static void test_gameplay_action_menu_output(void) {
+    char buffer[512];
+
+    writeFixtureAndRedirect(CLI_FIXTURE_DIR "gameplay_action.txt", "5\n");
+    captureStdout(show_action_menu_wrapper, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
+    assert(strstr(buffer, "Actions") != NULL);
+    assert(strstr(buffer, "Show AI suggestion") != NULL);
 }
 
 /* Check that the move-format hint prints the documented coordinate example. */
@@ -97,6 +115,7 @@ static void test_cli_error_output_uses_shared_error_message(void) {
 int main(void) {
     test_gameplay_action_selection();
     test_gameplay_move_command();
+    test_gameplay_action_menu_output();
     test_move_format_hint_output();
     test_cli_error_output_uses_shared_error_message();
     return 0;

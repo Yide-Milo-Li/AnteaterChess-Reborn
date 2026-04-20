@@ -3,12 +3,14 @@
 #include <stdio.h>
 #include <stddef.h>
 
+#include "ai/ai.h"
 #include "cli/cli_feedback.h"
 #include "cli/cli_gameplay.h"
 #include "cli/cli_menu.h"
 #include "cli/cli_renderer.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "input/input.h"
 #include "core/position.h"
 #include "gameplay/validation.h"
 #include "system/event.h"
@@ -20,7 +22,8 @@
  * Alignment assumptions for future extensions:
  * - CLI headers are the truth source for the text-front-end contract in this file.
  * - This file orchestrates a standalone CLI app loop and must not define GUI behavior.
- * - FSM and gameplay modules remain the source of truth for state transitions and rules.
+ * - FSM, gameplay, and AI modules remain the source of truth for state transitions,
+ *   rules, and move selection.
  */
 
 #define ANSI_RESET  "\x1b[0m"
@@ -80,9 +83,202 @@ static void print_gameplay_page_header(void) {
     printf("%sGameplay View%s\n", ANSI_ACCENT, ANSI_RESET);
 }
 
-/* Show the disabled AI-mode message without changing FSM state. */
-static void handle_disabled_mode_choice(void) {
-    (void)cliShowDisabledFeatureMessage("AI game modes");
+/* Render the shared gameplay view before human or AI turn handling. */
+static int render_gameplay_view(const GameState *state) {
+    print_gameplay_page_header();
+    if (cliDisplayTurn(state->currentTurn) != 0
+        || cliDisplayGameStatus(state) != 0
+        || cliRenderBoard(state) != 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Report whether the current side to move is controlled by the AI. */
+static int current_turn_is_ai(const GameState *state) {
+    if (state == NULL || state->currentTurn < WHITE || state->currentTurn > BLACK) {
+        return 0;
+    }
+
+    return state->players[state->currentTurn].type == AI;
+}
+
+/* Report whether the CLI session is currently computer-vs-computer. */
+static int both_players_are_ai(const GameState *state) {
+    if (state == NULL) {
+        return 0;
+    }
+
+    return state->players[WHITE].type == AI && state->players[BLACK].type == AI;
+}
+
+/* Return the shared color label used in setup and gameplay summaries. */
+static const char *color_label(Color color) {
+    return (color == BLACK) ? "Black" : "White";
+}
+
+/* Return the shared piece label used in move summaries. */
+static const char *piece_label(PieceType type) {
+    switch (type) {
+        case ANT:
+            return "Ant";
+        case ROOK:
+            return "Rook";
+        case KNIGHT:
+            return "Knight";
+        case BISHOP:
+            return "Bishop";
+        case QUEEN:
+            return "Queen";
+        case KING:
+            return "King";
+        case ANTEATER:
+            return "Anteater";
+        case EMPTY_PIECE:
+        default:
+            return "Piece";
+    }
+}
+
+/* Convert one valid board coordinate into the CLI algebraic display format. */
+static void format_position_text(Position pos, char buffer[8]) {
+    int displayRow;
+
+    if (buffer == NULL) {
+        return;
+    }
+
+    if (!isValidPosition(pos)) {
+        snprintf(buffer, 8, "??");
+        return;
+    }
+
+    displayRow = 8 - pos.row;
+    buffer[0] = (char)('A' + pos.col);
+    buffer[1] = (char)('0' + displayRow);
+    buffer[2] = '\0';
+}
+
+/* Return the optional special-move label for one public move type. */
+static const char *special_move_label(SpecialMove type) {
+    switch (type) {
+        case PROMOTION_QUEEN:
+            return "promotion to queen";
+        case PROMOTION_ROOK:
+            return "promotion to rook";
+        case PROMOTION_BISHOP:
+            return "promotion to bishop";
+        case PROMOTION_KNIGHT:
+            return "promotion to knight";
+        case EN_PASSANT:
+            return "en passant";
+        case CASTLING_KINGSIDE:
+            return "castle kingside";
+        case CASTLING_QUEENSIDE:
+            return "castle queenside";
+        case ANTEATER_CAPTURE:
+            return "anteater chain";
+        case NO_SPECIAL_MOVE:
+        default:
+            return NULL;
+    }
+}
+
+/* Print one concise CLI move summary for AI moves and hint suggestions. */
+static void print_move_summary(const char *prefix, Move move) {
+    char fromText[8];
+    char toText[8];
+    const char *specialText = special_move_label(move.specialType);
+
+    format_position_text(move.from, fromText);
+    format_position_text(move.to, toText);
+
+    printf("%s[%s]%s %s %s %s -> %s",
+        ANSI_ACCENT,
+        prefix,
+        ANSI_RESET,
+        color_label(move.movedPiece.color),
+        piece_label(move.movedPiece.type),
+        fromText,
+        toText);
+
+    if (move.captureCount > 0) {
+        printf(" | captures: %d", move.captureCount);
+    }
+
+    if (specialText != NULL) {
+        printf(" | special: %s", specialText);
+    }
+
+    printf("\n");
+}
+
+/* Read one autoplay control choice for computer-vs-computer CLI sessions. */
+static int prompt_ai_autoplay_action(int *selection) {
+    int parsedSelection;
+
+    if (selection == NULL) {
+        return 1;
+    }
+
+    printf("%s[AI Autoplay]%s 1. Continue  2. Leave game  3. Exit program\n",
+        ANSI_ACCENT, ANSI_RESET);
+    for (;;) {
+        if (getMenuSelection(&parsedSelection) != 0) {
+            cliShowErrorMessage(ERR_INVALID_INPUT);
+            continue;
+        }
+
+        if (parsedSelection < 1 || parsedSelection > 3) {
+            cliShowErrorMessage(ERR_INVALID_MENU_SELECTION);
+            continue;
+        }
+
+        *selection = parsedSelection;
+        return 0;
+    }
+}
+
+/* Generate one AI move event, optionally letting the user control CVC autoplay. */
+static int collect_ai_turn_event(GameState *state, EventQueue *queue) {
+    Move move;
+
+    if (state == NULL || queue == NULL) {
+        return 1;
+    }
+
+    if (both_players_are_ai(state)) {
+        int autoplaySelection;
+
+        if (prompt_ai_autoplay_action(&autoplaySelection) != 0) {
+            return 1;
+        }
+
+        if (autoplaySelection == 2) {
+            return enqueue_cli_event(queue, createSystemEvent(EVENT_LEAVE_GAME));
+        }
+
+        if (autoplaySelection == 3) {
+            return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
+        }
+    }
+
+    printf("%s[AI]%s %s is thinking...\n", ANSI_ACCENT, ANSI_RESET, color_label(state->currentTurn));
+    if (generateAIMove(state, &move) != 0) {
+        return 1;
+    }
+
+    if (state->config.timerEnabled) {
+        if (updateTurnTimer(state) != 0) {
+            return 1;
+        }
+        if (isTimeUp(state) == 1) {
+            return enqueue_cli_event(queue, createSystemEvent(EVENT_TIMER_EXPIRED));
+        }
+    }
+
+    return enqueue_cli_event(queue, createAIMoveEvent(move));
 }
 
 /* Collect the next main-menu event for the CLI frontend. */
@@ -101,20 +297,26 @@ static int collect_main_menu_event(EventQueue *queue) {
 }
 
 /* Collect the next game-mode event for the CLI frontend. */
-static int collect_mode_selection_event(EventQueue *queue) {
+static int collect_mode_selection_event(GameState *state, EventQueue *queue) {
     int selection;
 
-    if (cliGetGameModeSelection(&selection) != 0) {
+    if (state == NULL || cliGetGameModeSelection(&selection) != 0) {
         return 1;
     }
 
     switch (selection) {
         case 1:
+            initDefaultGameConfig(&state->config);
+            state->config.mode = MODE_HUMAN_VS_HUMAN;
             return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
         case 2:
+            initDefaultGameConfig(&state->config);
+            state->config.mode = MODE_HUMAN_VS_COMPUTER;
+            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
         case 3:
-            handle_disabled_mode_choice();
-            return 0;
+            initDefaultGameConfig(&state->config);
+            state->config.mode = MODE_COMPUTER_VS_COMPUTER;
+            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
         case 4:
             return enqueue_cli_event(queue, createSystemEvent(EVENT_BACK));
         case 5:
@@ -132,6 +334,7 @@ static int collect_setup_event(GameState *state, EventQueue *queue) {
         return 1;
     }
 
+    config = state->config;
     if (cliGetGameSetupConfig(&config) != 0) {
         return 1;
     }
@@ -145,6 +348,7 @@ static int collect_setup_event(GameState *state, EventQueue *queue) {
 static int collect_gameplay_event(GameState *state, EventQueue *queue) {
     int action;
     Command command;
+    Move hintMove;
 
     if (state == NULL) {
         return 1;
@@ -159,11 +363,12 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
         }
     }
 
-    print_gameplay_page_header();
-    if (cliDisplayTurn(state->currentTurn) != 0
-        || cliDisplayGameStatus(state) != 0
-        || cliRenderBoard(state) != 0) {
+    if (render_gameplay_view(state) != 0) {
         return 1;
+    }
+
+    if (current_turn_is_ai(state)) {
+        return collect_ai_turn_event(state, queue);
     }
 
     if (cliGetGameplayAction(&action) != 0) {
@@ -197,7 +402,12 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
         case 4:
             return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
         case 5:
-            return cliShowMoveFormatHint();
+            if (generateHintMove(state, &hintMove) != 0) {
+                cliShowErrorMessage(ERR_HINT_UNAVAILABLE);
+                return 0;
+            }
+            print_move_summary("Hint", hintMove);
+            return 0;
         default:
             return 1;
     }
@@ -284,7 +494,7 @@ static int collect_next_cli_event(GameState *state, EventQueue *queue) {
         case MAIN_MENU_STATE:
             return collect_main_menu_event(queue);
         case GAME_MODE_SELECTION_STATE:
-            return collect_mode_selection_event(queue);
+            return collect_mode_selection_event(state, queue);
         case GAME_SETUP_STATE:
             return collect_setup_event(state, queue);
         case GAMEPLAY_STATE:
@@ -347,6 +557,11 @@ int runCliApp(void) {
         event = dequeue_next_event(&queue);
         if (processEvent(&state, event) != 0) {
             report_processing_error(&state, event);
+            continue;
+        }
+
+        if (event.type == EVENT_AI_MOVE) {
+            print_move_summary("AI Move", event.data.move);
         }
     }
 

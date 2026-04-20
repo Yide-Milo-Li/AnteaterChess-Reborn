@@ -227,7 +227,11 @@ $(OBJ_DIR)/tests/%.o: tests/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
-$(TEST_BIN_DIR)/%$(EXE): $(OBJ_DIR)/tests/%.o $(COMMON_OBJS)
+$(TEST_BIN_DIR)/%$(EXE): $(OBJ_DIR)/tests/%.o $(COMMON_OBJS) $(AI_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
+
+$(TEST_BIN_DIR)/test_cli_app$(EXE): $(OBJ_DIR)/tests/test_cli_app.o $(COMMON_OBJS) $(AI_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
 
@@ -235,7 +239,7 @@ $(TEST_BIN_DIR)/test_ai$(EXE): $(OBJ_DIR)/tests/test_ai.o $(COMMON_OBJS) $(AI_OB
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
 
-$(CLI_APP_BIN): $(CLI_MAIN_OBJ) $(COMMON_OBJS)
+$(CLI_APP_BIN): $(CLI_MAIN_OBJ) $(COMMON_OBJS) $(AI_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
 

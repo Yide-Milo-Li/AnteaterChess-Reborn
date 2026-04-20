@@ -2,6 +2,7 @@
 
 #include <limits.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -386,8 +387,39 @@ static int is_noisy_move(const Move *move) {
            is_promotion_move(move);
 }
 
+/* Clone one caller-owned game state onto the heap to avoid deep search copies
+ * blowing up the stack. */
+static GameState *clone_state(const GameState *state) {
+    GameState *copy;
+
+    if (state == NULL) {
+        return NULL;
+    }
+
+    copy = (GameState *)malloc(sizeof(GameState));
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    *copy = *state;
+    return copy;
+}
+
+/* Allocate one move list on the heap so recursive search does not accumulate
+ * large stack frames. */
+static MoveList *allocate_move_list(void) {
+    MoveList *list = (MoveList *)malloc(sizeof(MoveList));
+
+    if (list == NULL) {
+        return NULL;
+    }
+
+    initMoveList(list);
+    return list;
+}
+
 static int collect_fully_legal_moves(const GameState *state, MoveList *legal) {
-    MoveList pseudo;
+    MoveList *pseudo;
     int index;
 
     if (state == NULL || legal == NULL) {
@@ -395,44 +427,66 @@ static int collect_fully_legal_moves(const GameState *state, MoveList *legal) {
     }
 
     initMoveList(legal);
-    if (generateMoves(state, &pseudo) != 0) {
+    pseudo = allocate_move_list();
+    if (pseudo == NULL) {
         return 1;
     }
 
-    for (index = 0; index < pseudo.count; ++index) {
-        Move candidate = pseudo.moves[index];
-        GameState next = *state;
+    if (generateMoves(state, pseudo) != 0) {
+        free(pseudo);
+        return 1;
+    }
+
+    for (index = 0; index < pseudo->count; ++index) {
+        Move candidate = pseudo->moves[index];
+        GameState *next = clone_state(state);
         Color moving_side = state->currentTurn;
 
-        if (applyMove(&next, candidate) != 0) {
+        if (next == NULL) {
+            free(pseudo);
+            return 1;
+        }
+
+        if (applyMove(next, candidate) != 0) {
+            free(next);
             continue;
         }
         // if got checked, then it's not a legal move
-        if (isInCheck(&next, moving_side)) {
+        if (isInCheck(next, moving_side)) {
+            free(next);
             continue;
         }
+        free(next);
         addMove(legal, candidate);
     }
 
+    free(pseudo);
     return 0;
 }
 
 // collect noisy legal moves
 static int collect_noisy_legal_moves(const GameState *state, MoveList *noisy) {
-    MoveList all;
+    MoveList *all;
     int index;
 
-    if (collect_fully_legal_moves(state, &all) != 0) {
+    all = allocate_move_list();
+    if (all == NULL) {
+        return 1;
+    }
+
+    if (collect_fully_legal_moves(state, all) != 0) {
+        free(all);
         return 1;
     }
 
     initMoveList(noisy);
-    for (index = 0; index < all.count; ++index) {
-        if (is_noisy_move(&all.moves[index])) {
-            addMove(noisy, all.moves[index]);
+    for (index = 0; index < all->count; ++index) {
+        if (is_noisy_move(&all->moves[index])) {
+            addMove(noisy, all->moves[index]);
         }
     }
 
+    free(all);
     return 0;
 }
 
@@ -440,7 +494,7 @@ static int collect_noisy_legal_moves(const GameState *state, MoveList *noisy) {
 static int quiescence(const GameState *state, int alpha, int beta, int ply,
                       int qdepth) {
     int stand_pat;
-    MoveList noisy;
+    MoveList *noisy;
     int index;
 
     // avoid unused variable compile error
@@ -469,31 +523,45 @@ static int quiescence(const GameState *state, int alpha, int beta, int ply,
     }
 
     // collect noisy legal moves, if there are no noisy moves, return alpha
-    if (collect_noisy_legal_moves(state, &noisy) != 0) {
+    noisy = allocate_move_list();
+    if (noisy == NULL) {
+        return alpha;
+    }
+
+    if (collect_noisy_legal_moves(state, noisy) != 0) {
+        free(noisy);
         return alpha;
     }
 
     // sort moves by noisy score
-    sort_moves(&noisy);
+    sort_moves(noisy);
 
-    for (index = 0; index < noisy.count; ++index) {
-        GameState next = *state;
+    for (index = 0; index < noisy->count; ++index) {
+        GameState *next = clone_state(state);
         int score;
 
+        if (next == NULL) {
+            return alpha;
+        }
+
         // check if move is legal
-        if (applyMove(&next, noisy.moves[index]) != 0) {
+        if (applyMove(next, noisy->moves[index]) != 0) {
+            free(next);
             continue;
         }
 
         // recursive call, main algorithm
-        score = -quiescence(&next, -beta, -alpha, ply + 1, qdepth + 1);
+        score = -quiescence(next, -beta, -alpha, ply + 1, qdepth + 1);
+        free(next);
 
         // if received stop signal, return alpha
         if (g_stop_search) {
+            free(noisy);
             return alpha;
         }
         // beta cut-off when score >= beta
         if (score >= beta) {
+            free(noisy);
             return beta;
         }
         if (score > alpha) {
@@ -501,13 +569,14 @@ static int quiescence(const GameState *state, int alpha, int beta, int ply,
         }
     }
 
+    free(noisy);
     return alpha;
 }
 
 // alpha-beta search
 static int alpha_beta(const GameState *state, int depth, int alpha, int beta,
                       int ply) {
-    MoveList legal;
+    MoveList *legal;
     int best_score = -AI_INF;
     int index;
 
@@ -519,12 +588,19 @@ static int alpha_beta(const GameState *state, int depth, int alpha, int beta,
     // increment node count
     ++g_nodes;
 
-    if (collect_fully_legal_moves(state, &legal) != 0) {
+    legal = allocate_move_list();
+    if (legal == NULL) {
+        return evaluate_relative(state);
+    }
+
+    if (collect_fully_legal_moves(state, legal) != 0) {
+        free(legal);
         return evaluate_relative(state);
     }
 
     // Endgame detection
-    if (legal.count == 0) {
+    if (legal->count == 0) {
+        free(legal);
         if (isInCheck(state, state->currentTurn)) {
             // checkmate and procrastinate as much as possible.
             return -AI_MATE + ply;
@@ -535,24 +611,33 @@ static int alpha_beta(const GameState *state, int depth, int alpha, int beta,
 
     // depth limit reached, use quiescence search
     if (depth <= 0) {
-        return quiescence(state, alpha, beta, ply, 0);
+        int quietScore = quiescence(state, alpha, beta, ply, 0);
+        free(legal);
+        return quietScore;
     }
 
     // sort moves by noisy score
-    sort_moves(&legal);
-    for (index = 0; index < legal.count; ++index) {
-        GameState next = *state;
+    sort_moves(legal);
+    for (index = 0; index < legal->count; ++index) {
+        GameState *next = clone_state(state);
         int score;
 
-        if (applyMove(&next, legal.moves[index]) != 0) {
+        if (next == NULL) {
+            return alpha;
+        }
+
+        if (applyMove(next, legal->moves[index]) != 0) {
+            free(next);
             continue;
         }
 
         // recursive call, main algorithm of alpha-beta search
-        score = -alpha_beta(&next, depth - 1, -beta, -alpha, ply + 1);
+        score = -alpha_beta(next, depth - 1, -beta, -alpha, ply + 1);
+        free(next);
 
         // Only return the alpha which is fully computed
         if (g_stop_search) {
+            free(legal);
             return alpha;
         }
 
@@ -570,6 +655,7 @@ static int alpha_beta(const GameState *state, int depth, int alpha, int beta,
         }
     }
 
+    free(legal);
     return best_score;
 }
 
@@ -626,7 +712,7 @@ static int time_budget_for_state(const GameState *state,
 
 static int search_best_move(const GameState *state, int max_depth,
                             int max_time_ms, Move *best_move) {
-    MoveList root_moves;
+    MoveList *root_moves;
     int root_scores[MAX_MOVES];
     int depth;
     int index;
@@ -637,16 +723,24 @@ static int search_best_move(const GameState *state, int max_depth,
     if (state == NULL || best_move == NULL) {
         return 1;
     }
-    if (collect_fully_legal_moves(state, &root_moves) != 0) {
+    root_moves = allocate_move_list();
+    if (root_moves == NULL) {
         return 1;
     }
-    if (root_moves.count <= 0) {
+
+    if (collect_fully_legal_moves(state, root_moves) != 0) {
+        free(root_moves);
+        return 1;
+    }
+    if (root_moves->count <= 0) {
+        free(root_moves);
         return 1;
     }
 
     // Special case: only one legal move
-    *best_move = root_moves.moves[0];
-    if (root_moves.count == 1) {
+    *best_move = root_moves->moves[0];
+    if (root_moves->count == 1) {
+        free(root_moves);
         return 0;
     }
 
@@ -657,7 +751,7 @@ static int search_best_move(const GameState *state, int max_depth,
     g_stop_search = 0;
     g_nodes = 0;
 
-    current_best = root_moves.moves[0];
+    current_best = root_moves->moves[0];
     current_best_score = -AI_INF;
 
     // iterative deepening
@@ -667,16 +761,23 @@ static int search_best_move(const GameState *state, int max_depth,
         int alpha = -AI_INF;
         int beta = AI_INF;
 
-        for (index = 0; index < root_moves.count; ++index) {
-            GameState next = *state;
+        for (index = 0; index < root_moves->count; ++index) {
+            GameState *next = clone_state(state);
             int score;
 
-            if (applyMove(&next, root_moves.moves[index]) != 0) {
+            if (next == NULL) {
+                free(root_moves);
+                return 1;
+            }
+
+            if (applyMove(next, root_moves->moves[index]) != 0) {
                 root_scores[index] = -AI_INF;
+                free(next);
                 continue;
             }
 
-            score = -alpha_beta(&next, depth - 1, -beta, -alpha, 1);
+            score = -alpha_beta(next, depth - 1, -beta, -alpha, 1);
+            free(next);
 
             // stop if received stop signal
             if (g_stop_search) {
@@ -686,7 +787,7 @@ static int search_best_move(const GameState *state, int max_depth,
             root_scores[index] = score;
             if (score > iteration_best_score) {
                 iteration_best_score = score;
-                iteration_best = root_moves.moves[index];
+                iteration_best = root_moves->moves[index];
             }
             if (score > alpha) {
                 alpha = score;
@@ -704,22 +805,23 @@ static int search_best_move(const GameState *state, int max_depth,
         *best_move = current_best;
 
         // sort moves by score
-        for (index = 1; index < root_moves.count; ++index) {
-            Move key_move = root_moves.moves[index];
+        for (index = 1; index < root_moves->count; ++index) {
+            Move key_move = root_moves->moves[index];
             int key_score = root_scores[index];
             int j = index - 1;
 
             while (j >= 0 && root_scores[j] < key_score) {
-                root_moves.moves[j + 1] = root_moves.moves[j];
+                root_moves->moves[j + 1] = root_moves->moves[j];
                 root_scores[j + 1] = root_scores[j];
                 --j;
             }
-            root_moves.moves[j + 1] = key_move;
+            root_moves->moves[j + 1] = key_move;
             root_scores[j + 1] = key_score;
         }
     }
 
     (void)current_best_score;
+    free(root_moves);
     return 0;
 }
 

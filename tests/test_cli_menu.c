@@ -35,21 +35,74 @@ static void test_game_mode_selection(void) {
     assert(selection == 5);
 }
 
-/* Check that game setup can build timer-off and timer-on configurations. */
-static void test_game_setup_config(void) {
+/* Check that human-vs-human setup keeps all AI fields disabled. */
+static void test_game_setup_human_vs_human(void) {
     GameConfig config;
 
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_HUMAN;
     writeFixtureAndRedirect(CLI_FIXTURE_DIR "setup_no_timer.txt", "2\n");
     assert(cliGetGameSetupConfig(&config) == 0);
     assert(config.mode == MODE_HUMAN_VS_HUMAN);
+    assert(config.aiDifficultyWhite == DIFFICULTY_NONE);
+    assert(config.aiDifficultyBlack == DIFFICULTY_NONE);
+    assert(config.aiTimeLimit == 0);
     assert(config.timerEnabled == 0);
     assert(config.initialTimeSeconds == 0);
 
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_HUMAN;
     writeFixtureAndRedirect(CLI_FIXTURE_DIR "setup_with_timer.txt", "1\n45\n");
     assert(cliGetGameSetupConfig(&config) == 0);
     assert(config.mode == MODE_HUMAN_VS_HUMAN);
+    assert(config.aiDifficultyWhite == DIFFICULTY_NONE);
+    assert(config.aiDifficultyBlack == DIFFICULTY_NONE);
     assert(config.timerEnabled == 1);
     assert(config.initialTimeSeconds == 45);
+}
+
+/* Check that human-vs-computer setup seeds roles and AI settings correctly. */
+static void test_game_setup_human_vs_computer(void) {
+    GameConfig config;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    writeFixtureAndRedirect(CLI_FIXTURE_DIR "setup_no_timer.txt", "2\n3\n1\n2\n");
+    assert(cliGetGameSetupConfig(&config) == 0);
+    assert(config.mode == MODE_HUMAN_VS_COMPUTER);
+    assert(config.playerColor == BLACK);
+    assert(config.aiDifficultyWhite == DIFFICULTY_HARD);
+    assert(config.aiDifficultyBlack == DIFFICULTY_NONE);
+    assert(config.aiTimeLimit == 1);
+    assert(config.timerEnabled == 0);
+}
+
+/* Check that computer-vs-computer setup accepts separate AI settings per side. */
+static void test_game_setup_computer_vs_computer(void) {
+    GameConfig config;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_COMPUTER_VS_COMPUTER;
+    writeFixtureAndRedirect(CLI_FIXTURE_DIR "setup_with_timer.txt", "1\n2\n1\n2\n");
+    assert(cliGetGameSetupConfig(&config) == 0);
+    assert(config.mode == MODE_COMPUTER_VS_COMPUTER);
+    assert(config.aiDifficultyWhite == DIFFICULTY_EASY);
+    assert(config.aiDifficultyBlack == DIFFICULTY_MEDIUM);
+    assert(config.aiTimeLimit == 1);
+    assert(config.timerEnabled == 0);
+}
+
+/* Check that AI setup fields re-prompt after invalid values. */
+static void test_game_setup_reprompts_invalid_ai_values(void) {
+    GameConfig config;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    writeFixtureAndRedirect(CLI_FIXTURE_DIR "game_mode.txt", "3\n1\n0\n2\n0\n1\n2\n");
+    assert(cliGetGameSetupConfig(&config) == 0);
+    assert(config.playerColor == WHITE);
+    assert(config.aiDifficultyBlack == DIFFICULTY_MEDIUM);
+    assert(config.aiTimeLimit == 1);
 }
 
 /* Check that the end-game menu returns the validated selection. */
@@ -72,7 +125,10 @@ static void test_endgame_menu_selection(void) {
 int main(void) {
     test_main_menu_selection();
     test_game_mode_selection();
-    test_game_setup_config();
+    test_game_setup_human_vs_human();
+    test_game_setup_human_vs_computer();
+    test_game_setup_computer_vs_computer();
+    test_game_setup_reprompts_invalid_ai_values();
     test_endgame_menu_selection();
     return 0;
 }

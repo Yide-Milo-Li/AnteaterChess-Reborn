@@ -42,6 +42,24 @@ static int run_and_capture_cli_app(const char *inputPath, const char *input, cha
     return result;
 }
 
+/* Count how many times one literal substring appears in captured output. */
+static int count_occurrences(const char *buffer, const char *needle) {
+    int count = 0;
+    const char *cursor = buffer;
+    size_t needleLength;
+
+    assert(buffer != NULL);
+    assert(needle != NULL);
+
+    needleLength = strlen(needle);
+    while ((cursor = strstr(cursor, needle)) != NULL) {
+        ++count;
+        cursor += needleLength;
+    }
+
+    return count;
+}
+
 /* Check that one human-vs-human CLI session can play a move and exit cleanly. */
 static void test_cli_app_full_session(void) {
     char buffer[32768];
@@ -62,23 +80,69 @@ static void test_cli_app_full_session(void) {
     assert(strstr(buffer, "Game Over") != NULL);
 }
 
-/* Check that disabled AI modes stay unavailable and return the user to the menu flow. */
-static void test_cli_app_disabled_ai_notice(void) {
+/* Check that human-vs-computer setup, hint output, and AI replies all work together. */
+static void test_cli_app_human_vs_computer_white_session(void) {
     char buffer[32768];
     int result = run_and_capture_cli_app(
         CLI_FIXTURE_DIR "cli_app_disabled_ai.txt",
-        "1\n2\n4\n2\n",
+        "1\n2\n1\n1\n1\n2\n5\n1\nE2 E4\n3\n3\n",
         buffer,
         sizeof(buffer)
     );
 
     assert(result == 0);
-    assert(strstr(buffer, "AI game modes is currently disabled") != NULL);
+    assert(strstr(buffer, "Selected mode: Human vs Computer") != NULL);
+    assert(strstr(buffer, "Human Side: White") != NULL);
+    assert(strstr(buffer, "Show AI suggestion") != NULL);
+    assert(strstr(buffer, "[Hint]") != NULL);
+    assert(strstr(buffer, "[AI Move]") != NULL);
+    assert(strstr(buffer, "Human vs Computer (Disabled)") == NULL);
+    assert(strstr(buffer, "AI game modes is currently disabled") == NULL);
+    assert(count_occurrences(buffer, "WHITE TO MOVE") >= 2);
+}
+
+/* Check that black-side human games auto-play White's first AI move. */
+static void test_cli_app_human_vs_computer_black_session(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        CLI_FIXTURE_DIR "main_menu.txt",
+        "1\n2\n2\n1\n1\n2\n3\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Selected mode: Human vs Computer") != NULL);
+    assert(strstr(buffer, "Human Side: Black") != NULL);
+    assert(strstr(buffer, "[AI]") != NULL);
+    assert(strstr(buffer, "White is thinking") != NULL);
+    assert(strstr(buffer, "[AI Move]") != NULL);
+    assert(strstr(buffer, "White Knight") != NULL);
+    assert(strstr(buffer, "Actions") != NULL);
+}
+
+/* Check that computer-vs-computer sessions can advance AI turns and still exit cleanly. */
+static void test_cli_app_computer_vs_computer_session(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        CLI_FIXTURE_DIR "endgame_menu.txt",
+        "1\n3\n1\n1\n1\n2\n1\n1\n2\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Selected mode: Computer vs Computer") != NULL);
+    assert(strstr(buffer, "[AI Autoplay]") != NULL);
+    assert(count_occurrences(buffer, "[AI Move]") >= 2);
+    assert(strstr(buffer, "Game Over") != NULL);
 }
 
 /* Run the standalone CLI app regression suite. */
 int main(void) {
     test_cli_app_full_session();
-    test_cli_app_disabled_ai_notice();
+    test_cli_app_human_vs_computer_white_session();
+    test_cli_app_human_vs_computer_black_session();
+    test_cli_app_computer_vs_computer_session();
     return 0;
 }

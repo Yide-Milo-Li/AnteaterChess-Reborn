@@ -15,7 +15,7 @@
 #define ANSI_RESET  "\x1b[0m"
 #define ANSI_ACCENT "\x1b[1;36m"
 
-/* Read one validated gameplay action selection from the CLI action menu. */
+/* Read one validated human-turn action selection from the CLI action menu. */
 int cliGetGameplayAction(int *selection) {
     if (selection == NULL) {
         return 1;
@@ -26,7 +26,7 @@ int cliGetGameplayAction(int *selection) {
     printf("| 2. Undo                                |\n");
     printf("| 3. Leave game                          |\n");
     printf("| 4. Exit program                        |\n");
-    printf("| 5. Show move format hint               |\n");
+    printf("| 5. Show AI suggestion                  |\n");
     printf("%s+-----------------------------------------+%s\n", ANSI_ACCENT, ANSI_RESET);
     printf("%sSelect an action:%s\n", ANSI_ACCENT, ANSI_RESET);
 

@@ -255,3 +255,53 @@ static int evaluate_pawns(const GameState *state, Color color) {
     }
     return score;
 }
+
+// evaluate the board
+static int evaluate_absolute(const GameState *state) {
+    int score = 0;
+    int white_bishops = 0;
+    int black_bishops = 0;
+    int row;
+    int col;
+
+    // iterate through the board
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Piece piece = getPiece(&state->board, createPosition(row, col));
+            int value;
+
+            if (piece.type == EMPTY_PIECE) {
+                continue;
+            }
+            // Value = piece value + table bonus
+            value = piece_value(piece.type) + pst_bonus(piece, row, col);
+
+            // add value to score
+            if (piece.color == WHITE) {
+                score += value;
+                // count white bishops
+                if (piece.type == BISHOP) {
+                    ++white_bishops;
+                }
+            } else {
+                score -= value;
+                // count black bishops
+                if (piece.type == BISHOP) {
+                    ++black_bishops;
+                }
+            }
+        }
+    }
+
+    if (white_bishops >= 2) {
+        score += 30;
+    }
+    if (black_bishops >= 2) {
+        score -= 30;
+    }
+    // add pawn evaluation
+    score += evaluate_pawns(state, WHITE);
+    score -= evaluate_pawns(state, BLACK);
+
+    return score;
+}

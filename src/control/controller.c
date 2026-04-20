@@ -8,6 +8,14 @@
 #include "system/system_state.h"
 #include "turn/turn_timer.h"
 
+/*
+ * Alignment assumptions for future extensions:
+ * - controller.h is the truth source for the public loop entrypoints.
+ * - This file owns queue polling and priority draining, not gameplay rule decisions.
+ * - FSM remains the authority on state transitions while controller orchestrates event flow.
+ */
+
+/* Map one event type to the queue priority class expected by the controller. */
 QueueType queueForEvent(EventType type) {
     switch (type) {
         /* Control events */
@@ -35,6 +43,7 @@ QueueType queueForEvent(EventType type) {
     }
 }
 
+/* Poll one source once and enqueue any non-empty event it produces. */
 static void pollAndEnqueue(EventPollerFn poller,
                            GameState *state,
                            EventQueue *queue)
@@ -49,6 +58,7 @@ static void pollAndEnqueue(EventPollerFn poller,
 }
 
 /* Single-tick body */
+/* Execute one controller tick: poll sources, synthesize timer events, then drain queues. */
 int tickGameLoop(GameState *state, EventQueue *queue, const EventSources *src) {
 
     if (getSystemState() == INIT_STATE) {
@@ -98,6 +108,7 @@ int tickGameLoop(GameState *state, EventQueue *queue, const EventSources *src) {
 
 /* Main loop */
 
+/* Run the controller loop until the FSM reaches EXIT_STATE. */
 int runGameLoop(GameState *state, EventQueue *queue, const EventSources *src) {
     if (!state || !queue) return 1;
 

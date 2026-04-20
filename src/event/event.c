@@ -2,6 +2,13 @@
 
 #include <string.h>
 
+/*
+ * Alignment assumptions for future extensions:
+ * - event.h is the truth source for every public constructor in this file.
+ * - Event creation stays payload-focused and must not perform queue routing or FSM work.
+ * - Payload-free system events should be representable without touching unrelated union fields.
+ */
+
 /* Zero-initialize makes test output / memcmp-based assertions stable. */
 static Event blankEvent(EventType type) {
     Event e;
@@ -10,18 +17,21 @@ static Event blankEvent(EventType type) {
     return e;
 }
 
+/* Build one gameplay input event from a parsed command payload. */
 Event createMoveInputEvent(Command cmd) {
     Event e = blankEvent(EVENT_MOVE_INPUT);
     e.data.command = cmd;
     return e;
 }
 
+/* Build one AI move event from an already selected move payload. */
 Event createAIMoveEvent(Move move) {
     Event e = blankEvent(EVENT_AI_MOVE);
     e.data.move = move;
     return e;
 }
 
+/* Build one payload-free system event when the type does not need union data. */
 Event createSystemEvent(EventType type) {
     switch (type) {
         case EVENT_UNDO:
@@ -38,22 +48,26 @@ Event createSystemEvent(EventType type) {
     }
 }
 
+/* Build the dedicated undo event helper used across controller and tests. */
 Event createUndoEvent(void) {
     return blankEvent(EVENT_UNDO);
 }
 
+/* Build a recoverable error event carrying one error code. */
 Event createErrorEvent(ErrorCode code) {
     Event e = blankEvent(EVENT_ERROR);
     e.data.errorCode = code;
     return e;
 }
 
+/* Build a fatal error event carrying one error code. */
 Event createFatalErrorEvent(ErrorCode code) {
     Event e = blankEvent(EVENT_FATAL_ERROR);
     e.data.errorCode = code;
     return e;
 }
 
+/* Convert an event type into a stable debug label for diagnostics. */
 const char *eventTypeName(EventType t) {
     switch (t) {
         case EVENT_MOVE_INPUT:    return "EVENT_MOVE_INPUT";

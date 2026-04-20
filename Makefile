@@ -4,7 +4,7 @@ CFLAGS ?= -std=c11 -Wall -Wextra -Werror -Iinclude
 BUILD_DIR := build
 OBJ_DIR := $(BUILD_DIR)/obj
 TEST_BIN_DIR := bin/tests
-EXE := .exe
+EXE :=
 
 SRC_SRCS := \
 	src/core/position.c \

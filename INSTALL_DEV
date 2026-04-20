@@ -1,0 +1,30 @@
+Anteater Chess Alpha Source Release
+Installation Instructions
+
+1. Extract the source package:
+   gtar xvzf Chess_Alpha_src.tar.gz
+
+2. Change to the project directory:
+   cd chess
+
+3. Build the program:
+   make
+
+4. Run the unit tests:
+   make test
+
+5. Run the program:
+   ./bin/chess
+
+Optional commands:
+- make clean
+  Remove generated build files
+- make tar
+  Regenerate the source package archive
+
+This source package is intended for a Linux environment with GNU Make
+and a standard C toolchain installed.
+
+For more details, please refer to:
+- doc/Chess_UserManual.pdf
+- doc/Chess_SoftwareSpec.pdf

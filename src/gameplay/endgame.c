@@ -459,9 +459,9 @@ int detectGameResult(GameState *state) {
     /* If the side to move is checkmated, the other side has won. */
     if (isCheckmate(state, playerToMove) == 1) {
         if (playerToMove == WHITE) {
-            setGameTermination(state, RESULT_BLACK_WIN, TERMINATION_CHECKMATE);
+            setGameResult(state, RESULT_BLACK_WIN);
         } else {
-            setGameTermination(state, RESULT_WHITE_WIN, TERMINATION_CHECKMATE);
+            setGameResult(state, RESULT_WHITE_WIN);
         }
         return 1;
     }
@@ -469,13 +469,13 @@ int detectGameResult(GameState *state) {
     /* If the side to move has no legal continuation without being in check,
      * record a draw. */
     if (isStalemate(state, playerToMove) == 1) {
-        setGameTermination(state, RESULT_DRAW, TERMINATION_STALEMATE);
+        setGameResult(state, RESULT_DRAW);
         return 1;
     }
 
     /* If there is not enough material left to force a win, record a draw. */
     if (isInsufficientMaterial(state) == 1) {
-        setGameTermination(state, RESULT_DRAW, TERMINATION_INSUFFICIENT_MATERIAL);
+        setGameResult(state, RESULT_DRAW);
         return 1;
     }
 

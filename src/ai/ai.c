@@ -97,8 +97,8 @@ static const int PST_ANTEATER[ROWS][COLS] = {
 // Global variables for search
 static clock_t g_search_start; // Start time of the search
 static int g_time_limit_ms;    // Time limit in milliseconds
-static int g_stop_search;      // Flag to stop the search, 1 = stop, 0 = continue
-static int g_nodes;            // Number of nodes visited
+static int g_stop_search; // Flag to stop the search, 1 = stop, 0 = continue
+static int g_nodes;       // Number of nodes visited
 
 // Piece Value Tables
 static int piece_value(PieceType type) {
@@ -170,4 +170,88 @@ static int evaluate_pawns(const GameState *state, Color color) {
             int file2;
             int row2;
             int is_passed = 1;
+
+            // Check if the piece is an ANT of the current color
+            if (piece.type != ANT || piece.color != color) {
+                continue;
+            }
+
+            for (row2 = 0; row2 < ROWS; ++row2) {
+                if (row2 != row &&
+                    getPiece(&state->board, createPosition(row2, col)).type ==
+                        ANT &&
+                    getPiece(&state->board, createPosition(row2, col)).color ==
+                        color) {
+                    score -= 15;
+                    break;
+                }
+            } // Doubled Pawns
+
+            // check left and right columns to see is it isolated
+            for (file2 = col - 1; file2 <= col + 1; file2 += 2) {
+                if (file2 < 0 || file2 >= COLS) {
+                    continue;
+                }
+                for (row2 = 0; row2 < ROWS; ++row2) {
+                    Piece other =
+                        getPiece(&state->board, createPosition(row2, file2));
+                    if (other.type == ANT && other.color == color) {
+                        file_has_neighbor = 1;
+                        break;
+                    }
+                }
+                if (file_has_neighbor) {
+                    break;
+                }
+            }
+            // Isolated Pawns -10
+            if (!file_has_neighbor) {
+                score -= 10;
+            }
+
+            // Passed Pawns White
+            if (color == WHITE) {
+                for (row2 = row - 1; row2 >= 0 && is_passed; --row2) {
+                    // check left and right columns to see is it passed
+                    for (file2 = col - 1; file2 <= col + 1; ++file2) {
+                        Piece enemy;
+                        // check edge
+                        if (file2 < 0 || file2 >= COLS) {
+                            continue;
+                        }
+                        // find ememy ant-->not passed
+                        enemy = getPiece(&state->board,
+                                         createPosition(row2, file2));
+                        if (enemy.type == ANT && enemy.color == BLACK) {
+                            is_passed = 0;
+                            break;
+                        }
+                    }
+                }
+                if (is_passed) {
+                    score += 10 + (ROWS - 1 - row) * 10;
+                }
+                // Passed Pawns Black
+            } else {
+                for (row2 = row + 1; row2 < ROWS && is_passed; ++row2) {
+                    for (file2 = col - 1; file2 <= col + 1; ++file2) {
+                        Piece enemy;
+                        if (file2 < 0 || file2 >= COLS) {
+                            continue;
+                        }
+                        enemy = getPiece(&state->board,
+                                         createPosition(row2, file2));
+                        if (enemy.type == ANT && enemy.color == WHITE) {
+                            is_passed = 0;
+                            break;
+                        }
+                    }
+                }
+                if (is_passed) {
+                    score += 10 + row * 10;
+                }
+            }
         }
+    }
+    return score;
+}

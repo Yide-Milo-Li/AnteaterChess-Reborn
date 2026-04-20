@@ -111,6 +111,23 @@ static const char *difficulty_label(AIDifficulty difficulty) {
     }
 }
 
+/* Return the stable human-readable label for one public game result. */
+static const char *game_result_label(GameResult result) {
+    switch (result) {
+        case RESULT_WHITE_WIN:
+            return "White Win";
+        case RESULT_BLACK_WIN:
+            return "Black Win";
+        case RESULT_DRAW:
+            return "Draw";
+        case RESULT_TERMINATED_BY_USER:
+            return "Terminated by User";
+        case RESULT_NONE:
+        default:
+            return "In Progress";
+    }
+}
+
 /* Read one human-side selection for human-vs-computer setup. */
 static int read_human_side(Color *color) {
     int selection;
@@ -296,7 +313,7 @@ int cliShowEndGameMenu(const GameState *state, int *selection) {
     }
 
     printf("\n=== Game Over ===\n");
-    printf("Result: %d\n", (int)state->result);
+    printf("Result: %s\n", game_result_label(state->result));
     printf("1. New Game\n");
     printf("2. Main Menu\n");
     printf("3. Exit\n");

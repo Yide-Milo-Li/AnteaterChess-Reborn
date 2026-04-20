@@ -93,6 +93,7 @@ static void test_cli_app_full_session(void) {
     assert(strstr(buffer, "Move format") != NULL);
     assert(strstr(buffer, "Illegal move") != NULL);
     assert(strstr(buffer, "Game Over") != NULL);
+    assert(strstr(buffer, "Result: Terminated by User") != NULL);
 }
 
 /* Check that human-vs-computer setup, hint output, and AI replies all work together. */

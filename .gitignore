@@ -17,7 +17,8 @@ a.out
 # =========================
 # Binary output
 # =========================
-bin/*
+bin/**
+!bin/
 !bin/.gitkeep
 !bin/logs/
 !bin/logs/.gitkeep

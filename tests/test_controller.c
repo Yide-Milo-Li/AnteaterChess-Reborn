@@ -1,5 +1,5 @@
 #include <assert.h>
-
+#include <stddef.h>
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "system/controller.h"
@@ -20,7 +20,8 @@ static void test_run_game_loop_rejects_null_state(void) {
     assert(runGameLoop(NULL) != 0);
 }
 
-/* Check that the controller performs the boot handshake and then idles cleanly. */
+/* Check that the controller performs the boot handshake and then idles cleanly.
+ */
 static void test_run_game_loop_bootstraps_init_state(void) {
     GameState state = fresh_state();
 

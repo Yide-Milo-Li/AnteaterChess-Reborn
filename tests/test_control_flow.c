@@ -1,5 +1,5 @@
 #include <assert.h>
-
+#include <stddef.h>
 #include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
@@ -24,7 +24,8 @@ static GameState fresh_gameplay_state(void) {
     return state;
 }
 
-/* Prepare a minimal board where one white ant has exactly one simple forward move. */
+/* Prepare a minimal board where one white ant has exactly one simple forward
+ * move. */
 static void seed_simple_ant_position(GameState *state) {
     assert(state != NULL);
     initBoard(&state->board);
@@ -42,7 +43,8 @@ static void test_process_event_applies_valid_move(void) {
     Command command;
 
     seed_simple_ant_position(&state);
-    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(5, 0)) == 0);
+    assert(createMoveCommand(&command, createPosition(6, 0),
+                             createPosition(5, 0)) == 0);
     assert(processEvent(&state, createMoveInputEvent(command)) == 0);
     assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
     assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
@@ -56,7 +58,8 @@ static void test_process_event_rejects_illegal_move(void) {
     Command command;
 
     seed_simple_ant_position(&state);
-    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(6, 1)) == 0);
+    assert(createMoveCommand(&command, createPosition(6, 0),
+                             createPosition(6, 1)) == 0);
     assert(processEvent(&state, createMoveInputEvent(command)) != 0);
     assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
     assert(getPiece(&state.board, createPosition(4, 0)).type == EMPTY_PIECE);
@@ -64,13 +67,15 @@ static void test_process_event_rejects_illegal_move(void) {
     assert(state.moveHistory.count == 0);
 }
 
-/* Check that undo flows back through the FSM and restores the previous position. */
+/* Check that undo flows back through the FSM and restores the previous
+ * position. */
 static void test_process_event_undo_restores_position(void) {
     GameState state = fresh_gameplay_state();
     Command command;
 
     seed_simple_ant_position(&state);
-    assert(createMoveCommand(&command, createPosition(6, 0), createPosition(5, 0)) == 0);
+    assert(createMoveCommand(&command, createPosition(6, 0),
+                             createPosition(5, 0)) == 0);
     assert(processEvent(&state, createMoveInputEvent(command)) == 0);
     assert(processEvent(&state, createUndoEvent()) == 0);
     assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);

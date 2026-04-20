@@ -12,6 +12,9 @@ EXE ?= .exe
 CPPFLAGS ?= -Iinclude
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror
 DEPFLAGS := -MMD -MP
+KEEP_DEPS ?= 1
+RM ?= rm -f
+RMDIR ?= rm -rf
 
 BUILD_DIR := build
 OBJ_DIR := $(BUILD_DIR)/obj
@@ -120,9 +123,9 @@ DEP_FILES := \
 	$(CLI_MAIN_OBJ:.o=.d) \
 	$(TEST_OBJS:.o=.d)
 
-.PHONY: all help apps cli tests test list-tests rebuild clean run-cli print-vars
+.PHONY: all help apps cli tests test list-tests rebuild clean clean-deps run-cli print-vars
 
-all: tests cli
+all: tests cli maybe-clean-deps
 
 help:
 	@echo "Targets:"
@@ -132,15 +135,18 @@ help:
 	@echo "  test       Build and run all maintained test binaries"
 	@echo "  run-cli    Build and launch the bin CLI executable"
 	@echo "  list-tests Print the maintained test target names"
+	@echo "  clean-deps Remove generated .d dependency files only"
 	@echo "  clean      Remove generated build and binary artifacts"
 	@echo "  rebuild    Clean and rebuild everything"
 	@echo "  print-vars Print key Makefile variables for debugging"
+	@echo "Variables:"
+	@echo "  KEEP_DEPS=0  Build normally, then delete generated .d files"
 
 apps: cli
 
-cli: $(CLI_APP_BIN) $(ROOT_CLI_APP_BIN)
+cli: $(CLI_APP_BIN) $(ROOT_CLI_APP_BIN) maybe-clean-deps
 
-tests: $(TEST_BINS)
+tests: $(TEST_BINS) maybe-clean-deps
 
 test: $(TEST_BINS)
 	@for test_bin in $(TEST_BINS); do "$${test_bin}"; done
@@ -151,7 +157,10 @@ list-tests:
 rebuild: clean all
 
 clean:
-	rm -rf $(BUILD_DIR) $(BIN_DIR) $(ROOT_CLI_APP_BIN)
+	$(RMDIR) $(BUILD_DIR) $(BIN_DIR) $(ROOT_CLI_APP_BIN)
+
+clean-deps:
+	$(RM) $(DEP_FILES)
 
 run-cli: $(CLI_APP_BIN)
 	./$(CLI_APP_BIN)
@@ -160,9 +169,17 @@ print-vars:
 	@echo "CC=$(CC)"
 	@echo "CPPFLAGS=$(CPPFLAGS)"
 	@echo "CFLAGS=$(CFLAGS)"
+	@echo "KEEP_DEPS=$(KEEP_DEPS)"
 	@echo "CLI_APP_BIN=$(CLI_APP_BIN)"
 	@echo "ROOT_CLI_APP_BIN=$(ROOT_CLI_APP_BIN)"
 	@echo "TEST_NAMES=$(TEST_NAMES)"
+
+maybe-clean-deps:
+ifeq ($(KEEP_DEPS),0)
+	$(RM) $(DEP_FILES)
+else
+	@:
+endif
 
 $(OBJ_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)

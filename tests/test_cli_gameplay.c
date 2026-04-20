@@ -21,7 +21,7 @@
 #include "error/error.h"
 
 #define CLI_FIXTURE_DIR "tests/fixtures/cli/"
-#define CLI_CAPTURE_FILE CLI_FIXTURE_DIR "capture_gameplay.txt"
+#define CLI_CAPTURE_FILE "bin/tests/test_cli_gameplay_capture.txt"
 
 /* Replace stdin with a deterministic fixture file for one CLI input test. */
 static void writeFixtureAndRedirect(const char *path, const char *contents) {

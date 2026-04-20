@@ -19,8 +19,8 @@
 #include "cli/cli_app.h"
 
 #define CLI_FIXTURE_DIR "tests/fixtures/cli/"
-#define CLI_TEMP_INPUT_FILE "build/test_cli_app_input.txt"
-#define CLI_CAPTURE_FILE "build/test_cli_app_capture.txt"
+#define CLI_TEMP_INPUT_FILE "bin/tests/test_cli_app_input.txt"
+#define CLI_CAPTURE_FILE "bin/tests/test_cli_app_capture.txt"
 
 /* Replace stdin with a deterministic temporary input file for one CLI app scenario. */
 static void writeInputAndRedirect(const char *path, const char *contents) {

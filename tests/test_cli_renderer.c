@@ -23,7 +23,7 @@
 #include "turn/turn_timer.h"
 
 #define CLI_FIXTURE_DIR "tests/fixtures/cli/"
-#define CLI_CAPTURE_FILE CLI_FIXTURE_DIR "capture_renderer.txt"
+#define CLI_CAPTURE_FILE "bin/tests/test_cli_renderer_capture.txt"
 
 /* Capture stdout to a fixture file while one renderer helper writes to it. */
 static void captureStdout(void (*fn)(void *), void *context, const char *path, char *buffer, size_t size) {

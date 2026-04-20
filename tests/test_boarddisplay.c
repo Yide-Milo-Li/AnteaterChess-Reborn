@@ -21,7 +21,7 @@
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 
-#define CAPTURE_FILE "build/test_boarddisplay_capture.txt"
+#define CAPTURE_FILE "bin/tests/test_boarddisplay_capture.txt"
 
 /* Clear the board so the renderer output only reflects the pieces under test. */
 static void clear_board(Board *board) {

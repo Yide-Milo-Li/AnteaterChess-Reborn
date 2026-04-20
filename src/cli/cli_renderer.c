@@ -26,21 +26,18 @@
 #define ANSI_WHITE_BADGE    "\x1b[1;30;106m"
 #define ANSI_BLACK_BADGE    "\x1b[1;30;103m"
 
-/* Unicode box-drawing escapes keep the source ASCII-friendly while rendering richly. */
-#define BOX_H               "\u2500"
-#define BOX_V               "\u2502"
-#define BOX_TL              "\u250C"
-#define BOX_TR              "\u2510"
-#define BOX_BL              "\u2514"
-#define BOX_BR              "\u2518"
-#define BOX_LTEE            "\u251C"
-#define BOX_RTEE            "\u2524"
-#define BOX_TTEE            "\u252C"
-#define BOX_BTEE            "\u2534"
-#define BOX_CROSS           "\u253C"
-#define BOX_ROUND_TL        "\u256D"
-#define BOX_ROUND_BL        "\u2570"
-#define BOX_DOUBLE_H        "\u2550"
+/* ASCII box helpers avoid Unicode encoding issues across terminals and logs. */
+#define BOX_H               "---"
+#define BOX_V               "|"
+#define BOX_TL              "+"
+#define BOX_TR              "+"
+#define BOX_BL              "+"
+#define BOX_BR              "+"
+#define BOX_LTEE            "+"
+#define BOX_RTEE            "+"
+#define BOX_TTEE            "+"
+#define BOX_BTEE            "+"
+#define BOX_CROSS           "+"
 
 /* Convert one board piece into the fixed CLI token used by the board panel. */
 static char cli_piece_token(Piece piece) {
@@ -164,7 +161,7 @@ static const char *piece_foreground_style(Piece piece) {
 static void print_status_row(const char *rowStyle, const char *label, const char *value) {
     const char *effectiveStyle = (rowStyle != NULL) ? rowStyle : "";
 
-    printf("%s" BOX_V " %-13s %-26s " BOX_V "%s\n", effectiveStyle, label, value, ANSI_RESET);
+    printf("%s| %-13s %-26s |%s\n", effectiveStyle, label, value, ANSI_RESET);
 }
 
 /* Print one fully styled board cell, including square background and piece color. */
@@ -173,11 +170,11 @@ static void print_board_cell(int row, int col, Piece piece) {
     char token = cli_piece_token(piece);
 
     if (token == ' ') {
-        printf(BOX_V "%s   %s", backgroundStyle, ANSI_RESET);
+        printf("|%s   %s", backgroundStyle, ANSI_RESET);
         return;
     }
 
-    printf(BOX_V "%s%s %c %s", backgroundStyle, piece_foreground_style(piece), token, ANSI_RESET);
+    printf("|%s%s %c %s", backgroundStyle, piece_foreground_style(piece), token, ANSI_RESET);
 }
 
 /* Print the current active-turn badge for the CLI gameplay header. */
@@ -230,9 +227,7 @@ int cliDisplayGameStatus(const GameState *state) {
 
     turnValue = (state->currentTurn == BLACK) ? "Black" : "White";
 
-    printf("%s" BOX_ROUND_TL BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H " Game Status "
-           BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H "%s\n",
-           ANSI_BORDER, ANSI_RESET);
+    printf("%s+------------- Game Status ----------------------+%s\n", ANSI_BORDER, ANSI_RESET);
     print_status_row(NULL, "State", system_state_label(state->systemState));
     print_status_row(ANSI_ACCENT, "Current Turn", turnValue);
     print_status_row(NULL, "Moves Played", moveCountText);
@@ -263,12 +258,11 @@ int cliDisplayGameStatus(const GameState *state) {
         print_status_row(NULL, "Result", game_result_label(RESULT_NONE));
     }
 
-    printf("%s" BOX_ROUND_BL BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H "%s\n",
-        ANSI_BORDER, ANSI_RESET);
+    printf("%s+-----------------------------------------------+%s\n", ANSI_BORDER, ANSI_RESET);
     return 0;
 }
 
-/* Render the board as a Unicode panel with ANSI-styled squares and pieces. */
+/* Render the board as an ASCII panel with ANSI-styled squares and pieces. */
 int cliRenderBoard(const GameState *state) {
     static const char *columnLabels[COLS] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
     int col;
@@ -288,42 +282,42 @@ int cliRenderBoard(const GameState *state) {
     }
     printf("%s\n", ANSI_RESET);
 
-    printf("%s    " BOX_TL, ANSI_BORDER);
+    printf("%s    %s", ANSI_BORDER, BOX_TL);
     for (col = 0; col < COLS; ++col) {
-        printf(BOX_H BOX_H BOX_H);
+        printf(BOX_H);
         if (col < COLS - 1) {
             printf(BOX_TTEE);
         }
     }
-    printf(BOX_TR "%s\n", ANSI_RESET);
+    printf("%s%s\n", BOX_TR, ANSI_RESET);
 
     for (row = 0; row < ROWS; ++row) {
         printf("%s %d  %s", ANSI_BORDER, ROWS - row, ANSI_RESET);
         for (col = 0; col < COLS; ++col) {
             print_board_cell(row, col, getPiece(&state->board, createPosition(row, col)));
         }
-        printf("%s" BOX_V "  %d%s\n", ANSI_BORDER, ROWS - row, ANSI_RESET);
+        printf("%s%s  %d%s\n", ANSI_BORDER, BOX_V, ROWS - row, ANSI_RESET);
 
         if (row < ROWS - 1) {
-            printf("%s    " BOX_LTEE, ANSI_BORDER);
+            printf("%s    %s", ANSI_BORDER, BOX_LTEE);
             for (col = 0; col < COLS; ++col) {
-                printf(BOX_H BOX_H BOX_H);
+                printf(BOX_H);
                 if (col < COLS - 1) {
                     printf(BOX_CROSS);
                 }
             }
-            printf(BOX_RTEE "%s\n", ANSI_RESET);
+            printf("%s%s\n", BOX_RTEE, ANSI_RESET);
         }
     }
 
-    printf("%s    " BOX_BL, ANSI_BORDER);
+    printf("%s    %s", ANSI_BORDER, BOX_BL);
     for (col = 0; col < COLS; ++col) {
-        printf(BOX_H BOX_H BOX_H);
+        printf(BOX_H);
         if (col < COLS - 1) {
             printf(BOX_BTEE);
         }
     }
-    printf(BOX_BR "%s\n", ANSI_RESET);
+    printf("%s%s\n", BOX_BR, ANSI_RESET);
 
     printf("%s      ", ANSI_BORDER);
     for (col = 0; col < COLS; ++col) {

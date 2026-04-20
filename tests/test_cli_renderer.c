@@ -74,8 +74,8 @@ static void test_board_renderer_output(void) {
     assert(strstr(buffer, "Board") != NULL);
     assert(strstr(buffer, "A") != NULL);
     assert(strstr(buffer, "J") != NULL);
-    assert(strstr(buffer, "\u250C") != NULL);
-    assert(strstr(buffer, "\u253C") != NULL);
+    assert(strstr(buffer, "+---") != NULL);
+    assert(strstr(buffer, "|") != NULL);
     assert(strchr(buffer, 'r') != NULL);
     assert(strchr(buffer, 'R') != NULL);
     assert(strstr(buffer, "Legend:") != NULL);

@@ -73,7 +73,7 @@ static int enqueue_cli_event(EventQueue *queue, Event event) {
 
 /* Print one lightweight gameplay page header before the status panel and board. */
 static void print_gameplay_page_header(void) {
-    printf("\n%s══════════════════ Anteater Chess CLI ══════════════════%s\n",
+    printf("\n%s================== Anteater Chess CLI ==================%s\n",
         ANSI_ACCENT, ANSI_RESET);
     printf("%sGameplay View%s\n", ANSI_ACCENT, ANSI_RESET);
 }

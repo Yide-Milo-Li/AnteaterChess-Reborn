@@ -21,13 +21,13 @@ int cliGetGameplayAction(int *selection) {
         return 1;
     }
 
-    printf("%s╭──────────── Actions ────────────╮%s\n", ANSI_ACCENT, ANSI_RESET);
-    printf("│ 1. Make move                   │\n");
-    printf("│ 2. Undo                        │\n");
-    printf("│ 3. Leave game                  │\n");
-    printf("│ 4. Exit program                │\n");
-    printf("│ 5. Show move format hint       │\n");
-    printf("%s╰────────────────────────────────╯%s\n", ANSI_ACCENT, ANSI_RESET);
+    printf("%s+---------------- Actions ----------------+%s\n", ANSI_ACCENT, ANSI_RESET);
+    printf("| 1. Make move                           |\n");
+    printf("| 2. Undo                                |\n");
+    printf("| 3. Leave game                          |\n");
+    printf("| 4. Exit program                        |\n");
+    printf("| 5. Show move format hint               |\n");
+    printf("%s+-----------------------------------------+%s\n", ANSI_ACCENT, ANSI_RESET);
     printf("%sSelect an action:%s\n", ANSI_ACCENT, ANSI_RESET);
 
     for (;;) {
@@ -52,11 +52,11 @@ int cliGetMoveCommand(Command *cmd) {
 
 /* Print one stable move-format hint for the CLI gameplay prompt. */
 int cliShowMoveFormatHint(void) {
-    printf("%s╭──────────── Move Format ────────────╮%s\n", ANSI_ACCENT, ANSI_RESET);
-    printf("│ Move format: FROM TO               │\n");
-    printf("│ Example: E2 E4                     │\n");
-    printf("│ Coordinates ignore case and        │\n");
-    printf("│ tolerate leading/trailing spaces.  │\n");
-    printf("%s╰────────────────────────────────────╯%s\n", ANSI_ACCENT, ANSI_RESET);
+    printf("%s+---------------- Move Format ----------------+%s\n", ANSI_ACCENT, ANSI_RESET);
+    printf("| Move format: FROM TO                       |\n");
+    printf("| Example: E2 E4                             |\n");
+    printf("| Coordinates ignore case and                |\n");
+    printf("| tolerate leading/trailing spaces.          |\n");
+    printf("%s+---------------------------------------------+%s\n", ANSI_ACCENT, ANSI_RESET);
     return 0;
 }

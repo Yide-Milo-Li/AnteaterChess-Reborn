@@ -1,0 +1,36 @@
+Anteater Chess
+Alpha User Release
+
+Team 22: DeepAnteater
+EECS 22L - Software Engineering Project in C
+University of California, Irvine
+
+Version: Alpha Release
+Date: April 20, 2026
+
+Authors:
+Yao Li
+Benjamin Feng
+Yide Li
+Yurang Li
+Yasith Diunugala
+Max Zhang
+
+This package contains the alpha user release of Anteater Chess.
+It is an early preview of the program and may still contain incomplete
+features or other limitations typical of an alpha version.
+
+Package contents:
+- bin/chess
+  Executable chess program
+- doc/Chess_UserManual.pdf
+  User documentation
+
+Quick start:
+1. Extract the package.
+2. Enter the extracted chess/ directory.
+3. Run the program with:
+   bin/chess
+
+For gameplay rules, usage instructions, and the currently supported features,
+please refer to doc/Chess_UserManual.pdf.

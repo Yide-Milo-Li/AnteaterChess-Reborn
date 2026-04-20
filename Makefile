@@ -22,13 +22,10 @@ RMDIR ?= rm -rf
 
 BUILD_DIR := build
 OBJ_DIR := $(BUILD_DIR)/obj
-BIN_DIR := bin
-TEST_BIN_DIR := $(BIN_DIR)/tests
+TEST_BIN_DIR := bin/tests
+EXE :=
 
-CLI_APP_NAME := anteater_chess_cli
-CLI_APP_BIN := $(BIN_DIR)/$(CLI_APP_NAME)$(EXE)
-
-CORE_SRCS := \
+SRC_SRCS := \
 	src/core/position.c \
 	src/core/piece.c \
 	src/core/board.c \

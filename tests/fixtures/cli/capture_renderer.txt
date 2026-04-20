@@ -1,0 +1,6 @@
+System State: 0
+Turn: White
+Moves Played: 0
+Timer: On
+White Time: 30
+Black Time: 30

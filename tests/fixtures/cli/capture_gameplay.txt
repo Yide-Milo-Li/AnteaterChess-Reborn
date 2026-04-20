@@ -1,0 +1,2 @@
+Move format: enter two coordinates separated by spaces, such as E2 E4.
+Coordinates are case-insensitive and may have leading or trailing whitespace.

@@ -1,0 +1,23 @@
+
+=== Anteater Chess CLI ===
+1. New Game
+2. Exit
+
+=== Game Mode ===
+1. Human vs Human
+2. Human vs Computer (Disabled)
+3. Computer vs Computer (Disabled)
+4. Back
+5. Exit
+AI game modes is currently disabled in the CLI build.
+
+=== Game Mode ===
+1. Human vs Human
+2. Human vs Computer (Disabled)
+3. Computer vs Computer (Disabled)
+4. Back
+5. Exit
+
+=== Anteater Chess CLI ===
+1. New Game
+2. Exit

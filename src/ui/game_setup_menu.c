@@ -50,3 +50,17 @@ int getGameSetupConfig(GameConfig *config) {
     *config = setup_config;
     return 0;
 }
+
+static int start_pressed = 0;
+
+void setStartPressed(int val) {
+    start_pressed = val;
+}
+
+int isStartPressed() {
+    return start_pressed;
+}
+
+void resetStartPressed() {
+    start_pressed = 0;
+}

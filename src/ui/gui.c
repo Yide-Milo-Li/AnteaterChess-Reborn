@@ -185,6 +185,7 @@ void gui_reset_selections(void) {
     resetMainMenuSelection();
     resetGameModeSelection();
     resetBackButtonClicked();
+    resetStartPressed();
 }
 
 void gui_process_events(void) {
@@ -279,6 +280,7 @@ static void on_time_changed(GtkSpinButton *spin, gpointer user_data) {
 
 static void on_start_clicked(GtkButton *button, gpointer user_data) {
     g_print("Start button clicked\n");
+    setStartPressed(1);
 }
 void setup_game_setup_menu_human_vs_human(Gui *gui) {
     if (!GTK_IS_WIDGET(gui->window)) return;

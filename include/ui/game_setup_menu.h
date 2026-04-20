@@ -10,5 +10,8 @@ void setAIDifficultyBlack(AIDifficulty diff);
 void setTimerEnabled(int enabled);
 void setInitialTimeSeconds(int seconds);
 int getGameSetupConfig(GameConfig *config);
+void setStartPressed(int val);
+int isStartPressed();
+void resetStartPressed();
 
 #endif

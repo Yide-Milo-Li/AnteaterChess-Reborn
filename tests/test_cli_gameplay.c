@@ -1,7 +1,20 @@
 #include <assert.h>
-#include <io.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#define dup_fd _dup
+#define dup2_fd _dup2
+#define close_fd _close
+#define fileno_fd _fileno
+#else
+#include <unistd.h>
+#define dup_fd dup
+#define dup2_fd dup2
+#define close_fd close
+#define fileno_fd fileno
+#endif
 
 #include "cli/cli_feedback.h"
 #include "cli/cli_gameplay.h"
@@ -22,7 +35,7 @@ static void writeFixtureAndRedirect(const char *path, const char *contents) {
 
 /* Capture stdout to a fixture file while one CLI rendering helper runs. */
 static void captureStdout(void (*fn)(void), const char *path, char *buffer, size_t size) {
-    int savedStdout = _dup(_fileno(stdout));
+    int savedStdout = dup_fd(fileno_fd(stdout));
     FILE *file;
     size_t bytesRead;
 
@@ -31,8 +44,8 @@ static void captureStdout(void (*fn)(void), const char *path, char *buffer, size
     assert(file != NULL);
     fn();
     fflush(stdout);
-    assert(_dup2(savedStdout, _fileno(stdout)) != -1);
-    _close(savedStdout);
+    assert(dup2_fd(savedStdout, fileno_fd(stdout)) != -1);
+    close_fd(savedStdout);
 
     file = fopen(path, "r");
     assert(file != NULL);

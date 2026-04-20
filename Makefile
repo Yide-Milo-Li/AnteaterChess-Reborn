@@ -116,7 +116,10 @@ SYSTEM_TEST_NAMES := \
 
 CLI_TEST_NAMES := \
 	test_boarddisplay \
-	test_cli_menu
+	test_cli_menu \
+	test_cli_renderer \
+	test_cli_gameplay \
+	test_cli_app
 
 AI_TEST_NAMES := \
 	test_ai

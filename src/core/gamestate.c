@@ -73,7 +73,6 @@ void initGameState(GameState *state, const GameConfig *config) {
     state->moveCount = 0;
     state->gameOver = 0;
     state->result = RESULT_NONE;
-    state->terminationReason = TERMINATION_NONE;
     state->systemState = INIT_STATE;
 
     /* No moves have happened yet, so initialize move history */
@@ -168,17 +167,6 @@ void setGameResult(GameState *state, GameResult result) {
     } else {
         state->gameOver = 1;
     }
-}
-
-/* Set result and termination reason together so both fields stay consistent. */
-void setGameTermination(GameState *state, GameResult result,
-                        TerminationReason reason) {
-    if (state == NULL) {
-        return;
-    }
-
-    setGameResult(state, result);
-    state->terminationReason = reason;
 }
 
 /* Return the currently stored game result. */

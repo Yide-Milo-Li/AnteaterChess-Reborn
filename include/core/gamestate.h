@@ -17,16 +17,6 @@ typedef enum {
     RESULT_TERMINATED_BY_USER
 } GameResult;
 
-typedef enum {
-    TERMINATION_NONE,
-    TERMINATION_CHECKMATE,
-    TERMINATION_STALEMATE,
-    TERMINATION_THREEFOLD_REPETITION,
-    TERMINATION_FIFTY_MOVE_RULE,
-    TERMINATION_INSUFFICIENT_MATERIAL,
-    TERMINATION_USER_REQUEST
-} TerminationReason;
-
 typedef struct {
     Board board;
     Player players[2];
@@ -34,7 +24,6 @@ typedef struct {
     int moveCount;
     int gameOver;
     GameResult result;
-    TerminationReason terminationReason;
     SystemState systemState;
     GameConfig config;
     MoveList moveHistory;
@@ -48,8 +37,6 @@ Player *getCurrentPlayer(GameState *state);
 MoveList *getMoveHistory(GameState *state);
 int addMoveToHistory(GameState *state, Move move);
 void setGameResult(GameState *state, GameResult result);
-void setGameTermination(GameState *state, GameResult result,
-                        TerminationReason reason);
 GameResult getGameResult(GameState *state);
 int removeLastMoveFromHistory(GameState *state);
 

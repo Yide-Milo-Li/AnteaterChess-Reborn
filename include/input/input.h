@@ -10,8 +10,11 @@ typedef enum {
     INPUT_CANCEL
 } InputType;
 
+/* Read one CLI move command for tests or terminal fallback input. */
 int getMoveInput(Command *cmd);
+/* Read one raw coordinate token without assigning source/destination semantics. */
 int getBoardInput(Position *pos, InputType *type);
+/* Read one raw integer menu selection from the active input stream. */
 int getMenuSelection(int *selection);
 
 #endif

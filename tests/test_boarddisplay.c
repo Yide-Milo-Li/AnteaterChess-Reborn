@@ -149,17 +149,17 @@ static void test_board_display_reflects_modified_board_contents(void) {
                    rendered, sizeof(rendered));
     strip_ansi_sequences(rendered, stripped, sizeof(stripped));
 
-    extract_line(stripped, " 8  |", row8, sizeof(row8));
-    extract_line(stripped, " 4  |", row4, sizeof(row4));
-    extract_line(stripped, " 2  |", row2, sizeof(row2));
+    extract_line(stripped, "  8 |", row8, sizeof(row8));
+    extract_line(stripped, "  4 |", row4, sizeof(row4));
+    extract_line(stripped, "  2 |", row2, sizeof(row2));
 
     assert(strstr(stripped, "      Board") != NULL);
     assert(strstr(stripped, " A   B   C   D   E   F   G   H   I   J ") != NULL);
     assert(strstr(stripped, "Legend: White = uppercase cyan, Black = lowercase gold.") != NULL);
 
-    assert(strcmp(row8, " 8  |   |   |   |   |   |   |   |   |   | r |  8") == 0);
-    assert(strcmp(row4, " 4  |   |   |   |   | Q |   |   |   |   |   |  4") == 0);
-    assert(strcmp(row2, " 2  |   | E |   |   |   |   |   |   |   |   |  2") == 0);
+    assert(strcmp(row8, "  8 |   |   |   |   |   |   |   |   |   | r |  8") == 0);
+    assert(strcmp(row4, "  4 |   |   |   |   | Q |   |   |   |   |   |  4") == 0);
+    assert(strcmp(row2, "  2 |   | E |   |   |   |   |   |   |   |   |  2") == 0);
 }
 
 int main(void) {

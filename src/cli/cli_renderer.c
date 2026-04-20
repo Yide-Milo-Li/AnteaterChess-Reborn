@@ -39,6 +39,9 @@
 #define BOX_BTEE            "+"
 #define BOX_CROSS           "+"
 
+/* Keep row labels fixed-width so the left and right borders stay aligned. */
+#define ROW_LABEL_FORMAT    "%2d"
+
 /* Convert one board piece into the fixed CLI token used by the board panel. */
 static char cli_piece_token(Piece piece) {
     char token;
@@ -292,11 +295,11 @@ int cliRenderBoard(const GameState *state) {
     printf("%s%s\n", BOX_TR, ANSI_RESET);
 
     for (row = 0; row < ROWS; ++row) {
-        printf("%s %d  %s", ANSI_BORDER, ROWS - row, ANSI_RESET);
+        printf("%s " ROW_LABEL_FORMAT " %s", ANSI_BORDER, ROWS - row, ANSI_RESET);
         for (col = 0; col < COLS; ++col) {
             print_board_cell(row, col, getPiece(&state->board, createPosition(row, col)));
         }
-        printf("%s%s  %d%s\n", ANSI_BORDER, BOX_V, ROWS - row, ANSI_RESET);
+        printf("%s%s " ROW_LABEL_FORMAT "%s\n", ANSI_BORDER, BOX_V, ROWS - row, ANSI_RESET);
 
         if (row < ROWS - 1) {
             printf("%s    %s", ANSI_BORDER, BOX_LTEE);

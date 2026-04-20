@@ -16,6 +16,8 @@
 #include "log/log.h"
 #include "time/clock.h"
 
+#define LOG_DIR_PATH "bin/logs"
+
 /*
  * Alignment assumptions for future extensions:
  * - The log module owns session-local timestamp metadata needed for rebuild.
@@ -56,7 +58,7 @@ static GameState create_log_state(void) {
     return state;
 }
 
-/* Find the newest timestamped session log under logs/. */
+/* Find the newest timestamped session log under bin/logs/. */
 static void find_latest_log_path(char *buffer, size_t size) {
 #ifdef _WIN32
     struct _finddata_t fileInfo;
@@ -64,7 +66,7 @@ static void find_latest_log_path(char *buffer, size_t size) {
     char bestName[256];
 
     bestName[0] = '\0';
-    handle = _findfirst("logs\\game_*.log", &fileInfo);
+    handle = _findfirst("bin\\logs\\game_*.log", &fileInfo);
     assert(handle != -1);
 
     do {
@@ -75,14 +77,14 @@ static void find_latest_log_path(char *buffer, size_t size) {
     } while (_findnext(handle, &fileInfo) == 0);
 
     _findclose(handle);
-    snprintf(buffer, size, "logs/%s", bestName);
+    snprintf(buffer, size, LOG_DIR_PATH "/%s", bestName);
 #else
     DIR *dir;
     struct dirent *entry;
     char bestName[256];
 
     bestName[0] = '\0';
-    dir = opendir("logs");
+    dir = opendir(LOG_DIR_PATH);
     assert(dir != NULL);
 
     while ((entry = readdir(dir)) != NULL) {
@@ -98,7 +100,7 @@ static void find_latest_log_path(char *buffer, size_t size) {
 
     closedir(dir);
     assert(bestName[0] != '\0');
-    snprintf(buffer, size, "logs/%s", bestName);
+    snprintf(buffer, size, LOG_DIR_PATH "/%s", bestName);
 #endif
 }
 

@@ -16,6 +16,9 @@
 
 #include "time/clock.h"
 
+#define LOG_BASE_DIR "bin"
+#define LOG_DIR_PATH "bin/logs"
+
 /*
  * Alignment assumptions for future extensions:
  * - The public log API is the only contract other modules should depend on.
@@ -180,13 +183,19 @@ static void format_player_label(const GameState *state, Color color, char buffer
     snprintf(buffer, 32, "%s", baseLabel);
 }
 
-/* Create the logs directory if it does not already exist. */
+/* Create the runtime log directory under bin/ if it does not already exist. */
 static int ensure_logs_directory(void) {
-    if (MAKE_DIRECTORY("logs") == 0 || errno == EEXIST) {
-        return 0;
+    errno = 0;
+    if (MAKE_DIRECTORY(LOG_BASE_DIR) != 0 && errno != EEXIST) {
+        return 1;
     }
 
-    return 1;
+    errno = 0;
+    if (MAKE_DIRECTORY(LOG_DIR_PATH) != 0 && errno != EEXIST) {
+        return 1;
+    }
+
+    return 0;
 }
 
 /* Build the timestamped session log path required by the architecture spec. */
@@ -207,7 +216,7 @@ static int build_log_path(char buffer[256]) {
     snprintf(
         buffer,
         256,
-        "logs/game_%04d%02d%02d_%02d%02d%02d.log",
+        LOG_DIR_PATH "/game_%04d%02d%02d_%02d%02d%02d.log",
         localNow->tm_year + 1900,
         localNow->tm_mon + 1,
         localNow->tm_mday,

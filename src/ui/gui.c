@@ -187,6 +187,24 @@ int gui_window_is_valid(Gui *gui) {
     return gui && GTK_IS_WIDGET(gui->window);
 }
 
+static void on_turn_timer_toggled(GtkToggleButton *toggle, gpointer user_data) {
+    GtkWidget **widgets = (GtkWidget **)user_data;
+    gboolean active = gtk_toggle_button_get_active(toggle);
+    for (int i = 0; i < 6; ++i) {  // 3 labels + 3 combos
+        if (active) {
+            gtk_widget_show(widgets[i]);
+        } else {
+            gtk_widget_hide(widgets[i]);
+        }
+    }
+}
+static void on_back_clicked(GtkButton *button, gpointer user_data) {
+    g_print("Back button clicked\n");
+}
+
+static void on_start_clicked(GtkButton *button, gpointer user_data) {
+    g_print("Start button clicked\n");
+}
 void setup_game_setup_menu_human_vs_human(Gui *gui) {
     if (!GTK_IS_WIDGET(gui->window)) return;
     if (gui->main_box) {
@@ -195,16 +213,90 @@ void setup_game_setup_menu_human_vs_human(Gui *gui) {
     }
     gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
     gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
     gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    // Content box for the setup options
+    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
 
     GtkWidget *label = gtk_label_new("Human vs. Human");
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
 
-    // Add setup options here, e.g., color selection, timer settings
+    // Turn timer toggle
+    GtkWidget *timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
+    gtk_widget_set_halign(timer_toggle, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), timer_toggle, FALSE, FALSE, 0);
 
-    gtk_widget_show_all(gui->window);
+    // Timer settings box
+    GtkWidget *timer_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(timer_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), timer_box, FALSE, FALSE, 0);
+
+    // Hours spin
+    GtkWidget *hours_label = gtk_label_new("Hours:");
+    GtkWidget *hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
+    gtk_widget_set_size_request(hours_spin, 50, -1);
+
+    // Minutes spin
+    GtkWidget *minutes_label = gtk_label_new("Minutes:");
+    GtkWidget *minutes_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(minutes_spin, 50, -1);
+
+    // Seconds spin
+    GtkWidget *seconds_label = gtk_label_new("Seconds:");
+    GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(seconds_spin, 50, -1);
+
+    // Pack into timer_box
+    gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), hours_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), minutes_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), minutes_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), seconds_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), seconds_spin, FALSE, FALSE, 0);
+
+    // Array of widgets to show/hide
+    static GtkWidget *timer_widgets[6];
+    timer_widgets[0] = hours_label;
+    timer_widgets[1] = hours_spin;
+    timer_widgets[2] = minutes_label;
+    timer_widgets[3] = minutes_spin;
+    timer_widgets[4] = seconds_label;
+    timer_widgets[5] = seconds_spin;
+
+    // Initially hide
+    for (int i = 0; i < 6; ++i) {
+        gtk_widget_hide(timer_widgets[i]);
+    }
+
+    // Connect signal
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
+
+    // Add buttons at the bottom
+    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
+
+    GtkWidget *back_button = gtk_button_new_with_label("Back");
+    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
+
+    GtkWidget *start_button = gtk_button_new_with_label("Start");
+    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
+
+    // Connect signals for buttons
+    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
+    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
+
+    gtk_widget_show_all(gui->main_box);
+    // Re-hide the timer widgets since show_all showed them
+    for (int i = 0; i < 6; ++i) {
+        gtk_widget_hide(timer_widgets[i]);
+    }
+    gtk_widget_show(gui->window);
 }
 
 void setup_game_setup_menu_human_vs_computer(Gui *gui) {
@@ -215,16 +307,123 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
     }
     gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
     gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
     gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    // Content box for the setup options
+    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
 
     GtkWidget *label = gtk_label_new("Human vs. Computer");
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
 
-    // Add setup options here, e.g., player color, AI difficulty
+    // Select Side
+    GtkWidget *side_label = gtk_label_new("Select Side");
+    gtk_widget_set_halign(side_label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), side_label, FALSE, FALSE, 0);
 
-    gtk_widget_show_all(gui->window);
+    GtkWidget *side_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(side_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), side_box, FALSE, FALSE, 0);
+
+    GtkWidget *white_radio = gtk_radio_button_new_with_label(NULL, "White");
+    gtk_box_pack_start(GTK_BOX(side_box), white_radio, FALSE, FALSE, 0);
+
+    GtkWidget *black_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_radio), "Black");
+    gtk_box_pack_start(GTK_BOX(side_box), black_radio, FALSE, FALSE, 0);
+
+    // Select Difficulty
+    GtkWidget *diff_label = gtk_label_new("Select Difficulty");
+    gtk_widget_set_halign(diff_label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), diff_label, FALSE, FALSE, 0);
+
+    GtkWidget *diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(diff_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), diff_box, FALSE, FALSE, 0);
+
+    GtkWidget *easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
+    gtk_box_pack_start(GTK_BOX(diff_box), easy_radio, FALSE, FALSE, 0);
+
+    GtkWidget *medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(easy_radio), "Medium");
+    gtk_box_pack_start(GTK_BOX(diff_box), medium_radio, FALSE, FALSE, 0);
+
+    GtkWidget *hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(easy_radio), "Hard");
+    gtk_box_pack_start(GTK_BOX(diff_box), hard_radio, FALSE, FALSE, 0);
+
+    // Turn timer toggle
+    GtkWidget *timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
+    gtk_widget_set_halign(timer_toggle, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), timer_toggle, FALSE, FALSE, 0);
+
+    // Timer settings box
+    GtkWidget *timer_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(timer_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), timer_box, FALSE, FALSE, 0);
+
+    // Hours spin
+    GtkWidget *hours_label = gtk_label_new("Hours:");
+    GtkWidget *hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
+    gtk_widget_set_size_request(hours_spin, 50, -1);
+
+    // Minutes spin
+    GtkWidget *minutes_label = gtk_label_new("Minutes:");
+    GtkWidget *minutes_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(minutes_spin, 50, -1);
+
+    // Seconds spin
+    GtkWidget *seconds_label = gtk_label_new("Seconds:");
+    GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(seconds_spin, 50, -1);
+
+    // Pack into timer_box
+    gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), hours_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), minutes_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), minutes_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), seconds_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timer_box), seconds_spin, FALSE, FALSE, 0);
+
+    // Array of widgets to show/hide
+    static GtkWidget *timer_widgets[6];
+    timer_widgets[0] = hours_label;
+    timer_widgets[1] = hours_spin;
+    timer_widgets[2] = minutes_label;
+    timer_widgets[3] = minutes_spin;
+    timer_widgets[4] = seconds_label;
+    timer_widgets[5] = seconds_spin;
+
+    // Initially hide
+    for (int i = 0; i < 6; ++i) {
+        gtk_widget_hide(timer_widgets[i]);
+    }
+
+    // Connect signal
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
+
+    // Add buttons at the bottom
+    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
+
+    GtkWidget *back_button = gtk_button_new_with_label("Back");
+    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
+
+    GtkWidget *start_button = gtk_button_new_with_label("Start");
+    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
+
+    // Connect signals for buttons
+    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
+    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
+
+    gtk_widget_show_all(gui->main_box);
+    // Re-hide the timer widgets since show_all showed them
+    for (int i = 0; i < 6; ++i) {
+        gtk_widget_hide(timer_widgets[i]);
+    }
+    gtk_widget_show(gui->window);
 }
 
 void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
@@ -235,14 +434,70 @@ void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
     }
     gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
     gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_START);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
     gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    // Content box for the setup options
+    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
 
     GtkWidget *label = gtk_label_new("Computer vs. Computer");
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
 
-    // Add setup options here, e.g., AI difficulties for both
+    // White AI Difficulty
+    GtkWidget *white_diff_label = gtk_label_new("White AI Difficulty");
+    gtk_widget_set_halign(white_diff_label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), white_diff_label, FALSE, FALSE, 0);
 
-    gtk_widget_show_all(gui->window);
+    GtkWidget *white_diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(white_diff_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), white_diff_box, FALSE, FALSE, 0);
+
+    GtkWidget *white_easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
+    gtk_box_pack_start(GTK_BOX(white_diff_box), white_easy_radio, FALSE, FALSE, 0);
+
+    GtkWidget *white_medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_easy_radio), "Medium");
+    gtk_box_pack_start(GTK_BOX(white_diff_box), white_medium_radio, FALSE, FALSE, 0);
+
+    GtkWidget *white_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_easy_radio), "Hard");
+    gtk_box_pack_start(GTK_BOX(white_diff_box), white_hard_radio, FALSE, FALSE, 0);
+
+    // Black AI Difficulty
+    GtkWidget *black_diff_label = gtk_label_new("Black AI Difficulty");
+    gtk_widget_set_halign(black_diff_label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), black_diff_label, FALSE, FALSE, 0);
+
+    GtkWidget *black_diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(black_diff_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(content_box), black_diff_box, FALSE, FALSE, 0);
+
+    GtkWidget *black_easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
+    gtk_box_pack_start(GTK_BOX(black_diff_box), black_easy_radio, FALSE, FALSE, 0);
+
+    GtkWidget *black_medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(black_easy_radio), "Medium");
+    gtk_box_pack_start(GTK_BOX(black_diff_box), black_medium_radio, FALSE, FALSE, 0);
+
+    GtkWidget *black_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(black_easy_radio), "Hard");
+    gtk_box_pack_start(GTK_BOX(black_diff_box), black_hard_radio, FALSE, FALSE, 0);
+
+    // Add buttons at the bottom
+    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
+
+    GtkWidget *back_button = gtk_button_new_with_label("Back");
+    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
+
+    GtkWidget *start_button = gtk_button_new_with_label("Start");
+    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
+
+    // Connect signals for buttons
+    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
+    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
+
+    gtk_widget_show_all(gui->main_box);
+    gtk_widget_show(gui->window);
 }

@@ -28,9 +28,14 @@ OBJ_DIR := $(BUILD_DIR)/obj
 PKG_DIR := $(BUILD_DIR)/package
 SRC_STAGE_DIR := $(PKG_DIR)/Chess_Alpha_src
 SRC_ARCHIVE := Chess_Alpha_src.tar.gz
+USER_STAGE_DIR := $(PKG_DIR)/Chess_Alpha
+USER_ARCHIVE := Chess_Alpha.tar.gz
 
-README_SRC := $(firstword $(wildcard README README_DEV))
-INSTALL_SRC := $(firstword $(wildcard INSTALL INSTALL_DEV))
+README_SRC := $(firstword $(wildcard packaging/src/README README))
+INSTALL_SRC := $(firstword $(wildcard packaging/src/INSTALL INSTALL))
+USER_README_SRC := $(firstword $(wildcard packaging/user/README))
+USER_INSTALL_SRC := $(firstword $(wildcard packaging/user/INSTALL))
+USER_MANUAL_PDF := doc/Chess_UserManual.pdf
 
 CORE_SRCS := \
 	src/core/position.c \
@@ -138,8 +143,13 @@ DEP_FILES := \
 	$(CLI_MAIN_OBJ:.o=.d) \
 	$(TEST_OBJS:.o=.d)
 
+ARCHIVE_SRC_DEPS := \
+	$(APP_SRCS) $(CLI_MAIN_SRC) \
+	$(wildcard tests/*.c) \
+	$(shell find include -name '*.h' 2>/dev/null)
+
 .PHONY: all cli tests test test-core test-system test-cli test-ai \
-	list-tests run clean tar help
+	list-tests run clean tar tar-user help
 
 all: $(CHESS_BIN) $(LOG_DIR)
 
@@ -170,22 +180,27 @@ run: $(CHESS_BIN)
 
 clean:
 	$(RMDIR) $(BUILD_DIR)
-	$(RM) $(SRC_ARCHIVE) $(CHESS_BIN) $(TEST_BINS) $(wildcard *.o) $(wildcard *.d)
+	$(RM) $(SRC_ARCHIVE) $(USER_ARCHIVE) $(CHESS_BIN) $(TEST_BINS) $(wildcard *.o) $(wildcard *.d)
 	$(RM) $(wildcard $(LOG_DIR)/*) $(wildcard $(TEST_BIN_DIR)/*)
 	$(MKDIR_P) $(BIN_DIR) $(LOG_DIR) $(TEST_BIN_DIR)
 
 tar: $(SRC_ARCHIVE)
+
+tar-user: $(USER_ARCHIVE)
 
 help:
 	@echo "Targets:"
 	@echo "  make / make all   Build bin/chess and create bin/logs"
 	@echo "  make test         Build and run the maintained test suite"
 	@echo "  make clean        Remove generated binaries, objects, logs, and tarball while preserving bin/"
-	@echo "  make tar          Create Chess_Alpha_src.tar.gz"
+	@echo "  make tar          Create Chess_Alpha_src.tar.gz (source package)"
+	@if [ -f packaging/user/README ] && [ -f packaging/user/INSTALL ]; then \
+		echo "  make tar-user     Create Chess_Alpha.tar.gz (user package, requires doc/Chess_UserManual.pdf)"; \
+	fi
 	@echo "  make list-tests   Print the maintained test binary names"
 
-$(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT
-	$(RMDIR) $(PKG_DIR)
+$(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT $(ARCHIVE_SRC_DEPS)
+	$(RMDIR) $(SRC_STAGE_DIR)
 	$(MKDIR_P) $(SRC_STAGE_DIR)/bin $(SRC_STAGE_DIR)/bin/logs $(SRC_STAGE_DIR)/doc
 	cp $(README_SRC) $(SRC_STAGE_DIR)/README
 	cp $(INSTALL_SRC) $(SRC_STAGE_DIR)/INSTALL
@@ -196,6 +211,20 @@ $(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT
 	$(CP) tests $(SRC_STAGE_DIR)/
 	@if [ -d doc ]; then $(CP) doc/. $(SRC_STAGE_DIR)/doc/; fi
 	$(TAR) -czf $(SRC_ARCHIVE) -C $(PKG_DIR) Chess_Alpha_src
+
+$(USER_ARCHIVE): $(CHESS_BIN) $(USER_README_SRC) $(USER_INSTALL_SRC) COPYRIGHT
+	$(RMDIR) $(USER_STAGE_DIR)
+	$(MKDIR_P) $(USER_STAGE_DIR)/bin $(USER_STAGE_DIR)/bin/logs $(USER_STAGE_DIR)/doc
+	cp $(USER_README_SRC) $(USER_STAGE_DIR)/README
+	cp $(USER_INSTALL_SRC) $(USER_STAGE_DIR)/INSTALL
+	cp COPYRIGHT $(USER_STAGE_DIR)/
+	cp $(CHESS_BIN) $(USER_STAGE_DIR)/bin/chess
+	@if [ -f $(USER_MANUAL_PDF) ]; then \
+		cp $(USER_MANUAL_PDF) $(USER_STAGE_DIR)/doc/; \
+	else \
+		echo "WARNING: $(USER_MANUAL_PDF) not found; user package will ship without the user manual."; \
+	fi
+	$(TAR) -czf $(USER_ARCHIVE) -C $(PKG_DIR) Chess_Alpha
 
 $(LOG_DIR):
 	$(MKDIR_P) $@

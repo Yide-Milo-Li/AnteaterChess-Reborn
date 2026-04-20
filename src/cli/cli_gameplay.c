@@ -47,6 +47,10 @@ int cliGetMoveCommand(Command *cmd) {
     }
 
     printf("%s[Move Input]%s Enter move as: FROM TO (example: E2 E4)\n", ANSI_ACCENT, ANSI_RESET);
+    printf("%s[Move Input]%s Castling uses king start/end squares (example: F1 H1).\n",
+        ANSI_ACCENT, ANSI_RESET);
+    printf("%s[Move Input]%s Promotion auto-queens; en passant uses normal destination squares.\n",
+        ANSI_ACCENT, ANSI_RESET);
     return getMoveInput(cmd);
 }
 
@@ -55,6 +59,9 @@ int cliShowMoveFormatHint(void) {
     printf("%s+---------------- Move Format ----------------+%s\n", ANSI_ACCENT, ANSI_RESET);
     printf("| Move format: FROM TO                       |\n");
     printf("| Example: E2 E4                             |\n");
+    printf("| Castling: F1 H1 or F1 D1                   |\n");
+    printf("| Promotion defaults to queen.               |\n");
+    printf("| En passant uses the normal landing square. |\n");
     printf("| Coordinates ignore case and                |\n");
     printf("| tolerate leading/trailing spaces.          |\n");
     printf("%s+---------------------------------------------+%s\n", ANSI_ACCENT, ANSI_RESET);

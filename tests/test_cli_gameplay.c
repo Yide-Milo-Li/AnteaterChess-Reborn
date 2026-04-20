@@ -107,11 +107,14 @@ static void test_gameplay_action_menu_output(void) {
 
 /* Check that the move-format hint prints the documented coordinate example. */
 static void test_move_format_hint_output(void) {
-    char buffer[256];
+    char buffer[512];
 
     captureStdout(show_hint_wrapper, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
     assert(strstr(buffer, "Move format") != NULL);
     assert(strstr(buffer, "Example: E2 E4") != NULL);
+    assert(strstr(buffer, "Castling: F1 H1") != NULL);
+    assert(strstr(buffer, "Promotion defaults to queen") != NULL);
+    assert(strstr(buffer, "En passant uses the normal landing square") != NULL);
     assert(strstr(buffer, "\x1b[") != NULL);
 }
 

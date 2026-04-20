@@ -78,8 +78,9 @@ static void append_promotion_moves(MoveList *list, Move baseMove) {
     };
     int index;
 
-    for (index = 0; index < (int)(sizeof(
-        Types) / sizeof(promotionTypes[0])); ++index) {
+    for (index = 0;
+        index < (int)(sizeof(promotionTypes) / sizeof(promotionTypes[0]));
+        ++index) {
         Move promotedMove = baseMove;
 
         setSpecialMove(&promotedMove, promotionTypes[index]);

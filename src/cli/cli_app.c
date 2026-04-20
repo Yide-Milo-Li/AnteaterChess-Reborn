@@ -10,8 +10,10 @@
 #include "cli/cli_renderer.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/board.h"
 #include "input/input.h"
 #include "core/position.h"
+#include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 #include "system/event.h"
 #include "system/event_queue.h"
@@ -176,6 +178,83 @@ static const char *special_move_label(SpecialMove type) {
     }
 }
 
+/* Classify one rejected move command into the most precise current public
+ * error code. */
+static ErrorCode classify_move_error(const GameState *state, Command command);
+
+/* Promotion ambiguity is intentionally normalized to queen for the human CLI
+ * because the public command interface still carries only from/to. */
+static int is_promotion_move(SpecialMove type) {
+    return type == PROMOTION_QUEEN
+        || type == PROMOTION_ROOK
+        || type == PROMOTION_BISHOP
+        || type == PROMOTION_KNIGHT;
+}
+
+/* Resolve one parsed CLI move command against the current legal move list. */
+static int resolve_cli_move_command(const GameState *state, Command command, Move *resolvedMove) {
+    MoveList candidates;
+    Piece movingPiece;
+    Move *promotionQueenCandidate;
+    int matchingCount;
+    int allMatchesArePromotions;
+    int index;
+
+    if (state == NULL || resolvedMove == NULL || command.type != CMD_MOVE) {
+        return 1;
+    }
+
+    if (validateSelection(state, command.from) != SELECT_VALID || !isValidPosition(command.to)) {
+        return 1;
+    }
+
+    movingPiece = getPiece(&state->board, command.from);
+    if (movingPiece.type == EMPTY_PIECE) {
+        return 1;
+    }
+
+    if (generateLegalMovesForPosition(state, command.from, &candidates) != 0) {
+        return 1;
+    }
+
+    promotionQueenCandidate = NULL;
+    matchingCount = 0;
+    allMatchesArePromotions = 1;
+    for (index = 0; index < getMoveCount(&candidates); ++index) {
+        Move *candidate = getMove(&candidates, index);
+
+        if (candidate == NULL
+            || !positionEqual(candidate->from, command.from)
+            || !positionEqual(candidate->to, command.to)
+            || candidate->movedPiece.type != movingPiece.type
+            || candidate->movedPiece.color != movingPiece.color) {
+            continue;
+        }
+
+        ++matchingCount;
+        if (candidate->specialType == PROMOTION_QUEEN) {
+            promotionQueenCandidate = candidate;
+        } else if (!is_promotion_move(candidate->specialType)) {
+            allMatchesArePromotions = 0;
+        }
+
+        if (matchingCount == 1) {
+            *resolvedMove = *candidate;
+        }
+    }
+
+    if (matchingCount == 1) {
+        return 0;
+    }
+
+    if (matchingCount > 1 && allMatchesArePromotions && promotionQueenCandidate != NULL) {
+        *resolvedMove = *promotionQueenCandidate;
+        return 0;
+    }
+
+    return 1;
+}
+
 /* Print one concise CLI move summary for AI moves and hint suggestions. */
 static void print_move_summary(const char *prefix, Move move) {
     char fromText[8];
@@ -297,6 +376,7 @@ static int collect_setup_event(GameState *state, EventQueue *queue) {
 static int collect_gameplay_event(GameState *state, EventQueue *queue) {
     int action;
     Command command;
+    Move resolvedMove;
     Move hintMove;
 
     if (state == NULL) {
@@ -335,11 +415,22 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
 
     switch (action) {
         case 1:
-            if (cliGetMoveCommand(&command) != 0) {
-                cliShowErrorMessage(ERR_INVALID_MOVE_FORMAT);
-                return 0;
+            if (cliShowMoveFormatHint() != 0) {
+                return 1;
             }
-            return enqueue_cli_event(queue, createMoveInputEvent(command));
+            for (;;) {
+                if (cliGetMoveCommand(&command) != 0) {
+                    cliShowErrorMessage(ERR_INVALID_MOVE_FORMAT);
+                    continue;
+                }
+
+                if (resolve_cli_move_command(state, command, &resolvedMove) != 0) {
+                    cliShowErrorMessage(classify_move_error(state, command));
+                    continue;
+                }
+
+                return enqueue_cli_event(queue, createMoveInputEvent(command));
+            }
         case 2:
             if (state->moveHistory.count <= 0) {
                 cliShowErrorMessage(ERR_UNDO_UNAVAILABLE);

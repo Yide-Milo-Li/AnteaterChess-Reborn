@@ -78,7 +78,7 @@ static int count_occurrences(const char *buffer, const char *needle) {
 static void test_cli_app_full_session(void) {
     char buffer[32768];
     int result = run_and_capture_cli_app(
-        "1\n1\n2\n1\nE2 E4\n3\n3\n",
+        "1\n1\n2\n1\nE2 E5\nE2 E4\n3\n3\n",
         buffer,
         sizeof(buffer)
     );
@@ -90,6 +90,8 @@ static void test_cli_app_full_session(void) {
     assert(strstr(buffer, "Game Status") != NULL);
     assert(strstr(buffer, "Board") != NULL);
     assert(strstr(buffer, "Actions") != NULL);
+    assert(strstr(buffer, "Move format") != NULL);
+    assert(strstr(buffer, "Illegal move") != NULL);
     assert(strstr(buffer, "Game Over") != NULL);
 }
 

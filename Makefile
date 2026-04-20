@@ -26,6 +26,7 @@ SRC_SRCS := \
 	src/event/event_queue.c \
 	src/control/controller.c \
 	src/control/fsm.c \
+	src/error/error.c \
 	src/log/log.c \
 	src/time/clock.c \
 	src/turn/turn.c \
@@ -34,7 +35,7 @@ SRC_SRCS := \
 
 SRC_OBJS := $(SRC_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
-TESTS := test_board test_piece test_move test_movegen test_move_execution test_undo test_game_state test_turn test_endgame test_log test_clock test_command test_input test_timer test_event test_fsm test_controller test_control_flow test_ai
+TESTS := test_board test_piece test_move test_movegen test_move_execution test_undo test_game_state test_turn test_endgame test_log test_clock test_command test_input test_timer test_event test_fsm test_controller test_control_flow test_error test_ai
 TEST_BINS := $(TESTS:%=$(TEST_BIN_DIR)/%$(EXE))
 TEST_OBJS := $(TESTS:%=$(OBJ_DIR)/tests/%.o)
 

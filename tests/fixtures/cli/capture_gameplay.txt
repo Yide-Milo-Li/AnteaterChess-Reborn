@@ -1,2 +1,6 @@
-Move format: enter two coordinates separated by spaces, such as E2 E4.
-Coordinates are case-insensitive and may have leading or trailing whitespace.
+[1;36m╭──────────── Move Format ────────────╮[0m
+│ Move format: FROM TO               │
+│ Example: E2 E4                     │
+│ Coordinates ignore case and        │
+│ tolerate leading/trailing spaces.  │
+[1;36m╰────────────────────────────────────╯[0m

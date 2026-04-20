@@ -9,6 +9,11 @@
  * - GUI-specific messaging must remain outside the CLI namespace.
  */
 
+#define ANSI_RESET       "\x1b[0m"
+#define ANSI_ERROR       "\x1b[1;31m"
+#define ANSI_INFO        "\x1b[1;36m"
+#define ANSI_UNAVAILABLE "\x1b[1;33m"
+
 /* Map one public error code to the CLI text shown to the player. */
 static const char *error_message_for_code(ErrorCode code) {
     switch (code) {
@@ -39,17 +44,19 @@ static const char *error_message_for_code(ErrorCode code) {
 
 /* Print one CLI error message and keep the public API side-effect free otherwise. */
 int cliShowErrorMessage(ErrorCode code) {
-    printf("Error: %s\n", error_message_for_code(code));
+    printf("%s[Error]%s %s\n", ANSI_ERROR, ANSI_RESET, error_message_for_code(code));
     return 0;
 }
 
 /* Print one standardized disabled-feature message for future-not-ready features. */
 int cliShowDisabledFeatureMessage(const char *featureName) {
     if (featureName == NULL) {
-        printf("This feature is currently unavailable in the CLI build.\n");
+        printf("%s[Unavailable]%s This feature is currently unavailable in the CLI build.\n",
+            ANSI_UNAVAILABLE, ANSI_RESET);
         return 1;
     }
 
-    printf("%s is currently disabled in the CLI build.\n", featureName);
+    printf("%s[Unavailable]%s %s is currently disabled in the CLI build.\n",
+        ANSI_UNAVAILABLE, ANSI_RESET, featureName);
     return 0;
 }

@@ -9,7 +9,7 @@
 3. Computer vs Computer (Disabled)
 4. Back
 5. Exit
-AI game modes is currently disabled in the CLI build.
+[1;33m[Unavailable][0m AI game modes is currently disabled in the CLI build.
 
 === Game Mode ===
 1. Human vs Human

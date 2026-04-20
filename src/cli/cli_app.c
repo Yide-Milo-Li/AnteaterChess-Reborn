@@ -1,5 +1,6 @@
 #include "cli/cli_app.h"
 
+#include <stdio.h>
 #include <stddef.h>
 
 #include "cli/cli_feedback.h"
@@ -19,6 +20,9 @@
  * - This file orchestrates a standalone CLI app loop and must not define GUI behavior.
  * - FSM and gameplay modules remain the source of truth for state transitions and rules.
  */
+
+#define ANSI_RESET  "\x1b[0m"
+#define ANSI_ACCENT "\x1b[1;36m"
 
 /* Map one event type to the queue used by the standalone CLI app loop. */
 static QueueType queue_type_for_event(EventType type) {
@@ -65,6 +69,13 @@ static Event dequeue_next_event(EventQueue *queue) {
 /* Enqueue one event for later prioritized dispatch. */
 static int enqueue_cli_event(EventQueue *queue, Event event) {
     return enqueueEvent(queue, event, queue_type_for_event(event.type));
+}
+
+/* Print one lightweight gameplay page header before the status panel and board. */
+static void print_gameplay_page_header(void) {
+    printf("\n%s══════════════════ Anteater Chess CLI ══════════════════%s\n",
+        ANSI_ACCENT, ANSI_RESET);
+    printf("%sGameplay View%s\n", ANSI_ACCENT, ANSI_RESET);
 }
 
 /* Show the disabled AI-mode message without changing FSM state. */
@@ -146,7 +157,10 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
         }
     }
 
-    if (cliDisplayGameStatus(state) != 0 || cliRenderBoard(state) != 0) {
+    print_gameplay_page_header();
+    if (cliDisplayTurn(state->currentTurn) != 0
+        || cliDisplayGameStatus(state) != 0
+        || cliRenderBoard(state) != 0) {
         return 1;
     }
 

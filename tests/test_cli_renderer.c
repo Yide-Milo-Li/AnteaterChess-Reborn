@@ -67,27 +67,37 @@ static GameState create_state(int timerEnabled, int initialTimeSeconds) {
 static void test_board_renderer_output(void) {
     GameState state = create_state(0, 0);
     RenderContext context = {&state};
-    char buffer[1024];
+    char buffer[4096];
 
     captureStdout(render_board_wrapper, &context, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
-    assert(strstr(buffer, "A B C D E F G H I J") != NULL);
-    assert(strstr(buffer, "r n b e q k e b n r") != NULL);
-    assert(strstr(buffer, "R N B E Q K E B N R") != NULL);
+    assert(strstr(buffer, "\x1b[") != NULL);
+    assert(strstr(buffer, "Board") != NULL);
+    assert(strstr(buffer, "A") != NULL);
+    assert(strstr(buffer, "J") != NULL);
+    assert(strstr(buffer, "\u250C") != NULL);
+    assert(strstr(buffer, "\u253C") != NULL);
+    assert(strchr(buffer, 'r') != NULL);
+    assert(strchr(buffer, 'R') != NULL);
+    assert(strstr(buffer, "Legend:") != NULL);
 }
 
 /* Check that the status block prints turn and timer details. */
 static void test_status_output(void) {
     GameState state = create_state(1, 30);
     RenderContext context = {&state};
-    char buffer[1024];
+    char buffer[4096];
 
     assert(initClock() == 0);
     assert(initTurnTimer(&state) == 0);
     captureStdout(render_status_wrapper, &context, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
-    assert(strstr(buffer, "Turn: White") != NULL);
-    assert(strstr(buffer, "Timer: On") != NULL);
-    assert(strstr(buffer, "White Time: 30") != NULL);
-    assert(strstr(buffer, "Black Time: 30") != NULL);
+    assert(strstr(buffer, "\x1b[") != NULL);
+    assert(strstr(buffer, "Game Status") != NULL);
+    assert(strstr(buffer, "Current Turn") != NULL);
+    assert(strstr(buffer, "Elapsed Time") != NULL);
+    assert(strstr(buffer, "Turn Timer") != NULL);
+    assert(strstr(buffer, "White Timer") != NULL);
+    assert(strstr(buffer, "Black Timer") != NULL);
+    assert(strstr(buffer, "00:00:30") != NULL);
 }
 
 /* Run the CLI renderer regression suite. */

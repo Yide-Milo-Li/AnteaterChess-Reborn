@@ -44,7 +44,7 @@ static int run_and_capture_cli_app(const char *inputPath, const char *input, cha
 
 /* Check that one human-vs-human CLI session can play a move and exit cleanly. */
 static void test_cli_app_full_session(void) {
-    char buffer[8192];
+    char buffer[32768];
     int result = run_and_capture_cli_app(
         CLI_FIXTURE_DIR "cli_app_session.txt",
         "1\n1\n2\n1\nE2 E4\n3\n3\n",
@@ -54,12 +54,17 @@ static void test_cli_app_full_session(void) {
 
     assert(result == 0);
     assert(strstr(buffer, "Anteater Chess CLI") != NULL);
+    assert(strstr(buffer, "Gameplay View") != NULL);
+    assert(strstr(buffer, "WHITE TO MOVE") != NULL);
+    assert(strstr(buffer, "Game Status") != NULL);
+    assert(strstr(buffer, "Board") != NULL);
+    assert(strstr(buffer, "Actions") != NULL);
     assert(strstr(buffer, "Game Over") != NULL);
 }
 
 /* Check that disabled AI modes stay unavailable and return the user to the menu flow. */
 static void test_cli_app_disabled_ai_notice(void) {
-    char buffer[8192];
+    char buffer[32768];
     int result = run_and_capture_cli_app(
         CLI_FIXTURE_DIR "cli_app_disabled_ai.txt",
         "1\n2\n4\n2\n",

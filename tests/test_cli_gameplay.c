@@ -22,6 +22,7 @@ static void writeFixtureAndRedirect(const char *path, const char *contents) {
 static void captureStdout(void (*fn)(void), const char *path, char *buffer, size_t size) {
     int savedStdout = _dup(_fileno(stdout));
     FILE *file;
+    size_t bytesRead;
 
     assert(savedStdout != -1);
     file = freopen(path, "w", stdout);
@@ -33,7 +34,8 @@ static void captureStdout(void (*fn)(void), const char *path, char *buffer, size
 
     file = fopen(path, "r");
     assert(file != NULL);
-    assert(fgets(buffer, (int)size, file) != NULL);
+    bytesRead = fread(buffer, 1, size - 1, file);
+    buffer[bytesRead] = '\0';
     fclose(file);
 }
 
@@ -71,6 +73,8 @@ static void test_move_format_hint_output(void) {
 
     captureStdout(show_hint_wrapper, CLI_CAPTURE_FILE, buffer, sizeof(buffer));
     assert(strstr(buffer, "Move format") != NULL);
+    assert(strstr(buffer, "Example: E2 E4") != NULL);
+    assert(strstr(buffer, "\x1b[") != NULL);
 }
 
 /* Run the CLI gameplay regression suite. */

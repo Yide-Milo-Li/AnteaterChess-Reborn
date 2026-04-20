@@ -1,6 +1,10 @@
-System State: 0
-Turn: White
-Moves Played: 0
-Timer: On
-White Time: 30
-Black Time: 30
+[38;5;45m╭───────────── Game Status ─────────────────[0m
+│ State         Init                       │[0m
+[1;36m│ Current Turn  White                      │[0m
+│ Moves Played  0                          │[0m
+│ Elapsed Time  00:00:00                   │[0m
+│ Turn Timer    Enabled                    │[0m
+[1;36m│ White Timer   00:00:30                   │[0m
+│ Black Timer   00:00:30                   │[0m
+│ Result        In Progress                │[0m
+[38;5;45m╰─────────────────────────────────────────[0m

@@ -1,7 +1,9 @@
 #include "cli/cli_renderer.h"
 
+#include <stdint.h>
 #include <stdio.h>
 
+#include "time/clock.h"
 #include "turn/turn_timer.h"
 
 /*
@@ -11,12 +13,41 @@
  * - The CLI board format is independent from any future GUI presentation model.
  */
 
-/* Convert one board piece into the fixed CLI token used by the ASCII renderer. */
+/* ANSI style helpers keep presentation choices localized to the CLI renderer. */
+#define ANSI_RESET          "\x1b[0m"
+#define ANSI_BOLD           "\x1b[1m"
+#define ANSI_ACCENT         "\x1b[1;36m"
+#define ANSI_BORDER         "\x1b[38;5;45m"
+#define ANSI_WHITE_PIECE    "\x1b[1;96m"
+#define ANSI_BLACK_PIECE    "\x1b[1;33m"
+#define ANSI_LIGHT_SQUARE   "\x1b[48;5;255m"
+#define ANSI_DARK_SQUARE    "\x1b[48;5;240m"
+#define ANSI_WARNING        "\x1b[1;31m"
+#define ANSI_WHITE_BADGE    "\x1b[1;30;106m"
+#define ANSI_BLACK_BADGE    "\x1b[1;30;103m"
+
+/* Unicode box-drawing escapes keep the source ASCII-friendly while rendering richly. */
+#define BOX_H               "\u2500"
+#define BOX_V               "\u2502"
+#define BOX_TL              "\u250C"
+#define BOX_TR              "\u2510"
+#define BOX_BL              "\u2514"
+#define BOX_BR              "\u2518"
+#define BOX_LTEE            "\u251C"
+#define BOX_RTEE            "\u2524"
+#define BOX_TTEE            "\u252C"
+#define BOX_BTEE            "\u2534"
+#define BOX_CROSS           "\u253C"
+#define BOX_ROUND_TL        "\u256D"
+#define BOX_ROUND_BL        "\u2570"
+#define BOX_DOUBLE_H        "\u2550"
+
+/* Convert one board piece into the fixed CLI token used by the board panel. */
 static char cli_piece_token(Piece piece) {
     char token;
 
     if (piece.type == EMPTY_PIECE || piece.color == EMPTY_COLOR) {
-        return '.';
+        return ' ';
     }
 
     switch (piece.type) {
@@ -43,7 +74,7 @@ static char cli_piece_token(Piece piece) {
             break;
         case EMPTY_PIECE:
         default:
-            return '.';
+            return ' ';
     }
 
     if (piece.color == BLACK) {
@@ -53,67 +84,263 @@ static char cli_piece_token(Piece piece) {
     return token;
 }
 
-/* Print the current active-turn label for the CLI gameplay header. */
+/* Return the stable status label for one public system state value. */
+static const char *system_state_label(SystemState state) {
+    switch (state) {
+        case INIT_STATE:
+            return "Init";
+        case MAIN_MENU_STATE:
+            return "Main Menu";
+        case GAME_MODE_SELECTION_STATE:
+            return "Mode Select";
+        case GAME_SETUP_STATE:
+            return "Game Setup";
+        case GAMEPLAY_STATE:
+            return "Gameplay";
+        case END_GAME_MENU_STATE:
+            return "Endgame Menu";
+        case GAME_TERMINATION_STATE:
+            return "Terminating";
+        case EXIT_STATE:
+            return "Exit";
+        default:
+            return "Unknown";
+    }
+}
+
+/* Return the stable status label for one public game result value. */
+static const char *game_result_label(GameResult result) {
+    switch (result) {
+        case RESULT_NONE:
+            return "In Progress";
+        case RESULT_WHITE_WIN:
+            return "White Wins";
+        case RESULT_BLACK_WIN:
+            return "Black Wins";
+        case RESULT_DRAW:
+            return "Draw";
+        case RESULT_TERMINATED_BY_USER:
+            return "Ended by User";
+        default:
+            return "Unknown";
+    }
+}
+
+/* Format elapsed seconds into the shared HH:MM:SS display layout. */
+static void format_time_value(int64_t totalSeconds, char buffer[32]) {
+    int64_t hours;
+    int64_t minutes;
+    int64_t seconds;
+
+    if (totalSeconds < 0) {
+        totalSeconds = 0;
+    }
+
+    hours = totalSeconds / 3600;
+    minutes = (totalSeconds % 3600) / 60;
+    seconds = totalSeconds % 60;
+    snprintf(buffer, 32, "%02lld:%02lld:%02lld",
+        (long long)hours,
+        (long long)minutes,
+        (long long)seconds);
+}
+
+/* Return the badge style used to highlight the side to move. */
+static const char *turn_badge_style(Color turn) {
+    return (turn == BLACK) ? ANSI_BLACK_BADGE : ANSI_WHITE_BADGE;
+}
+
+/* Return the square background used for one checkerboard coordinate. */
+static const char *square_background_style(int row, int col) {
+    return (((row + col) % 2) == 0) ? ANSI_LIGHT_SQUARE : ANSI_DARK_SQUARE;
+}
+
+/* Return the piece foreground style for one side. */
+static const char *piece_foreground_style(Piece piece) {
+    return (piece.color == BLACK) ? ANSI_BLACK_PIECE : ANSI_WHITE_PIECE;
+}
+
+/* Print one status row inside the game-status panel with optional row emphasis. */
+static void print_status_row(const char *rowStyle, const char *label, const char *value) {
+    const char *effectiveStyle = (rowStyle != NULL) ? rowStyle : "";
+
+    printf("%s" BOX_V " %-13s %-26s " BOX_V "%s\n", effectiveStyle, label, value, ANSI_RESET);
+}
+
+/* Print one fully styled board cell, including square background and piece color. */
+static void print_board_cell(int row, int col, Piece piece) {
+    const char *backgroundStyle = square_background_style(row, col);
+    char token = cli_piece_token(piece);
+
+    if (token == ' ') {
+        printf(BOX_V "%s   %s", backgroundStyle, ANSI_RESET);
+        return;
+    }
+
+    printf(BOX_V "%s%s %c %s", backgroundStyle, piece_foreground_style(piece), token, ANSI_RESET);
+}
+
+/* Print the current active-turn badge for the CLI gameplay header. */
 int cliDisplayTurn(Color turn) {
     switch (turn) {
         case WHITE:
-            printf("Turn: White\n");
+            printf("%s%s  WHITE TO MOVE  %s\n", ANSI_BOLD, turn_badge_style(turn), ANSI_RESET);
             return 0;
         case BLACK:
-            printf("Turn: Black\n");
+            printf("%s%s  BLACK TO MOVE  %s\n", ANSI_BOLD, turn_badge_style(turn), ANSI_RESET);
             return 0;
         default:
-            printf("Turn: Unknown\n");
+            printf("%s[Info]%s Unknown side to move.\n", ANSI_ACCENT, ANSI_RESET);
             return 1;
     }
 }
 
-/* Print the shared gameplay status block shown before CLI actions. */
+/* Print the structured gameplay status panel shown above the rendered board. */
 int cliDisplayGameStatus(const GameState *state) {
+    char moveCountText[16];
+    char elapsedText[32];
+    char whiteTimerText[32];
+    char blackTimerText[32];
+    char timerModeText[16];
     int whiteTime;
     int blackTime;
+    const char *turnValue;
 
     if (state == NULL) {
         return 1;
     }
 
-    printf("System State: %d\n", (int)state->systemState);
-    cliDisplayTurn(state->currentTurn);
-    printf("Moves Played: %d\n", state->moveHistory.count);
-    printf("Timer: %s\n", state->config.timerEnabled ? "On" : "Off");
+    snprintf(moveCountText, sizeof(moveCountText), "%d", state->moveHistory.count);
+    snprintf(timerModeText, sizeof(timerModeText), "%s", state->config.timerEnabled ? "Enabled" : "Disabled");
+    format_time_value(getElapsedTimeSeconds(), elapsedText);
 
-    if (state->config.timerEnabled) {
-        whiteTime = getRemainingTime(state, WHITE);
-        blackTime = getRemainingTime(state, BLACK);
-        if (whiteTime >= 0 && blackTime >= 0) {
-            printf("White Time: %d\n", whiteTime);
-            printf("Black Time: %d\n", blackTime);
-        }
+    whiteTime = getRemainingTime(state, WHITE);
+    blackTime = getRemainingTime(state, BLACK);
+    if (whiteTime >= 0) {
+        format_time_value(whiteTime, whiteTimerText);
+    } else {
+        snprintf(whiteTimerText, sizeof(whiteTimerText), "--:--:--");
     }
 
+    if (blackTime >= 0) {
+        format_time_value(blackTime, blackTimerText);
+    } else {
+        snprintf(blackTimerText, sizeof(blackTimerText), "--:--:--");
+    }
+
+    turnValue = (state->currentTurn == BLACK) ? "Black" : "White";
+
+    printf("%s" BOX_ROUND_TL BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H " Game Status "
+           BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H "%s\n",
+           ANSI_BORDER, ANSI_RESET);
+    print_status_row(NULL, "State", system_state_label(state->systemState));
+    print_status_row(ANSI_ACCENT, "Current Turn", turnValue);
+    print_status_row(NULL, "Moves Played", moveCountText);
+    print_status_row(NULL, "Elapsed Time", elapsedText);
+    print_status_row(NULL, "Turn Timer", timerModeText);
+
+    if (state->config.timerEnabled) {
+        print_status_row(
+            (state->currentTurn == WHITE && whiteTime >= 0 && whiteTime <= 10) ? ANSI_WARNING
+                : (state->currentTurn == WHITE ? ANSI_ACCENT : NULL),
+            "White Timer",
+            whiteTimerText
+        );
+        print_status_row(
+            (state->currentTurn == BLACK && blackTime >= 0 && blackTime <= 10) ? ANSI_WARNING
+                : (state->currentTurn == BLACK ? ANSI_ACCENT : NULL),
+            "Black Timer",
+            blackTimerText
+        );
+    } else {
+        print_status_row(NULL, "White Timer", "--:--:--");
+        print_status_row(NULL, "Black Timer", "--:--:--");
+    }
+
+    if (state->gameOver) {
+        print_status_row(ANSI_WARNING, "Result", game_result_label(state->result));
+    } else {
+        print_status_row(NULL, "Result", game_result_label(RESULT_NONE));
+    }
+
+    printf("%s" BOX_ROUND_BL BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H BOX_H "%s\n",
+        ANSI_BORDER, ANSI_RESET);
     return 0;
 }
 
-/* Render the board in a stable ASCII grid with fixed row and column labels. */
+/* Render the board as a Unicode panel with ANSI-styled squares and pieces. */
 int cliRenderBoard(const GameState *state) {
-    int row;
+    static const char *columnLabels[COLS] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
     int col;
+    int row;
 
     if (state == NULL) {
         return 1;
     }
 
-    printf("\n   A B C D E F G H I J\n");
-    for (row = 0; row < ROWS; ++row) {
-        printf("%d  ", ROWS - row);
-        for (col = 0; col < COLS; ++col) {
-            printf("%c", cli_piece_token(getPiece(&state->board, createPosition(row, col))));
-            if (col < COLS - 1) {
-                printf(" ");
-            }
+    printf("%s      Board%s\n", ANSI_ACCENT, ANSI_RESET);
+    printf("%s      ", ANSI_BORDER);
+    for (col = 0; col < COLS; ++col) {
+        printf(" %s ", columnLabels[col]);
+        if (col < COLS - 1) {
+            printf(" ");
         }
-        printf("  %d\n", ROWS - row);
     }
-    printf("   A B C D E F G H I J\n\n");
+    printf("%s\n", ANSI_RESET);
+
+    printf("%s    " BOX_TL, ANSI_BORDER);
+    for (col = 0; col < COLS; ++col) {
+        printf(BOX_H BOX_H BOX_H);
+        if (col < COLS - 1) {
+            printf(BOX_TTEE);
+        }
+    }
+    printf(BOX_TR "%s\n", ANSI_RESET);
+
+    for (row = 0; row < ROWS; ++row) {
+        printf("%s %d  %s", ANSI_BORDER, ROWS - row, ANSI_RESET);
+        for (col = 0; col < COLS; ++col) {
+            print_board_cell(row, col, getPiece(&state->board, createPosition(row, col)));
+        }
+        printf("%s" BOX_V "  %d%s\n", ANSI_BORDER, ROWS - row, ANSI_RESET);
+
+        if (row < ROWS - 1) {
+            printf("%s    " BOX_LTEE, ANSI_BORDER);
+            for (col = 0; col < COLS; ++col) {
+                printf(BOX_H BOX_H BOX_H);
+                if (col < COLS - 1) {
+                    printf(BOX_CROSS);
+                }
+            }
+            printf(BOX_RTEE "%s\n", ANSI_RESET);
+        }
+    }
+
+    printf("%s    " BOX_BL, ANSI_BORDER);
+    for (col = 0; col < COLS; ++col) {
+        printf(BOX_H BOX_H BOX_H);
+        if (col < COLS - 1) {
+            printf(BOX_BTEE);
+        }
+    }
+    printf(BOX_BR "%s\n", ANSI_RESET);
+
+    printf("%s      ", ANSI_BORDER);
+    for (col = 0; col < COLS; ++col) {
+        printf(" %s ", columnLabels[col]);
+        if (col < COLS - 1) {
+            printf(" ");
+        }
+    }
+    printf("%s\n", ANSI_RESET);
+
+    printf("%sLegend:%s %sWhite%s = uppercase cyan, %sBlack%s = lowercase gold.\n\n",
+        ANSI_ACCENT,
+        ANSI_RESET,
+        ANSI_WHITE_PIECE,
+        ANSI_RESET,
+        ANSI_BLACK_PIECE,
+        ANSI_RESET
+    );
     return 0;
 }

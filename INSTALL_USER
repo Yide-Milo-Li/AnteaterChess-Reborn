@@ -5,12 +5,13 @@ Installation Instructions
    gtar xvzf Chess_Alpha.tar.gz
 
 2. Change to the project directory:
-   cd chess
+   cd Chess_Alpha
 
 3. Run the program:
-   bin/chess
+   ./bin/chess
 
 Notes:
 - No compilation is required for the user package.
 - This alpha release is intended for a Linux environment.
+- Runtime logs are written to bin/logs/.
 - For detailed usage instructions, please refer to doc/Chess_UserManual.pdf.

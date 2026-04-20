@@ -29,18 +29,32 @@ Directory overview:
 - tests/
   Unit tests
 - bin/
-  Build output directory
+  Build output directory for the executable, runtime logs, and test binaries
+- build/
+  Build intermediates and source-package staging area
 - doc/
-  Documentation
+  Release documentation when included
 
 Supported Makefile targets:
-- make
+- make / make all
+  Build bin/chess and create bin/logs
 - make test
+  Build and run the maintained test suite
 - make clean
+  Remove generated build artifacts while preserving the bin/ directory layout
+- make tar
+  Generate Chess_Alpha_src.tar.gz
 
 After building, run the program with:
    ./bin/chess
 
-For user-level instructions, please refer to doc/Chess_UserManual.pdf.
-For architecture and module-level details, please refer to
-doc/Chess_SoftwareSpec.pdf.
+Build outputs:
+- bin/chess
+  Main executable
+- bin/logs/
+  Runtime log directory
+- bin/tests/
+  Test binaries and test temporary files
+
+For detailed user and architecture documentation, please refer to the
+files placed in doc/ when they are included in the release package.

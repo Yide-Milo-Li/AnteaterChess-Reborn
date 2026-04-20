@@ -23,14 +23,20 @@ features or other limitations typical of an alpha version.
 Package contents:
 - bin/chess
   Executable chess program
+- bin/logs/
+  Runtime log directory
 - doc/Chess_UserManual.pdf
   User documentation
 
 Quick start:
 1. Extract the package.
-2. Enter the extracted chess/ directory.
+2. Enter the extracted package directory:
+   cd Chess_Alpha
 3. Run the program with:
-   bin/chess
+   ./bin/chess
+
+Runtime logs are written to:
+- bin/logs/
 
 For gameplay rules, usage instructions, and the currently supported features,
 please refer to doc/Chess_UserManual.pdf.

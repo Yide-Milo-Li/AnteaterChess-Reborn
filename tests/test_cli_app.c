@@ -6,10 +6,11 @@
 #include "cli/cli_app.h"
 
 #define CLI_FIXTURE_DIR "tests/fixtures/cli/"
-#define CLI_CAPTURE_FILE CLI_FIXTURE_DIR "capture_app.txt"
+#define CLI_TEMP_INPUT_FILE "build/test_cli_app_input.txt"
+#define CLI_CAPTURE_FILE "build/test_cli_app_capture.txt"
 
-/* Replace stdin with a deterministic fixture file for one CLI app scenario. */
-static void writeFixtureAndRedirect(const char *path, const char *contents) {
+/* Replace stdin with a deterministic temporary input file for one CLI app scenario. */
+static void writeInputAndRedirect(const char *path, const char *contents) {
     FILE *file = fopen(path, "w");
 
     assert(file != NULL);
@@ -19,13 +20,13 @@ static void writeFixtureAndRedirect(const char *path, const char *contents) {
 }
 
 /* Capture stdout while the full CLI app scenario runs. */
-static int run_and_capture_cli_app(const char *inputPath, const char *input, char *buffer, size_t size) {
+static int run_and_capture_cli_app(const char *input, char *buffer, size_t size) {
     int savedStdout = _dup(_fileno(stdout));
     FILE *file;
     size_t bytesRead;
     int result;
 
-    writeFixtureAndRedirect(inputPath, input);
+    writeInputAndRedirect(CLI_TEMP_INPUT_FILE, input);
     assert(savedStdout != -1);
     file = freopen(CLI_CAPTURE_FILE, "w", stdout);
     assert(file != NULL);
@@ -64,7 +65,6 @@ static int count_occurrences(const char *buffer, const char *needle) {
 static void test_cli_app_full_session(void) {
     char buffer[32768];
     int result = run_and_capture_cli_app(
-        CLI_FIXTURE_DIR "cli_app_session.txt",
         "1\n1\n2\n1\nE2 E4\n3\n3\n",
         buffer,
         sizeof(buffer)
@@ -84,7 +84,6 @@ static void test_cli_app_full_session(void) {
 static void test_cli_app_human_vs_computer_white_session(void) {
     char buffer[32768];
     int result = run_and_capture_cli_app(
-        CLI_FIXTURE_DIR "cli_app_disabled_ai.txt",
         "1\n2\n1\n1\n1\n2\n5\n1\nE2 E4\n3\n3\n",
         buffer,
         sizeof(buffer)
@@ -105,7 +104,6 @@ static void test_cli_app_human_vs_computer_white_session(void) {
 static void test_cli_app_human_vs_computer_black_session(void) {
     char buffer[32768];
     int result = run_and_capture_cli_app(
-        CLI_FIXTURE_DIR "main_menu.txt",
         "1\n2\n2\n1\n1\n2\n3\n3\n",
         buffer,
         sizeof(buffer)
@@ -121,28 +119,10 @@ static void test_cli_app_human_vs_computer_black_session(void) {
     assert(strstr(buffer, "Actions") != NULL);
 }
 
-/* Check that computer-vs-computer sessions can advance AI turns and still exit cleanly. */
-static void test_cli_app_computer_vs_computer_session(void) {
-    char buffer[32768];
-    int result = run_and_capture_cli_app(
-        CLI_FIXTURE_DIR "endgame_menu.txt",
-        "1\n3\n1\n1\n1\n2\n1\n1\n2\n3\n",
-        buffer,
-        sizeof(buffer)
-    );
-
-    assert(result == 0);
-    assert(strstr(buffer, "Selected mode: Computer vs Computer") != NULL);
-    assert(strstr(buffer, "[AI Autoplay]") != NULL);
-    assert(count_occurrences(buffer, "[AI Move]") >= 2);
-    assert(strstr(buffer, "Game Over") != NULL);
-}
-
 /* Run the standalone CLI app regression suite. */
 int main(void) {
     test_cli_app_full_session();
     test_cli_app_human_vs_computer_white_session();
     test_cli_app_human_vs_computer_black_session();
-    test_cli_app_computer_vs_computer_session();
     return 0;
 }

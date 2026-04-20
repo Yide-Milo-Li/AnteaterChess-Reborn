@@ -104,15 +104,6 @@ static int current_turn_is_ai(const GameState *state) {
     return state->players[state->currentTurn].type == AI;
 }
 
-/* Report whether the CLI session is currently computer-vs-computer. */
-static int both_players_are_ai(const GameState *state) {
-    if (state == NULL) {
-        return 0;
-    }
-
-    return state->players[WHITE].type == AI && state->players[BLACK].type == AI;
-}
-
 /* Return the shared color label used in setup and gameplay summaries. */
 static const char *color_label(Color color) {
     return (color == BLACK) ? "Black" : "White";
@@ -214,54 +205,12 @@ static void print_move_summary(const char *prefix, Move move) {
     printf("\n");
 }
 
-/* Read one autoplay control choice for computer-vs-computer CLI sessions. */
-static int prompt_ai_autoplay_action(int *selection) {
-    int parsedSelection;
-
-    if (selection == NULL) {
-        return 1;
-    }
-
-    printf("%s[AI Autoplay]%s 1. Continue  2. Leave game  3. Exit program\n",
-        ANSI_ACCENT, ANSI_RESET);
-    for (;;) {
-        if (getMenuSelection(&parsedSelection) != 0) {
-            cliShowErrorMessage(ERR_INVALID_INPUT);
-            continue;
-        }
-
-        if (parsedSelection < 1 || parsedSelection > 3) {
-            cliShowErrorMessage(ERR_INVALID_MENU_SELECTION);
-            continue;
-        }
-
-        *selection = parsedSelection;
-        return 0;
-    }
-}
-
-/* Generate one AI move event, optionally letting the user control CVC autoplay. */
+/* Generate one AI move event and keep autoplay continuous until the game ends. */
 static int collect_ai_turn_event(GameState *state, EventQueue *queue) {
     Move move;
 
     if (state == NULL || queue == NULL) {
         return 1;
-    }
-
-    if (both_players_are_ai(state)) {
-        int autoplaySelection;
-
-        if (prompt_ai_autoplay_action(&autoplaySelection) != 0) {
-            return 1;
-        }
-
-        if (autoplaySelection == 2) {
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_LEAVE_GAME));
-        }
-
-        if (autoplaySelection == 3) {
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
-        }
     }
 
     printf("%s[AI]%s %s is thinking...\n", ANSI_ACCENT, ANSI_RESET, color_label(state->currentTurn));

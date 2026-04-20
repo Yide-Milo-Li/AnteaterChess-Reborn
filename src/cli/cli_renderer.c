@@ -276,12 +276,9 @@ int cliRenderBoard(const GameState *state) {
     }
 
     printf("%s      Board%s\n", ANSI_ACCENT, ANSI_RESET);
-    printf("%s      ", ANSI_BORDER);
+    printf("%s     ", ANSI_BORDER);
     for (col = 0; col < COLS; ++col) {
-        printf(" %s ", columnLabels[col]);
-        if (col < COLS - 1) {
-            printf(" ");
-        }
+        printf(" %s  ", columnLabels[col]);
     }
     printf("%s\n", ANSI_RESET);
 
@@ -322,12 +319,9 @@ int cliRenderBoard(const GameState *state) {
     }
     printf("%s%s\n", BOX_BR, ANSI_RESET);
 
-    printf("%s      ", ANSI_BORDER);
+    printf("%s     ", ANSI_BORDER);
     for (col = 0; col < COLS; ++col) {
-        printf(" %s ", columnLabels[col]);
-        if (col < COLS - 1) {
-            printf(" ");
-        }
+        printf(" %s  ", columnLabels[col]);
     }
     printf("%s\n", ANSI_RESET);
 

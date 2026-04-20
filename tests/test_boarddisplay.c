@@ -154,7 +154,7 @@ static void test_board_display_reflects_modified_board_contents(void) {
     extract_line(stripped, "  2 |", row2, sizeof(row2));
 
     assert(strstr(stripped, "      Board") != NULL);
-    assert(strstr(stripped, " A   B   C   D   E   F   G   H   I   J ") != NULL);
+    assert(strstr(stripped, "      A   B   C   D   E   F   G   H   I   J  ") != NULL);
     assert(strstr(stripped, "Legend: White = uppercase cyan, Black = lowercase gold.") != NULL);
 
     assert(strcmp(row8, "  8 |   |   |   |   |   |   |   |   |   | r |  8") == 0);

@@ -262,8 +262,19 @@ static void on_difficulty_selected(GtkToggleButton *button, gpointer user_data) 
 }
 
 static void on_timer_toggled_config(GtkToggleButton *button, gpointer user_data) {
+    GtkSpinButton *minutes_spin = GTK_SPIN_BUTTON(user_data);
     int active = gtk_toggle_button_get_active(button);
-    setTimerEnabled(active);
+    if (active) {
+        GameConfig config;
+        getGameSetupConfig(&config);
+        if (config.initialTimeSeconds == 0) {
+            setInitialTimeSeconds(60); // default to 1 minute
+            gtk_spin_button_set_value(minutes_spin, 1);
+        }
+        setTimerEnabled(1);
+    } else {
+        setTimerEnabled(0);
+    }
 }
 
 static void on_time_changed(GtkSpinButton *spin, gpointer user_data) {
@@ -275,6 +286,10 @@ static void on_time_changed(GtkSpinButton *spin, gpointer user_data) {
     int minutes = gtk_spin_button_get_value_as_int(minutes_spin);
     int seconds = gtk_spin_button_get_value_as_int(seconds_spin);
     int total_seconds = hours * 3600 + minutes * 60 + seconds;
+    if (total_seconds == 0) {
+        total_seconds = 1;
+        gtk_spin_button_set_value(seconds_spin, 1);
+    }
     setInitialTimeSeconds(total_seconds);
 }
 
@@ -370,8 +385,7 @@ void setup_game_setup_menu_human_vs_human(Gui *gui) {
 
     // Connect signal
     g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), minutes_spin);
 
     // Add buttons at the bottom
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
@@ -527,8 +541,7 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui) {
 
     // Connect signal
     g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), NULL);
+    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), minutes_spin);
 
     // Add buttons at the bottom
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);

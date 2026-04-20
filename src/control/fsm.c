@@ -8,6 +8,7 @@
 #include "gameplay/validation.h"
 #include "log/log.h"
 #include "time/clock.h"
+#include "turn/turn.h"
 #include "turn/turn_timer.h"
 
 /*
@@ -190,12 +191,11 @@ static int handle_gameplay_event(GameState *state, Event event) {
         case EVENT_UNDO:
             return handle_undo(state);
         case EVENT_TIMER_EXPIRED:
-            if (state->currentTurn == WHITE) {
-                setGameResult(state, RESULT_BLACK_WIN);
-            } else {
-                setGameResult(state, RESULT_WHITE_WIN);
+            if (switchTurn(state) != 0) {
+                return 1;
             }
-            return transitionState(state, GAME_TERMINATION_STATE);
+            setGameResult(state, RESULT_NONE);
+            return resetTurnTimer(state);
         case EVENT_LEAVE_GAME:
             setGameOver(state);
             return transitionState(state, GAME_TERMINATION_STATE);

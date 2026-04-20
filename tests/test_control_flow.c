@@ -170,6 +170,21 @@ static void test_process_event_applies_en_passant(void) {
     assert(getPiece(&state.board, createPosition(3, 5)).type == EMPTY_PIECE);
 }
 
+/* Check that timer expiry skips the active turn and keeps gameplay running. */
+static void test_process_event_timer_expiry_passes_turn(void) {
+    GameState state = fresh_gameplay_state();
+
+    seed_empty_gameplay_position(&state, WHITE);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+
+    assert(processEvent(&state, createSystemEvent(EVENT_TIMER_EXPIRED)) == 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+    assert(state.currentTurn == BLACK);
+    assert(state.result == RESULT_NONE);
+    assert(state.gameOver == 0);
+}
+
 /* Run the Phase E control-flow integration tests. */
 int main(void) {
     test_process_event_applies_valid_move();
@@ -178,5 +193,6 @@ int main(void) {
     test_process_event_auto_promotes_to_queen();
     test_process_event_applies_castling();
     test_process_event_applies_en_passant();
+    test_process_event_timer_expiry_passes_turn();
     return 0;
 }

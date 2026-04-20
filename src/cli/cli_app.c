@@ -178,6 +178,19 @@ static const char *special_move_label(SpecialMove type) {
     }
 }
 
+/* Report one non-terminal turn-timer timeout as a skipped turn, not a game
+ * result. */
+static void print_timeout_skip_message(Color expiredSide) {
+    Color nextSide;
+
+    nextSide = (expiredSide == BLACK) ? WHITE : BLACK;
+    printf("%s[Timer]%s %s timed out; turn passed to %s.\n",
+        ANSI_ACCENT,
+        ANSI_RESET,
+        color_label(expiredSide),
+        color_label(nextSide));
+}
+
 /* Classify one rejected move command into the most precise current public
  * error code. */
 static ErrorCode classify_move_error(const GameState *state, Command command);
@@ -584,6 +597,7 @@ int runCliApp(void) {
 
     while (state.systemState != EXIT_STATE) {
         Event event;
+        Color timerExpiredSide;
 
         if (collect_next_cli_event(&state, &queue) != 0) {
             cliShowErrorMessage(ERR_FATAL);
@@ -594,9 +608,15 @@ int runCliApp(void) {
             continue;
         }
 
+        timerExpiredSide = state.currentTurn;
         event = dequeue_next_event(&queue);
         if (processEvent(&state, event) != 0) {
             report_processing_error(&state, event);
+            continue;
+        }
+
+        if (event.type == EVENT_TIMER_EXPIRED) {
+            print_timeout_skip_message(timerExpiredSide);
             continue;
         }
 

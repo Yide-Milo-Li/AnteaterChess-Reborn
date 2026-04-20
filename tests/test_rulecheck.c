@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 
 #include "core/board.h"
 #include "core/gameconfig.h"

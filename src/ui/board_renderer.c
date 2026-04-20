@@ -1,5 +1,3 @@
-// Forward declaration for main menu rendering
-void setup_main_menu(struct Gui *gui);
 
 #include "ui/board_renderer.h"
 #include "core/gamestate.h"
@@ -8,30 +6,55 @@ void setup_main_menu(struct Gui *gui);
 
 // Static GUI pointer for the application window
 static Gui *gui = NULL;
+// Getter for the static gui pointer
+Gui *get_board_renderer_gui(void) {
+	return gui;
+}
+
+// Event processing and validation functions
+void br_process_events(void) {
+    gui_process_events();
+}
+
+int br_window_is_valid(Gui *gui) {
+    return gui_window_is_valid(gui);
+}
 
 int renderBoard(const GameState *state){
 	if (!state) return -1;
 	int render_success = 0;
 	switch (state->systemState) {
 		case INIT_STATE:
-			// Initialize the window if not already done, but do not add widgets yet
+			g_print("Window initialized (INIT_STATE).\n");
+			// Initialize the window if not already done, but do not add widgets yet.
+			// This state will also be used to load resources (e.g., images for pieces) in the future.
 			if (!gui) {
 				int argc = 0;
 				char **argv = NULL;
 				gui = gui_create(&argc, &argv);
 				if (!gui) return -1;
 			}
+			// TODO: Load resources such as images for pieces here.
 			break;
 		case MAIN_MENU_STATE:
 			// Render the main menu
-			if (gui) {
+			if (gui && gui->window) {
 				setup_main_menu(gui);
+				g_print("Main menu rendered (MAIN_MENU_STATE).\n");
+				gui_reset_selections();
 			} else {
 				render_success = -1;
 			}
 			break;
 		case GAME_MODE_SELECTION_STATE:
-			// Handle game mode selection rendering, should display options for different game modes (e.g., Player vs Player, Player vs AI, AI vs AI)
+			// Render the game mode selection menu
+			if (gui && gui->window) {
+				setup_game_mode_menu(gui);
+				g_print("Game mode selection rendered (GAME_MODE_SELECTION_STATE).\n");
+				gui_reset_selections();
+			} else {
+				render_success = -1;
+			}
 			break;
 		case GAME_SETUP_STATE:
 			// Handle game setup rendering, should display options for configuring the game (e.g., choosing player colors, setting AI difficulty, enabling timers)

@@ -1,17 +1,15 @@
 
+
 #include <gtk/gtk.h>
 #include "ui/gui.h"
-#include "ui/dialog.h"
-#include "ui/main_menu.h"
 
 
-
+// main menu setup function
 static void setup_quit_confirmation(Gui *gui);
-static void setup_main_menu(Gui *gui);
+void setup_main_menu(Gui *gui);
 
 static void on_new_game_clicked(GtkButton *button, gpointer user_data) {
     (void)button;
-    (void)user_data;
     setMainMenuSelection(0);
     g_print("New Game button clicked\n");
 }
@@ -42,6 +40,7 @@ static void on_no_clicked(GtkButton *button, gpointer user_data) {
 }
 
 static void setup_quit_confirmation(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
     if (gui->main_box) {
         gtk_widget_destroy(gui->main_box);
         gui->main_box = NULL;
@@ -70,7 +69,8 @@ static void setup_quit_confirmation(Gui *gui) {
     gtk_widget_show_all(gui->window);
 }
 
-static void setup_main_menu(Gui *gui) {
+void setup_main_menu(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
     if (gui->main_box) {
         gtk_widget_destroy(gui->main_box);
         gui->main_box = NULL;
@@ -88,7 +88,8 @@ static void setup_main_menu(Gui *gui) {
     gui->new_game_button = gtk_button_new_with_label("New Game");
     gtk_widget_set_hexpand(gui->new_game_button, TRUE);
     gtk_widget_set_halign(gui->new_game_button, GTK_ALIGN_CENTER);
-    g_signal_connect(gui->new_game_button, "clicked", G_CALLBACK(on_new_game_clicked), gui);
+    // Pass NULL as user_data, state is accessed via static pointer
+    g_signal_connect(gui->new_game_button, "clicked", G_CALLBACK(on_new_game_clicked), NULL);
     gtk_box_pack_start(GTK_BOX(gui->main_box), gui->new_game_button, FALSE, FALSE, 0);
 
     gui->quit_game_button = gtk_button_new_with_label("Quit Game");
@@ -110,9 +111,8 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_window_set_resizable(GTK_WINDOW(gui->window), FALSE);
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
-    g_signal_connect(gui->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    // Note: destroy signal connection moved to gui_run
 
-    setup_main_menu(gui);
 
     return gui;
 }
@@ -123,12 +123,66 @@ void gui_destroy(Gui *gui) {
     }
     if (gui->window != NULL && GTK_IS_WIDGET(gui->window)) {
         gtk_widget_destroy(gui->window);
+        gui->window = NULL;
     }
     g_free(gui);
 }
 
 void gui_run(Gui *gui) {
     (void)gui;
+    g_signal_connect(gui->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
     gtk_main();
 }
 
+// --- Game Mode Menu Setup ---
+static void on_game_mode_button_clicked(GtkButton *button, gpointer user_data) {
+    int index = GPOINTER_TO_INT(user_data);
+    setGameModeSelection(index);
+}
+
+void setup_game_mode_menu(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->window)) return;
+    if (gui->main_box) {
+        gtk_widget_destroy(gui->main_box);
+        gui->main_box = NULL;
+    }
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_CENTER);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+
+    GtkWidget *label = gtk_label_new("Game Mode Selection");
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+
+    const char *button_labels[] = {
+        "Human vs. Computer",
+        "Human vs. Human",
+        "Computer vs. Computer",
+        "Back"
+    };
+    for (int i = 0; i < 4; ++i) {
+        GtkWidget *button = gtk_button_new_with_label(button_labels[i]);
+        gtk_widget_set_hexpand(button, TRUE);
+        gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
+        g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_button_clicked), GINT_TO_POINTER(i));
+        gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+    }
+
+    gtk_widget_show_all(gui->window);
+}
+
+void gui_reset_selections(void) {
+    setMainMenuSelection(-1);
+    setGameModeSelection(-1);
+}
+
+void gui_process_events(void) {
+    while (gtk_events_pending()) {
+        gtk_main_iteration();
+    }
+}
+
+int gui_window_is_valid(Gui *gui) {
+    return gui && GTK_IS_WIDGET(gui->window);
+}

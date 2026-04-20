@@ -13,18 +13,18 @@
  * - The CLI board format is independent from any future GUI presentation model.
  */
 
-/* ANSI style helpers keep presentation choices localized to the CLI renderer. */
+/* ANSI style helpers use broadly supported standard color sequences. */
 #define ANSI_RESET          "\x1b[0m"
 #define ANSI_BOLD           "\x1b[1m"
 #define ANSI_ACCENT         "\x1b[1;36m"
-#define ANSI_BORDER         "\x1b[38;5;45m"
+#define ANSI_BORDER         "\x1b[36m"
 #define ANSI_WHITE_PIECE    "\x1b[1;96m"
 #define ANSI_BLACK_PIECE    "\x1b[1;33m"
-#define ANSI_LIGHT_SQUARE   "\x1b[48;5;255m"
-#define ANSI_DARK_SQUARE    "\x1b[48;5;240m"
+#define ANSI_LIGHT_SQUARE   "\x1b[47m"
+#define ANSI_DARK_SQUARE    "\x1b[100m"
 #define ANSI_WARNING        "\x1b[1;31m"
-#define ANSI_WHITE_BADGE    "\x1b[1;30;106m"
-#define ANSI_BLACK_BADGE    "\x1b[1;30;103m"
+#define ANSI_WHITE_BADGE    "\x1b[1;30;46m"
+#define ANSI_BLACK_BADGE    "\x1b[1;30;43m"
 
 /* ASCII box helpers avoid Unicode encoding issues across terminals and logs. */
 #define BOX_H               "---"

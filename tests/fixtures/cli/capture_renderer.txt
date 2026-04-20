@@ -1,0 +1,10 @@
+[36m+------------- Game Status ----------------------+[0m
+| State         Init                       |[0m
+[1;36m| Current Turn  White                      |[0m
+| Moves Played  0                          |[0m
+| Elapsed Time  00:00:00                   |[0m
+| Turn Timer    Enabled                    |[0m
+[1;36m| White Timer   00:00:30                   |[0m
+| Black Timer   00:00:30                   |[0m
+| Result        In Progress                |[0m
+[36m+-----------------------------------------------+[0m

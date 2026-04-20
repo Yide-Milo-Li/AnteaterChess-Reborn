@@ -3,6 +3,7 @@
 
 #include "core/move.h"
 
+/* Reduced back to 1024 because larger values currently put too much pressure on stack-heavy search and analysis paths. */
 #define MAX_MOVES 1024
 
 typedef struct {

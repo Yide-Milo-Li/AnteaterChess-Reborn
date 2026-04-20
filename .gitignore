@@ -1,7 +1,9 @@
 # =========================
 # Build artifacts
 # =========================
+build/
 *.o
+*.d
 *.out
 *.exe
 a.out
@@ -15,7 +17,13 @@ a.out
 # =========================
 # Binary output
 # =========================
-bin/
+bin/**
+!bin/
+!bin/.gitkeep
+!bin/logs/
+!bin/logs/.gitkeep
+!bin/tests/
+!bin/tests/.gitkeep
 
 # =========================
 # Logs
@@ -52,4 +60,5 @@ coverage/
 .vscode/
 .idea/
 .cache/
+.codex
 compile_commands.json

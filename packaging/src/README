@@ -1,0 +1,60 @@
+Anteater Chess
+Alpha Source Release
+
+Team 22: DeepAnteater
+EECS 22L - Software Engineering Project in C
+University of California, Irvine
+
+Version: Alpha Source Release
+Date: April 20, 2026
+
+Authors:
+Yao Li
+Benjamin Feng
+Yide Li
+Yurang Li
+Yasith Diunugala
+Max Zhang
+
+This package contains the alpha source release of Anteater Chess,
+including source code, tests, build scripts, and documentation.
+It is an early preview release and some optional or advanced features
+may still be incomplete.
+
+Directory overview:
+- src/
+  Source files
+- include/
+  Header files
+- tests/
+  Unit tests
+- bin/
+  Build output directory for the executable, runtime logs, and test binaries
+- build/
+  Build intermediates and source-package staging area
+- doc/
+  Release documentation when included
+
+Supported Makefile targets:
+- make / make all
+  Build bin/chess and create bin/logs
+- make test
+  Build and run the maintained test suite
+- make clean
+  Remove generated build artifacts while preserving the bin/ directory layout
+- make tar
+  Generate Chess_Alpha_src.tar.gz
+
+After building, run the program with:
+   ./bin/chess
+
+Build outputs:
+- bin/chess
+  Main executable
+- bin/logs/
+  Runtime log directory
+- bin/tests/
+  Test binaries and test temporary files
+
+For detailed user and architecture documentation, please refer to the
+files placed in doc/ when they are included in the release package.

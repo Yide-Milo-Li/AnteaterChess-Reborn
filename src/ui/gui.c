@@ -9,6 +9,17 @@
 #include "turn/turn_timer.h"
 
 
+// Static flag for quit
+static int quit_flag = 0;
+
+// Callback for window destroy
+static void on_window_destroy(GtkWidget *widget, gpointer data) {
+    (void)widget;
+    (void)data;
+    quit_flag = 1;
+}
+
+
 // Forward declarations
 static void on_back_clicked(GtkButton *button, gpointer user_data);
 static void on_leave_game_clicked(GtkButton *button, gpointer user_data);
@@ -150,6 +161,9 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), 
         GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
+
+    // Connect destroy signal
+    g_signal_connect(gui->window, "destroy", G_CALLBACK(on_window_destroy), NULL);
 
     // Note: destroy signal connection moved to gui_run
 
@@ -406,10 +420,12 @@ void gui_reset_selections(void) {
     resetLeaveChoice();
 }
 
-void gui_process_events(void) {
+int gui_process_events(void) {
+    if (quit_flag) return 0;
     while (gtk_events_pending()) {
         gtk_main_iteration();
     }
+    return 1;
 }
 
 int gui_window_is_valid(Gui *gui) {

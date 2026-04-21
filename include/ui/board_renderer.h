@@ -11,7 +11,7 @@ typedef struct Gui Gui;
 Gui *get_board_renderer_gui(void);
 
 // Event processing and validation functions
-void br_process_events(void);
+int br_process_events(void);
 int br_window_is_valid(Gui *gui);
 
 int renderBoard(const GameState *state);

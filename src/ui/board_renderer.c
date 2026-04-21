@@ -4,6 +4,8 @@
 #include "system/system_state.h"
 #include "ui/game_setup_menu.h"
 #include "ui/gui.h"
+#include "ui/dialog.h"
+#include "ui/gameplay_ui.h"
 
 // Static GUI pointer for the application window
 static Gui *gui = NULL;
@@ -13,8 +15,8 @@ Gui *get_board_renderer_gui(void) {
 }
 
 // Event processing and validation functions
-void br_process_events(void) {
-    gui_process_events();
+int br_process_events(void) {
+    return gui_process_events();
 }
 
 // Wrapper for GUI window validation, returns 1 if the window is valid and 0 otherwise
@@ -94,6 +96,18 @@ int renderBoard(const GameState *state){
 			if (gui && gui->window) {
 				setup_gameplay_ui(gui, state);
 				g_print("Gameplay UI rendered (GAMEPLAY_STATE).\n");
+				// Main loop to handle events
+				int leave_pressed = 0;
+				while (br_process_events()) {
+					// Update all displays
+					displayGameStatus(state);
+					if (leave_choice) {
+						leave_pressed = 1;
+						gui_reset_selections();
+						break;
+					}
+				}
+				return leave_pressed ? 1 : 0;
 			} else {
 				render_success = -1;
 			}

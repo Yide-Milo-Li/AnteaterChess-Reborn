@@ -46,7 +46,7 @@ void setup_game_setup_menu_human_vs_computer(Gui *gui);
 void setup_game_setup_menu_computer_vs_computer(Gui *gui);
 void setup_gameplay_ui(Gui *gui, const GameState *gameState);
 void gui_reset_selections(void);
-void gui_process_events(void);
+int gui_process_events(void);
 int gui_window_is_valid(Gui *gui);
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
 

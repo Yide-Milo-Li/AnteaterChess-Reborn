@@ -59,6 +59,54 @@ static int transition_is_allowed(SystemState from, SystemState to) {
     return 0;
 }
 
+/* Return the single human-controlled color for human-vs-computer mode. */
+static Color human_color_for_undo(const GameState *state) {
+    if (state == NULL || state->config.mode != MODE_HUMAN_VS_COMPUTER) {
+        return EMPTY_COLOR;
+    }
+
+    if (state->players[WHITE].type == HUMAN && state->players[BLACK].type == AI) {
+        return WHITE;
+    }
+
+    if (state->players[WHITE].type == AI && state->players[BLACK].type == HUMAN) {
+        return BLACK;
+    }
+
+    return EMPTY_COLOR;
+}
+
+/* Decide which historical ply count undo should restore before mutating state. */
+static int find_undo_target_history_count(const GameState *state, int *targetCount) {
+    int candidateCount;
+    Color humanColor;
+
+    if (state == NULL || targetCount == NULL || state->moveHistory.count <= 0) {
+        return 1;
+    }
+
+    if (state->config.mode != MODE_HUMAN_VS_COMPUTER) {
+        *targetCount = state->moveHistory.count - 1;
+        return 0;
+    }
+
+    humanColor = human_color_for_undo(state);
+    if (humanColor == EMPTY_COLOR) {
+        return 1;
+    }
+
+    for (candidateCount = state->moveHistory.count - 1; candidateCount >= 0; --candidateCount) {
+        Color nextTurn = ((candidateCount % 2) == 0) ? WHITE : BLACK;
+
+        if (nextTurn == humanColor) {
+            *targetCount = candidateCount;
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 /* Build the exact legal move candidate that matches one move command. */
 static int find_command_move(const GameState *state, Command command, Move *resolvedMove) {
     MoveList candidates;
@@ -166,8 +214,16 @@ static int handle_ai_move(GameState *state, Move move) {
 
 /* Handle undo by restoring board, timers, and persisted move log state. */
 static int handle_undo(GameState *state) {
-    if (undoMove(state) != 0) {
+    int targetHistoryCount;
+
+    if (find_undo_target_history_count(state, &targetHistoryCount) != 0) {
         return 1;
+    }
+
+    while (state->moveHistory.count > targetHistoryCount) {
+        if (undoMove(state) != 0) {
+            return 1;
+        }
     }
 
     if (resetTurnTimer(state) != 0) {

@@ -13,5 +13,6 @@ int confirmLeaveGame(int *result);
 int confirmQuitGame(int *result);
 int isBackButtonClicked();
 void resetBackButtonClicked();
+void resetLeaveChoice();
 
 #endif

@@ -1,10 +1,18 @@
 
 
 #include <gtk/gtk.h>
+#include <time.h>
 #include "ui/game_setup_menu.h"
 #include "ui/gui.h"
 #include "time/clock.h"
+#include "ui/board_renderer.h"
+#include "turn/turn_timer.h"
 
+
+// Forward declarations
+static void on_back_clicked(GtkButton *button, gpointer user_data);
+static void on_leave_game_clicked(GtkButton *button, gpointer user_data);
+const char *get_piece_icon(Piece piece);
 
 // Callback for square clicks
 static void on_square_clicked(GtkWidget *widget, GdkEventButton *event, gpointer data) {
@@ -53,6 +61,11 @@ static void on_no_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *)user_data;
     setQuitChoice(0); // No
     setup_main_menu(gui);
+}
+
+static void on_leave_game_clicked(GtkButton *button, gpointer user_data) {
+    setLeaveChoice(1);
+    g_print("Leave Game button clicked\n");
 }
 
 static void setup_quit_confirmation(Gui *gui) {
@@ -167,10 +180,6 @@ static void on_game_mode_selected(GtkButton *button, gpointer user_data) {
     setGameModeSelection(index);
 }
 
-static void on_game_mode_back_clicked(GtkButton *button, gpointer user_data) {
-    setBackButtonClicked(1);
-}
-
 void setup_game_mode_menu(Gui *gui) {
     if (!GTK_IS_WIDGET(gui->window)) return;
     if (gui->main_box) {
@@ -199,7 +208,7 @@ void setup_game_mode_menu(Gui *gui) {
         if (i < 3) {
             g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_selected), GINT_TO_POINTER(i));
         } else {
-            g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_back_clicked), NULL);
+            g_signal_connect(button, "clicked", G_CALLBACK(on_back_clicked), NULL);
         }
         gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
     }
@@ -220,6 +229,7 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     GtkWidget *turn_label = gtk_label_new("White's Turn"); // Placeholder, should be based on gameState->currentPlayer
     gtk_widget_set_halign(turn_label, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(gui->main_box), turn_label, FALSE, FALSE, 0);
+    gui->turn_label = turn_label;
 
     // Middle: Horizontal box for utility and board
     GtkWidget *middle_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -245,6 +255,7 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     sprintf(time_str, "%02d:%02d:%02d", hours, mins, secs);
     GtkWidget *time_display = gtk_label_new(time_str);
     gtk_box_pack_start(GTK_BOX(time_box), time_display, FALSE, FALSE, 0);
+    gui->time_display = time_display;
 
     // Move History
     GtkWidget *history_label = gtk_label_new("Move History");
@@ -252,10 +263,15 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
 
     GtkWidget *history_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(history_view), FALSE);
-    gtk_widget_set_size_request(history_view, -1, 300);
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(history_view));
     gtk_text_buffer_set_text(buffer, "Move 1: e2-e4\nMove 2: e7-e5\n", -1);
-    gtk_box_pack_start(GTK_BOX(left_box), history_view, TRUE, TRUE, 0);
+
+    GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(scrolled_window, -1, 450);
+    gtk_container_add(GTK_CONTAINER(scrolled_window), history_view);
+    gtk_box_pack_start(GTK_BOX(left_box), scrolled_window, FALSE, FALSE, 0);
+    gui->history_view = history_view;
 
     // Enter Move section
     GtkWidget *enter_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
@@ -292,7 +308,7 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_box_pack_start(GTK_BOX(button_box), undo_button, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(button_box), hint_button, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(left_box), button_box, TRUE, FALSE, 0);
+    gtk_box_pack_end(GTK_BOX(left_box), button_box, TRUE, FALSE, 20);
 
     // Right panel: Board area
     GtkWidget *right_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -302,6 +318,7 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     GtkWidget *black_timer_label = gtk_label_new("Black Timer: 00:00");
     gtk_widget_set_halign(black_timer_label, GTK_ALIGN_END);
     gtk_box_pack_start(GTK_BOX(right_box), black_timer_label, FALSE, FALSE, 0);
+    gui->black_timer_label = black_timer_label;
 
     // Middle: Board grid with rank labels
     GtkWidget *board_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -330,10 +347,11 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     // Create images for each cell (8 rows x 10 columns)
     for (int row = 0; row < 8; ++row) {
         for (int col = 0; col < 10; ++col) {
-            GtkWidget *image = gtk_image_new(); // Empty for now
-            // Place image holders in some random squares
-            if ((row + col) % 3 == 0) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(image), "gtk-dialog-info", GTK_ICON_SIZE_BUTTON);
+            GtkWidget *image = gtk_image_new();
+            Piece piece = gameState->board.cells[row][col];
+            const char *icon = get_piece_icon(piece);
+            if (icon) {
+                gtk_image_set_from_icon_name(GTK_IMAGE(image), icon, GTK_ICON_SIZE_BUTTON);
             }
             gui->board_images[row][col] = image;
 
@@ -369,11 +387,13 @@ void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
     GtkWidget *white_timer_label = gtk_label_new("White Timer: 00:00");
     gtk_widget_set_halign(white_timer_label, GTK_ALIGN_END);
     gtk_box_pack_end(GTK_BOX(right_box), white_timer_label, FALSE, FALSE, 0);
+    gui->white_timer_label = white_timer_label;
 
     // Bottom: Leave Game button
     GtkWidget *leave_button = gtk_button_new_with_label("Leave Game");
     gtk_widget_set_halign(leave_button, GTK_ALIGN_CENTER);
     gtk_box_pack_end(GTK_BOX(gui->main_box), leave_button, FALSE, FALSE, 0);
+    g_signal_connect(leave_button, "clicked", G_CALLBACK(on_leave_game_clicked), NULL);
 
     gtk_widget_show_all(gui->window);
 }
@@ -383,6 +403,7 @@ void gui_reset_selections(void) {
     resetGameModeSelection();
     resetBackButtonClicked();
     resetStartPressed();
+    resetLeaveChoice();
 }
 
 void gui_process_events(void) {
@@ -398,6 +419,108 @@ int gui_window_is_valid(Gui *gui) {
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf) {
     if (!gui || row < 0 || row >= 8 || col < 0 || col >= 10) return;
     gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
+}
+
+// Update functions for gameplay UI
+void update_board(Gui *gui, const GameState *state) {
+    for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 10; ++col) {
+            Piece piece = state->board.cells[row][col];
+            const char *icon = get_piece_icon(piece);
+            if (icon && GTK_IS_IMAGE(gui->board_images[row][col])) {
+                gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]), icon, GTK_ICON_SIZE_BUTTON);
+            }
+        }
+    }
+}
+
+void update_movelist(Gui *gui, const GameState *state) {
+    if (!GTK_IS_WIDGET(gui->history_view) || !GTK_IS_TEXT_VIEW(gui->history_view)) return;
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gui->history_view));
+    // Clear buffer
+    gtk_text_buffer_set_text(buffer, "", -1);
+    // Add moves from state->moveHistory
+    char text[1024] = "";
+    for (int i = 0; i < state->moveHistory.count; ++i) {
+        Move m = state->moveHistory.moves[i];
+        char from_file = 'a' + m.from.col;
+        char from_rank = '8' - m.from.row;
+        char to_file = 'a' + m.to.col;
+        char to_rank = '8' - m.to.row;
+        char move_str[10];
+        sprintf(move_str, "%c%c-%c%c\n", from_file, from_rank, to_file, to_rank);
+        strcat(text, move_str);
+    }
+    gtk_text_buffer_set_text(buffer, text, -1);
+}
+
+void update_clock(Gui *gui) {
+    if (!GTK_IS_WIDGET(gui->time_display) || !GTK_IS_LABEL(gui->time_display)) return;
+    int64_t elapsed = getElapsedTimeSeconds();
+    int hours = elapsed / 3600;
+    int mins = (elapsed % 3600) / 60;
+    int secs = elapsed % 60;
+    char time_str[20];
+    sprintf(time_str, "%02d:%02d:%02d", hours, mins, secs);
+    gtk_label_set_text(GTK_LABEL(gui->time_display), time_str);
+}
+
+void update_timers(Gui *gui, const GameState *state) {
+    if (!GTK_IS_WIDGET(gui->black_timer_label) || !GTK_IS_LABEL(gui->black_timer_label) ||
+        !GTK_IS_WIDGET(gui->white_timer_label) || !GTK_IS_LABEL(gui->white_timer_label)) return;
+    if (state->config.timerEnabled) {
+        updateTurnTimer((GameState *)state);
+        int white_rem = getRemainingTime(state, WHITE);
+        int black_rem = getRemainingTime(state, BLACK);
+        // Format and display
+        int w_h = white_rem / 3600;
+        int w_m = (white_rem % 3600) / 60;
+        int w_s = white_rem % 60;
+        char w_str[25];
+        sprintf(w_str, "White: %02d:%02d:%02d", w_h, w_m, w_s);
+        gtk_label_set_text(GTK_LABEL(gui->white_timer_label), w_str);
+
+        int b_h = black_rem / 3600;
+        int b_m = (black_rem % 3600) / 60;
+        int b_s = black_rem % 60;
+        char b_str[25];
+        sprintf(b_str, "Black: %02d:%02d:%02d", b_h, b_m, b_s);
+        gtk_label_set_text(GTK_LABEL(gui->black_timer_label), b_str);
+    } else {
+        gtk_label_set_text(GTK_LABEL(gui->white_timer_label), "White: -- : --");
+        gtk_label_set_text(GTK_LABEL(gui->black_timer_label), "Black: -- : --");
+    }
+}
+
+void gui_display_turn(Gui *gui, Color turn) {
+    if (!GTK_IS_WIDGET(gui->turn_label) || !GTK_IS_LABEL(gui->turn_label)) return;
+    const char *text = (turn == WHITE) ? "White's Turn" : "Black's Turn";
+    gtk_label_set_text(GTK_LABEL(gui->turn_label), text);
+}
+
+const char *get_piece_icon(Piece piece) {
+    if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) return NULL;
+    const char *white_icons[] = {
+        "gtk-dialog-info",      // ANT
+        "gtk-dialog-warning",   // ROOK
+        "gtk-dialog-question",  // KNIGHT
+        "gtk-dialog-error",     // BISHOP
+        "gtk-dialog-authentication", // QUEEN
+        "gtk-dialog-password",  // KING
+        "gtk-dialog-info"       // ANTEATER
+    };
+    const char *black_icons[] = {
+        "gtk-dialog-warning",   // ANT
+        "gtk-dialog-question",  // ROOK
+        "gtk-dialog-error",     // KNIGHT
+        "gtk-dialog-authentication", // BISHOP
+        "gtk-dialog-password",  // QUEEN
+        "gtk-dialog-info",      // KING
+        "gtk-dialog-warning"    // ANTEATER
+    };
+    int index = piece.type - ANT;
+    if (index < 0 || index >= 7) return NULL;
+    return piece.color == WHITE ? white_icons[index] : black_icons[index];
 }
 
 static void on_turn_timer_toggled(GtkToggleButton *toggle, gpointer user_data) {

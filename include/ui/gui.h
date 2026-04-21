@@ -32,6 +32,11 @@ typedef struct Gui {
 	GtkWidget *new_game_button;
 	GtkWidget *quit_game_button;
 	GtkWidget *board_images[8][10];
+	GtkWidget *turn_label;
+	GtkWidget *time_display;
+	GtkWidget *history_view;
+	GtkWidget *black_timer_label;
+	GtkWidget *white_timer_label;
 } Gui;
 
 void setup_main_menu(Gui *gui);
@@ -44,5 +49,12 @@ void gui_reset_selections(void);
 void gui_process_events(void);
 int gui_window_is_valid(Gui *gui);
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
+
+// Update functions for gameplay UI
+void update_board(Gui *gui, const GameState *state);
+void update_movelist(Gui *gui, const GameState *state);
+void update_clock(Gui *gui);
+void update_timers(Gui *gui, const GameState *state);
+void gui_display_turn(Gui *gui, Color turn);
 
 #endif // CHESS_UI_GUI_H

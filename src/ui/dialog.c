@@ -42,3 +42,7 @@ int isBackButtonClicked() {
 void resetBackButtonClicked() {
     back_button_clicked = 0;
 }
+
+void resetLeaveChoice() {
+    leave_choice = 0;
+}

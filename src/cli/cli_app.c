@@ -445,10 +445,6 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
                 return enqueue_cli_event(queue, createMoveInputEvent(command));
             }
         case 2:
-            if (state->moveHistory.count <= 0) {
-                cliShowErrorMessage(ERR_UNDO_UNAVAILABLE);
-                return 0;
-            }
             return enqueue_cli_event(queue, createUndoEvent());
         case 3:
             return enqueue_cli_event(queue, createSystemEvent(EVENT_LEAVE_GAME));

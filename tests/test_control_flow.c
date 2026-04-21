@@ -59,6 +59,20 @@ static void seed_empty_gameplay_position(GameState *state, Color turn) {
     state->result = RESULT_NONE;
 }
 
+/* Configure one gameplay-ready state for human-vs-computer ownership. */
+static void seed_human_vs_computer_players(GameState *state, Color humanColor) {
+    assert(state != NULL);
+
+    state->config.mode = MODE_HUMAN_VS_COMPUTER;
+    if (humanColor == WHITE) {
+        state->players[WHITE] = createPlayer(WHITE, HUMAN);
+        state->players[BLACK] = createPlayer(BLACK, AI);
+    } else {
+        state->players[WHITE] = createPlayer(WHITE, AI);
+        state->players[BLACK] = createPlayer(BLACK, HUMAN);
+    }
+}
+
 /* Record one historical move without mutating the current board state. */
 static void push_history_move(GameState *state, Move move) {
     assert(state != NULL);
@@ -111,6 +125,98 @@ static void test_process_event_undo_restores_position(void) {
     assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
     assert(state.currentTurn == WHITE);
     assert(state.moveHistory.count == 0);
+}
+
+/* Check that human-vs-computer undo rewinds White games to the previous human
+ * turn instead of stopping on the AI turn. */
+static void test_process_event_hvc_undo_returns_to_previous_white_human_turn(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+    Move aiMove;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    seed_human_vs_computer_players(&state, WHITE);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+
+    assert(createMoveCommand(&command, createPosition(6, 0),
+        createPosition(5, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+
+    aiMove = createMove(createPosition(1, 0), createPosition(2, 0), createPiece(ANT, BLACK));
+    assert(processEvent(&state, createAIMoveEvent(aiMove)) == 0);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 2);
+
+    assert(processEvent(&state, createUndoEvent()) == 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 0);
+}
+
+/* Check that human-vs-computer undo rewinds Black games to the previous human
+ * turn after White's opening AI move. */
+static void test_process_event_hvc_undo_returns_to_previous_black_human_turn(void) {
+    GameState state = fresh_gameplay_state();
+    Command command;
+    Move aiOpeningMove;
+    Move aiReplyMove;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    seed_human_vs_computer_players(&state, BLACK);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+
+    aiOpeningMove = createMove(createPosition(6, 0), createPosition(5, 0), createPiece(ANT, WHITE));
+    assert(processEvent(&state, createAIMoveEvent(aiOpeningMove)) == 0);
+
+    assert(createMoveCommand(&command, createPosition(1, 0),
+        createPosition(2, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+
+    aiReplyMove = createMove(createPosition(5, 0), createPosition(4, 0), createPiece(ANT, WHITE));
+    assert(processEvent(&state, createAIMoveEvent(aiReplyMove)) == 0);
+    assert(state.currentTurn == BLACK);
+    assert(state.moveHistory.count == 3);
+
+    assert(processEvent(&state, createUndoEvent()) == 0);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(4, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
+    assert(state.currentTurn == BLACK);
+    assert(state.moveHistory.count == 1);
+}
+
+/* Check that Black cannot undo White's opening AI move before Black has taken
+ * a turn. */
+static void test_process_event_hvc_black_opening_undo_unavailable(void) {
+    GameState state = fresh_gameplay_state();
+    Move aiOpeningMove;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    seed_human_vs_computer_players(&state, BLACK);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+
+    aiOpeningMove = createMove(createPosition(6, 0), createPosition(5, 0), createPiece(ANT, WHITE));
+    assert(processEvent(&state, createAIMoveEvent(aiOpeningMove)) == 0);
+
+    assert(processEvent(&state, createUndoEvent()) != 0);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
+    assert(state.currentTurn == BLACK);
+    assert(state.moveHistory.count == 1);
 }
 
 /* Check that public move input auto-promotes to queen without changing the
@@ -190,6 +296,9 @@ int main(void) {
     test_process_event_applies_valid_move();
     test_process_event_rejects_illegal_move();
     test_process_event_undo_restores_position();
+    test_process_event_hvc_undo_returns_to_previous_white_human_turn();
+    test_process_event_hvc_undo_returns_to_previous_black_human_turn();
+    test_process_event_hvc_black_opening_undo_unavailable();
     test_process_event_auto_promotes_to_queen();
     test_process_event_applies_castling();
     test_process_event_applies_en_passant();

@@ -16,14 +16,46 @@
 #include "gameplay/execution.h"
 #include "gameplay/movegen.h"
 
-#define AI_INF 100000000
-#define AI_MATE 1000000
-#define AI_Q_DEPTH 8
-#define AI_MAX_PLY 48
-#define AI_MAX_PHASE 28
-#define AI_HISTORY_MAX 2000000
+// AI Constants
+#define AI_INF 100000000       // Infinity
+#define AI_MATE 1000000        // Mate score
+#define AI_Q_DEPTH 8           // Quiescence search depth
+#define AI_MAX_PLY 48          // Maximum number of ply
+#define AI_MAX_PHASE 28        // 0 for initial, 28 for final stage
+#define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
+
+enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
+typedef struct {
+    uint64_t key; // position's zobrist hash
+    int score;
+    short depth;
+    unsigned char flag;       // TT_FLAG_EXACT, TT_FLAG_LOWER, TT_FLAG_UPPER
+    unsigned char generation; // search version
+    unsigned char from;       // best move from
+    unsigned char to;         // best move to
+    unsigned char special;    // special move flag
+} TTEntry;
+
+typedef struct {
+    clock_t searchStart;
+    int timeLimitMs;
+    int softTimeLimitMs;
+    int stopSearch;
+    int nodes;
+    unsigned char generation;
+    MoveList *moveBuffers;
+    HashState hashStack[AI_MAX_PLY + 1];
+    Move killerMoves[AI_MAX_PLY][2];
+    unsigned char killerValid[AI_MAX_PLY][2];
+    int history[2][ROWS * COLS][ROWS * COLS];
+    uint64_t gameHashes[MAX_MOVES + 1];
+    int gameHashCount;
+    int gameHistoryStart;
+    int repetitionLimit[AI_MAX_PLY + 1];
+    unsigned char nullMoveActive[AI_MAX_PLY + 1];
+} SearchContext;
 
 // Piece-Square Table
 static const int PST_ANT[ROWS][COLS] = {

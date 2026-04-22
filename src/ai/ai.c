@@ -1,12 +1,15 @@
 #include "ai/ai.h"
+#include "ai/book.h"
 
 #include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #include "core/board.h"
+#include "core/hash.h"
 #include "core/movelist.h"
 #include "core/piece.h"
 #include "gameplay/endgame.h"
@@ -15,7 +18,12 @@
 
 #define AI_INF 100000000
 #define AI_MATE 1000000
-#define AI_Q_DEPTH 4 // Only for Alpha Version, Quiescence Depth
+#define AI_Q_DEPTH 8
+#define AI_MAX_PLY 48
+#define AI_MAX_PHASE 28
+#define AI_HISTORY_MAX 2000000
+#define ASPIRATION_WINDOW 60
+#define NULL_MOVE_R 2
 
 // Piece-Square Table
 static const int PST_ANT[ROWS][COLS] = {

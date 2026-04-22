@@ -61,4 +61,5 @@ coverage/
 .idea/
 .codex
 compile_commands.json
+.cache/
 

@@ -429,6 +429,7 @@ void update_board(Gui *gui, const GameState *state) {
             const char *icon = get_piece_icon(piece);
             if (icon && GTK_IS_IMAGE(gui->board_images[row][col])) {
                 gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]), icon, GTK_ICON_SIZE_BUTTON);
+                gtk_widget_queue_draw(gui->board_images[row][col]);
             }
         }
     }

@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stddef.h>
 
-#include "ai/ai.h"
 #include "cli/cli_feedback.h"
 #include "cli/cli_gameplay.h"
 #include "cli/cli_menu.h"
@@ -15,68 +14,21 @@
 #include "core/position.h"
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
+#include "system/controller.h"
 #include "system/event.h"
-#include "system/event_queue.h"
-#include "system/fsm.h"
 #include "turn/turn_timer.h"
 
 /*
  * Alignment assumptions for future extensions:
  * - CLI headers are the truth source for the text-front-end contract in this file.
- * - This file orchestrates a standalone CLI app loop and must not define GUI behavior.
- * - FSM, gameplay, and AI modules remain the source of truth for state transitions,
- *   rules, and move selection.
+ * - This file remains a temporary text frontend, but it now drives runtime
+ *   flow through controller.h instead of orchestrating its own event queues.
+ * - Controller owns event routing and internal work; gameplay and AI modules
+ *   remain the source of truth for rules and move selection.
  */
 
 #define ANSI_RESET  "\x1b[0m"
 #define ANSI_ACCENT "\x1b[1;36m"
-
-/* Map one event type to the queue used by the standalone CLI app loop. */
-static QueueType queue_type_for_event(EventType type) {
-    switch (type) {
-        case EVENT_LEAVE_GAME:
-        case EVENT_BACK:
-        case EVENT_NEW_GAME:
-        case EVENT_EXIT_PROGRAM:
-        case EVENT_ERROR:
-        case EVENT_FATAL_ERROR:
-            return QUEUE_CONTROL;
-        case EVENT_TIMER_EXPIRED:
-            return QUEUE_SYSTEM;
-        case EVENT_MOVE_INPUT:
-        case EVENT_AI_MOVE:
-        case EVENT_UNDO:
-        case EVENT_HINT:
-        case EVENT_NONE:
-        default:
-            return QUEUE_GAMEPLAY;
-    }
-}
-
-/* Check whether the local CLI event queue currently has pending work. */
-static int all_queues_empty(const EventQueue *queue) {
-    return isControlQueueEmpty(queue)
-        && isSystemQueueEmpty(queue)
-        && isGameplayQueueEmpty(queue);
-}
-
-/* Remove one event using the same priority order the system controller expects. */
-static Event dequeue_next_event(EventQueue *queue) {
-    if (!isControlQueueEmpty(queue)) {
-        return dequeueControlEvent(queue);
-    }
-
-    if (!isSystemQueueEmpty(queue)) {
-        return dequeueSystemEvent(queue);
-    }
-
-    return dequeueGameplayEvent(queue);
-}
-
-/* Enqueue one event for later prioritized dispatch. */
-static int enqueue_cli_event(EventQueue *queue, Event event) {
-    return enqueueEvent(queue, event, queue_type_for_event(event.type));
-}
 
 /* Print one lightweight gameplay page header before the status panel and board. */
 static void print_gameplay_page_header(void) {
@@ -104,6 +56,17 @@ static int current_turn_is_ai(const GameState *state) {
     }
 
     return state->players[state->currentTurn].type == AI;
+}
+
+/* Check whether the controller currently has pending queued work. */
+static int controller_queue_is_empty(const Controller *controller) {
+    if (controller == NULL) {
+        return 1;
+    }
+
+    return isControlQueueEmpty(&controller->queue)
+        && isSystemQueueEmpty(&controller->queue)
+        && isGameplayQueueEmpty(&controller->queue);
 }
 
 /* Return the shared color label used in setup and gameplay summaries. */
@@ -297,33 +260,8 @@ static void print_move_summary(const char *prefix, Move move) {
     printf("\n");
 }
 
-/* Generate one AI move event and keep autoplay continuous until the game ends. */
-static int collect_ai_turn_event(GameState *state, EventQueue *queue) {
-    Move move;
-
-    if (state == NULL || queue == NULL) {
-        return 1;
-    }
-
-    printf("%s[AI]%s %s is thinking...\n", ANSI_ACCENT, ANSI_RESET, color_label(state->currentTurn));
-    if (generateAIMove(state, &move) != 0) {
-        return 1;
-    }
-
-    if (state->config.timerEnabled) {
-        if (updateTurnTimer(state) != 0) {
-            return 1;
-        }
-        if (isTimeUp(state) == 1) {
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_TIMER_EXPIRED));
-        }
-    }
-
-    return enqueue_cli_event(queue, createAIMoveEvent(move));
-}
-
 /* Collect the next main-menu event for the CLI frontend. */
-static int collect_main_menu_event(EventQueue *queue) {
+static int collect_main_menu_event(Controller *controller) {
     int selection;
 
     if (cliGetMainMenuSelection(&selection) != 0) {
@@ -331,99 +269,108 @@ static int collect_main_menu_event(EventQueue *queue) {
     }
 
     if (selection == 1) {
-        return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+        return controllerRequestNewGame(controller);
     }
 
-    return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
+    return controllerRequestExit(controller);
 }
 
 /* Collect the next game-mode event for the CLI frontend. */
-static int collect_mode_selection_event(GameState *state, EventQueue *queue) {
+static int collect_mode_selection_event(Controller *controller, GameConfig *pendingConfig) {
     int selection;
 
-    if (state == NULL || cliGetGameModeSelection(&selection) != 0) {
+    if (pendingConfig == NULL || cliGetGameModeSelection(&selection) != 0) {
         return 1;
     }
 
     switch (selection) {
         case 1:
-            initDefaultGameConfig(&state->config);
-            state->config.mode = MODE_HUMAN_VS_HUMAN;
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_HUMAN_VS_HUMAN);
+            return controllerRequestNewGame(controller);
         case 2:
-            initDefaultGameConfig(&state->config);
-            state->config.mode = MODE_HUMAN_VS_COMPUTER;
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_HUMAN_VS_COMPUTER);
+            return controllerRequestNewGame(controller);
         case 3:
-            initDefaultGameConfig(&state->config);
-            state->config.mode = MODE_COMPUTER_VS_COMPUTER;
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_COMPUTER_VS_COMPUTER);
+            return controllerRequestNewGame(controller);
         case 4:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_BACK));
+            return controllerRequestBack(controller);
         case 5:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
+            return controllerRequestExit(controller);
         default:
             return 1;
     }
 }
 
-/* Collect setup fields, reinitialize the game state, and continue into gameplay. */
-static int collect_setup_event(GameState *state, EventQueue *queue) {
-    GameConfig config;
+/* Re-check the active gameplay timer after a blocking CLI prompt. */
+static int enqueue_timer_expiry_if_needed(Controller *controller) {
+    GameState *state;
 
-    if (state == NULL) {
+    if (controller == NULL) {
         return 1;
     }
 
-    config = state->config;
+    state = &controller->state;
+    if (state->systemState != GAMEPLAY_STATE || !state->config.timerEnabled) {
+        return 0;
+    }
+
+    if (updateTurnTimer(state) != 0) {
+        return 1;
+    }
+
+    if (isTimeUp(state) == 1) {
+        return controllerEnqueueEvent(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
+    }
+
+    return 0;
+}
+
+/* Collect setup fields, rebuild the controller, and continue into gameplay. */
+static int collect_setup_event(Controller *controller, GameConfig *pendingConfig) {
+    GameConfig config;
+
+    if (pendingConfig == NULL) {
+        return 1;
+    }
+
+    config = *pendingConfig;
     if (cliGetGameSetupConfig(&config) != 0) {
         return 1;
     }
 
-    initGameState(state, &config);
-    state->systemState = GAME_SETUP_STATE;
-    return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+    *pendingConfig = config;
+    return controllerStartConfiguredGame(controller, pendingConfig);
 }
 
 /* Collect one gameplay action and map it to the next CLI event if any. */
-static int collect_gameplay_event(GameState *state, EventQueue *queue) {
+static int collect_gameplay_event(Controller *controller) {
+    const GameState *state;
     int action;
     Command command;
     Move resolvedMove;
     Move hintMove;
 
-    if (state == NULL) {
+    if (controller == NULL) {
         return 1;
     }
 
-    if (state->config.timerEnabled) {
-        if (updateTurnTimer(state) != 0) {
-            return 1;
-        }
-        if (isTimeUp(state) == 1) {
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_TIMER_EXPIRED));
-        }
-    }
-
+    state = controllerGetState(controller);
     if (render_gameplay_view(state) != 0) {
         return 1;
     }
 
     if (current_turn_is_ai(state)) {
-        return collect_ai_turn_event(state, queue);
+        return 0;
     }
 
     if (cliGetGameplayAction(&action) != 0) {
         return 1;
     }
 
-    if (state->config.timerEnabled) {
-        if (updateTurnTimer(state) != 0) {
-            return 1;
-        }
-        if (isTimeUp(state) == 1) {
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_TIMER_EXPIRED));
-        }
+    state = controllerGetState(controller);
+    if (state == NULL) {
+        return 1;
     }
 
     switch (action) {
@@ -442,16 +389,49 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
                     continue;
                 }
 
-                return enqueue_cli_event(queue, createMoveInputEvent(command));
+                /* Keep move input as a low-level event so the outer CLI tick can
+                 * print the exact processed move, timeout, or error event. */
+                return controllerEnqueueEvent(controller, createMoveInputEvent(command));
             }
         case 2:
-            return enqueue_cli_event(queue, createUndoEvent());
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            if (controllerRequestUndo(controller) != 0) {
+                cliShowErrorMessage(ERR_UNDO_UNAVAILABLE);
+            }
+            return 0;
         case 3:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_LEAVE_GAME));
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            return controllerRequestLeaveGame(controller);
         case 4:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            return controllerRequestExit(controller);
         case 5:
-            if (generateHintMove(state, &hintMove) != 0) {
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            state = controllerGetState(controller);
+            if (state == NULL) {
+                return 1;
+            }
+            if (controllerGetHint(controller, &hintMove) != 0) {
                 cliShowErrorMessage(ERR_HINT_UNAVAILABLE);
                 return 0;
             }
@@ -463,7 +443,7 @@ static int collect_gameplay_event(GameState *state, EventQueue *queue) {
 }
 
 /* Collect the next end-game menu event for the CLI frontend. */
-static int collect_endgame_event(const GameState *state, EventQueue *queue) {
+static int collect_endgame_event(const GameState *state, Controller *controller) {
     int selection;
 
     if (cliShowEndGameMenu(state, &selection) != 0) {
@@ -472,11 +452,11 @@ static int collect_endgame_event(const GameState *state, EventQueue *queue) {
 
     switch (selection) {
         case 1:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_NEW_GAME));
+            return controllerRequestNewGame(controller);
         case 2:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_BACK));
+            return controllerRequestBack(controller);
         case 3:
-            return enqueue_cli_event(queue, createSystemEvent(EVENT_EXIT_PROGRAM));
+            return controllerRequestExit(controller);
         default:
             return 1;
     }
@@ -512,44 +492,32 @@ static ErrorCode classify_move_error(const GameState *state, Command command) {
     }
 }
 
-/* Synthesize internal events that do not come directly from CLI input. */
-static int collect_internal_event(GameState *state, EventQueue *queue) {
-    if (state == NULL) {
+/* Collect the next external CLI event for the active controller state. */
+static int collect_next_cli_event(Controller *controller, GameConfig *pendingConfig) {
+    const GameState *state;
+
+    if (controller == NULL || pendingConfig == NULL) {
         return 1;
     }
 
-    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
-        return enqueue_cli_event(queue, createSystemEvent(EVENT_NONE));
-    }
-
-    return 0;
-}
-
-/* Collect the next event for the standalone CLI app based on the active system state. */
-static int collect_next_cli_event(GameState *state, EventQueue *queue) {
-    if (state == NULL || queue == NULL) {
-        return 1;
-    }
-
-    if (!all_queues_empty(queue)) {
+    if (!controller_queue_is_empty(controller)) {
         return 0;
     }
 
-    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
-        return collect_internal_event(state, queue);
-    }
-
+    state = controllerGetState(controller);
     switch (state->systemState) {
         case MAIN_MENU_STATE:
-            return collect_main_menu_event(queue);
+            return collect_main_menu_event(controller);
         case GAME_MODE_SELECTION_STATE:
-            return collect_mode_selection_event(state, queue);
+            return collect_mode_selection_event(controller, pendingConfig);
         case GAME_SETUP_STATE:
-            return collect_setup_event(state, queue);
+            return collect_setup_event(controller, pendingConfig);
         case GAMEPLAY_STATE:
-            return collect_gameplay_event(state, queue);
+            return collect_gameplay_event(controller);
         case END_GAME_MENU_STATE:
-            return collect_endgame_event(state, queue);
+            return collect_endgame_event(state, controller);
+        case INIT_STATE:
+        case GAME_TERMINATION_STATE:
         case EXIT_STATE:
             return 0;
         default:
@@ -584,30 +552,23 @@ static void report_processing_error(const GameState *state, Event event) {
 
 /* Run the standalone CLI application loop until the FSM reaches EXIT_STATE. */
 int runCliApp(void) {
+    Controller controller;
     GameConfig config;
-    GameState state;
-    EventQueue queue = {0};
+    GameConfig pendingConfig;
 
     initDefaultGameConfig(&config);
-    initGameState(&state, &config);
+    pendingConfig = config;
+    initController(&controller, &config);
 
-    while (state.systemState != EXIT_STATE) {
+    while (controllerGetState(&controller)->systemState != EXIT_STATE) {
         Event event;
         Color timerExpiredSide;
+        const GameState *state;
 
-        if (collect_next_cli_event(&state, &queue) != 0) {
-            cliShowErrorMessage(ERR_FATAL);
-            return 1;
-        }
-
-        if (all_queues_empty(&queue)) {
-            continue;
-        }
-
-        timerExpiredSide = state.currentTurn;
-        event = dequeue_next_event(&queue);
-        if (processEvent(&state, event) != 0) {
-            report_processing_error(&state, event);
+        state = controllerGetState(&controller);
+        timerExpiredSide = state->currentTurn;
+        if (controllerTick(&controller, &event) != 0) {
+            report_processing_error(controllerGetState(&controller), event);
             continue;
         }
 
@@ -617,7 +578,17 @@ int runCliApp(void) {
         }
 
         if (event.type == EVENT_AI_MOVE) {
+            printf("%s[AI]%s %s is thinking...\n",
+                ANSI_ACCENT,
+                ANSI_RESET,
+                color_label(event.data.move.movedPiece.color));
             print_move_summary("AI Move", event.data.move);
+            continue;
+        }
+
+        if (collect_next_cli_event(&controller, &pendingConfig) != 0) {
+            cliShowErrorMessage(ERR_FATAL);
+            return 1;
         }
     }
 

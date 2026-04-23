@@ -27,5 +27,6 @@ typedef struct {
 } GameConfig;
 
 void initDefaultGameConfig(GameConfig *config);
+void initGameConfigForMode(GameConfig *config, GameMode mode);
 
 #endif

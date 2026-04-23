@@ -140,6 +140,36 @@ static int seed_internal_events(Controller *controller) {
     return enqueue_controller_event(controller, createAIMoveEvent(move));
 }
 
+/* Settle one controller into the next stable user-facing state before an
+ * external request runs, so INIT and termination handshakes do not swallow the
+ * caller's intent event. */
+static int settle_for_external_request(Controller *controller) {
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState == INIT_STATE
+        || controller->state.systemState == GAME_TERMINATION_STATE) {
+        return controllerRunUntilIdle(controller);
+    }
+
+    return 0;
+}
+
+/* Apply one external request by routing it through the public queue policy and
+ * draining follow-up controller work before returning to the caller. */
+static int apply_external_request(Controller *controller, Event event) {
+    if (settle_for_external_request(controller) != 0) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, event) != 0) {
+        return 1;
+    }
+
+    return controllerRunUntilIdle(controller);
+}
+
 /* Initialize one controller value with a fresh game state and an empty queue. */
 void initController(Controller *controller, const GameConfig *config) {
     if (controller == NULL) {
@@ -288,6 +318,96 @@ int controllerStartConfiguredGame(Controller *controller, const GameConfig *conf
     }
 
     return 0;
+}
+
+/* Advance one controller along the public "new game" flow until it next goes
+ * idle in a UI-facing state. */
+int controllerRequestNewGame(Controller *controller) {
+    return apply_external_request(controller, createSystemEvent(EVENT_NEW_GAME));
+}
+
+/* Advance one controller along the public "back" flow until it next goes
+ * idle in a UI-facing state. */
+int controllerRequestBack(Controller *controller) {
+    return apply_external_request(controller, createSystemEvent(EVENT_BACK));
+}
+
+/* Advance one controller along the public "exit" flow until it reaches the
+ * next stable state. */
+int controllerRequestExit(Controller *controller) {
+    return apply_external_request(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
+}
+
+/* Submit one already parsed move command and drain controller-owned follow-up
+ * work such as AI replies, timers, or termination transitions. */
+int controllerSubmitMove(Controller *controller, Command command) {
+    if (command.type != CMD_MOVE) {
+        return 1;
+    }
+
+    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createMoveInputEvent(command)) != 0) {
+        return 1;
+    }
+
+    return controllerRunUntilIdle(controller);
+}
+
+/* Request one undo and drain controller-owned follow-up work before the GUI
+ * reads back state again. */
+int controllerRequestUndo(Controller *controller) {
+    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createUndoEvent()) != 0) {
+        return 1;
+    }
+
+    return controllerRunUntilIdle(controller);
+}
+
+/* Request user-triggered gameplay termination and drain the transition into
+ * the next stable menu state. */
+int controllerRequestLeaveGame(Controller *controller) {
+    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_LEAVE_GAME)) != 0) {
+        return 1;
+    }
+
+    return controllerRunUntilIdle(controller);
+}
+
+/* Return one hint move for the current gameplay position without mutating the
+ * controller-owned state. */
+int controllerGetHint(const Controller *controller, Move *move) {
+    if (controller == NULL || move == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        return 1;
+    }
+
+    return generateHintMove(&controller->state, move);
 }
 
 /* Drive one legacy public runtime loop by copying state into a temporary

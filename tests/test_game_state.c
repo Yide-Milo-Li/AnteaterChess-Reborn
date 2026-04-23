@@ -60,6 +60,39 @@ static void test_game_state_player_setup_follows_mode(void) {
     assertPlayer(state.players[BLACK], BLACK, AI);
 }
 
+/* Check that mode-specific config defaults stay centralized in the core
+ * helper instead of being rebuilt ad hoc in frontends. */
+static void test_game_config_mode_defaults(void) {
+    GameConfig config;
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_HUMAN);
+    assert(config.mode == MODE_HUMAN_VS_HUMAN);
+    assert(config.playerColor == WHITE);
+    assert(config.aiDifficultyWhite == DIFFICULTY_NONE);
+    assert(config.aiDifficultyBlack == DIFFICULTY_NONE);
+    assert(config.timerEnabled == 0);
+    assert(config.aiTimeLimit == 0);
+    assert(config.initialTimeSeconds == 0);
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_COMPUTER);
+    assert(config.mode == MODE_HUMAN_VS_COMPUTER);
+    assert(config.playerColor == WHITE);
+    assert(config.aiDifficultyWhite == DIFFICULTY_NONE);
+    assert(config.aiDifficultyBlack == DIFFICULTY_EASY);
+    assert(config.timerEnabled == 0);
+    assert(config.aiTimeLimit == 0);
+    assert(config.initialTimeSeconds == 0);
+
+    initGameConfigForMode(&config, MODE_COMPUTER_VS_COMPUTER);
+    assert(config.mode == MODE_COMPUTER_VS_COMPUTER);
+    assert(config.playerColor == EMPTY_COLOR);
+    assert(config.aiDifficultyWhite == DIFFICULTY_EASY);
+    assert(config.aiDifficultyBlack == DIFFICULTY_EASY);
+    assert(config.timerEnabled == 0);
+    assert(config.aiTimeLimit == 0);
+    assert(config.initialTimeSeconds == 0);
+}
+
 /* Check history bookkeeping and result/gameOver consistency helpers. */
 static void test_history_and_result_helpers(void) {
     GameState state;
@@ -114,6 +147,7 @@ static void test_get_current_player_tracks_turn(void) {
 int main(void) {
     test_game_state_initialization_defaults();
     test_game_state_player_setup_follows_mode();
+    test_game_config_mode_defaults();
     test_history_and_result_helpers();
     test_get_current_player_tracks_turn();
     return 0;

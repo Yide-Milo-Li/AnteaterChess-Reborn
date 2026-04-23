@@ -26,6 +26,13 @@ int controllerEnqueueEvent(Controller *controller, Event event);
 int controllerTick(Controller *controller, Event *processedEvent);
 int controllerRunUntilIdle(Controller *controller);
 int controllerStartConfiguredGame(Controller *controller, const GameConfig *config);
+int controllerRequestNewGame(Controller *controller);
+int controllerRequestBack(Controller *controller);
+int controllerRequestExit(Controller *controller);
+int controllerSubmitMove(Controller *controller, Command command);
+int controllerRequestUndo(Controller *controller);
+int controllerRequestLeaveGame(Controller *controller);
+int controllerGetHint(const Controller *controller, Move *move);
 int runGameLoop(GameState *state);
 
 #endif

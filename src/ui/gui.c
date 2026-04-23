@@ -1,150 +1,932 @@
-
-
-#include <gtk/gtk.h>
-#include <time.h>
-#include "ui/game_setup_menu.h"
 #include "ui/gui.h"
+
+#include <stdio.h>
+#include <string.h>
+
+#include "error/error.h"
+#include "input/command_parser.h"
 #include "time/clock.h"
-#include "ui/board_renderer.h"
 #include "turn/turn_timer.h"
 
+struct Gui {
+    GtkWidget *window;
+    GtkWidget *main_box;
+    GtkWidget *new_game_button;
+    GtkWidget *quit_game_button;
+    GtkWidget *board_images[8][10];
+    GtkWidget *turn_label;
+    GtkWidget *time_display;
+    GtkWidget *history_view;
+    GtkWidget *black_timer_label;
+    GtkWidget *white_timer_label;
+    GtkWidget *status_label;
+    GtkWidget *from_entry;
+    GtkWidget *to_entry;
+    GtkWidget *setup_timer_toggle;
+    GtkWidget *setup_hours_spin;
+    GtkWidget *setup_minutes_spin;
+    GtkWidget *setup_seconds_spin;
+    GtkWidget *setup_timer_widgets[6];
+    GtkWidget *setup_side_white;
+    GtkWidget *setup_side_black;
+    GtkWidget *setup_ai_diff_buttons[3];
+    GtkWidget *setup_white_diff_buttons[3];
+    GtkWidget *setup_black_diff_buttons[3];
+    Controller controller;
+    GameConfig pendingConfig;
+    SystemState last_rendered_state;
+    guint sync_source_id;
+    int has_rendered_state;
+    int should_quit;
+};
 
-// Static flag for quit
-static int quit_flag = 0;
-
-// Callback for window destroy
-static void on_window_destroy(GtkWidget *widget, gpointer data) {
-    (void)widget;
-    (void)data;
-    quit_flag = 1;
-}
-
-
-// Forward declarations
+static gboolean on_sync_tick(gpointer user_data);
+static void on_window_destroy(GtkWidget *widget, gpointer user_data);
+static void on_new_game_clicked(GtkButton *button, gpointer user_data);
+static void on_quit_game_clicked(GtkButton *button, gpointer user_data);
+static void on_mode_selected(GtkButton *button, gpointer user_data);
 static void on_back_clicked(GtkButton *button, gpointer user_data);
+static void on_start_clicked(GtkButton *button, gpointer user_data);
+static void on_setup_timer_toggled(GtkToggleButton *button, gpointer user_data);
+static void on_submit_move_clicked(GtkButton *button, gpointer user_data);
+static void on_undo_clicked(GtkButton *button, gpointer user_data);
+static void on_hint_clicked(GtkButton *button, gpointer user_data);
 static void on_leave_game_clicked(GtkButton *button, gpointer user_data);
-const char *get_piece_icon(Piece piece);
+static void on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
+static void on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);
+static void on_endgame_exit_clicked(GtkButton *button, gpointer user_data);
 
-// Callback for square clicks
-static void on_square_clicked(GtkWidget *widget, GdkEventButton *event, gpointer data) {
-    int index = GPOINTER_TO_INT(data);
-    int row = index / 10;
-    int col = index % 10;
-    int rank = 8 - row;
-    char file = 'A' + col;
-    if (event->button == 1) {
-        g_print("Left click on square %c%d\n", file, rank);
-    } else if (event->button == 3) {
-        g_print("Right click on square %c%d\n", file, rank);
+static void gui_clear_view_refs(Gui *gui) {
+    int row;
+    int col;
+    int index;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->main_box = NULL;
+    gui->new_game_button = NULL;
+    gui->quit_game_button = NULL;
+    gui->turn_label = NULL;
+    gui->time_display = NULL;
+    gui->history_view = NULL;
+    gui->black_timer_label = NULL;
+    gui->white_timer_label = NULL;
+    gui->status_label = NULL;
+    gui->from_entry = NULL;
+    gui->to_entry = NULL;
+    gui->setup_timer_toggle = NULL;
+    gui->setup_hours_spin = NULL;
+    gui->setup_minutes_spin = NULL;
+    gui->setup_seconds_spin = NULL;
+    gui->setup_side_white = NULL;
+    gui->setup_side_black = NULL;
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            gui->board_images[row][col] = NULL;
+        }
+    }
+
+    for (index = 0; index < 6; ++index) {
+        gui->setup_timer_widgets[index] = NULL;
+    }
+
+    for (index = 0; index < 3; ++index) {
+        gui->setup_ai_diff_buttons[index] = NULL;
+        gui->setup_white_diff_buttons[index] = NULL;
+        gui->setup_black_diff_buttons[index] = NULL;
     }
 }
 
-// main menu setup function
-static void setup_quit_confirmation(Gui *gui);
-void setup_main_menu(Gui *gui);
+static int current_turn_is_ai(const GameState *state) {
+    if (state == NULL || state->currentTurn < WHITE || state->currentTurn > BLACK) {
+        return 0;
+    }
 
-static void on_new_game_clicked(GtkButton *button, gpointer user_data) {
-    (void)button;
-    setMainMenuSelection(0);
-    g_print("New Game button clicked\n");
+    return state->players[state->currentTurn].type == AI;
 }
 
-static void on_quit_game_clicked(GtkButton *button, gpointer user_data) {
-    Gui *gui = (Gui *)user_data;
-    setMainMenuSelection(1);
-    g_print("Quit Game button clicked\n");
-    setup_quit_confirmation(gui);
-}
-
-
-static void on_yes_clicked(GtkButton *button, gpointer user_data) {
-    (void)button;
-    Gui *gui = (Gui *)user_data;
-    setQuitChoice(1); // Yes
-    if (GTK_IS_WIDGET(gui->window)) {
-        gtk_widget_destroy(gui->window);
-        gui->window = NULL;
+static const char *game_mode_title(GameMode mode) {
+    switch (mode) {
+        case MODE_HUMAN_VS_HUMAN:
+            return "Human vs. Human";
+        case MODE_HUMAN_VS_COMPUTER:
+            return "Human vs. Computer";
+        case MODE_COMPUTER_VS_COMPUTER:
+            return "Computer vs. Computer";
+        default:
+            return "Game Setup";
     }
 }
 
-static void on_no_clicked(GtkButton *button, gpointer user_data) {
-    (void)button;
-    Gui *gui = (Gui *)user_data;
-    setQuitChoice(0); // No
-    setup_main_menu(gui);
+static const char *game_result_text(GameResult result) {
+    switch (result) {
+        case RESULT_WHITE_WIN:
+            return "White wins.";
+        case RESULT_BLACK_WIN:
+            return "Black wins.";
+        case RESULT_DRAW:
+            return "Draw.";
+        case RESULT_TERMINATED_BY_USER:
+            return "Game ended by user.";
+        case RESULT_NONE:
+        default:
+            return "Game over.";
+    }
 }
 
-static void on_leave_game_clicked(GtkButton *button, gpointer user_data) {
-    setLeaveChoice(1);
-    g_print("Leave Game button clicked\n");
+static AIDifficulty difficulty_from_index(int index) {
+    switch (index) {
+        case 0:
+            return DIFFICULTY_EASY;
+        case 1:
+            return DIFFICULTY_MEDIUM;
+        case 2:
+            return DIFFICULTY_HARD;
+        default:
+            return DIFFICULTY_EASY;
+    }
 }
 
-static void setup_quit_confirmation(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
+static int difficulty_index(AIDifficulty difficulty) {
+    switch (difficulty) {
+        case DIFFICULTY_MEDIUM:
+            return 1;
+        case DIFFICULTY_HARD:
+            return 2;
+        case DIFFICULTY_EASY:
+        case DIFFICULTY_NONE:
+        default:
+            return 0;
+    }
+}
+
+static void format_elapsed_text(char buffer[32], int64_t elapsedSeconds) {
+    int hours;
+    int minutes;
+    int seconds;
+
+    if (buffer == NULL) {
+        return;
+    }
+
+    if (elapsedSeconds < 0) {
+        elapsedSeconds = 0;
+    }
+
+    hours = (int) (elapsedSeconds / 3600);
+    minutes = (int) ((elapsedSeconds % 3600) / 60);
+    seconds = (int) (elapsedSeconds % 60);
+    snprintf(buffer, 32, "%02d:%02d:%02d", hours, minutes, seconds);
+}
+
+static void format_timer_text(char buffer[32], const char *prefix, int seconds) {
+    int hours;
+    int minutes;
+    int remainderSeconds;
+
+    if (buffer == NULL || prefix == NULL) {
+        return;
+    }
+
+    if (seconds < 0) {
+        snprintf(buffer, 32, "%s --:--:--", prefix);
+        return;
+    }
+
+    hours = seconds / 3600;
+    minutes = (seconds % 3600) / 60;
+    remainderSeconds = seconds % 60;
+    snprintf(buffer, 32, "%s %02d:%02d:%02d", prefix, hours, minutes, remainderSeconds);
+}
+
+static void format_position_text(Position pos, char buffer[8]) {
+    if (buffer == NULL) {
+        return;
+    }
+
+    if (!isValidPosition(pos)) {
+        snprintf(buffer, 8, "??");
+        return;
+    }
+
+    buffer[0] = (char) ('A' + pos.col);
+    buffer[1] = (char) ('0' + (8 - pos.row));
+    buffer[2] = '\0';
+}
+
+static void format_hint_text(Move move, char buffer[64]) {
+    char fromText[8];
+    char toText[8];
+
+    if (buffer == NULL) {
+        return;
+    }
+
+    format_position_text(move.from, fromText);
+    format_position_text(move.to, toText);
+    snprintf(buffer, 64, "Hint: %s -> %s", fromText, toText);
+}
+
+static void gui_set_status_text(Gui *gui, const char *text) {
+    if (gui == NULL || !GTK_IS_WIDGET(gui->status_label) || !GTK_IS_LABEL(gui->status_label)) {
+        return;
+    }
+
+    gtk_label_set_text(GTK_LABEL(gui->status_label), (text != NULL) ? text : "");
+}
+
+static void gui_show_message_dialog(Gui *gui, GtkMessageType type,
+                                    GtkButtonsType buttons,
+                                    const char *title,
+                                    const char *message) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+
+    if (message == NULL) {
+        return;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent,
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        type,
+        buttons,
+        "%s",
+        message);
+    if (title != NULL) {
+        gtk_window_set_title(GTK_WINDOW(dialog), title);
+    }
+
+    (void)gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+static int gui_confirm(Gui *gui, const char *title, const char *message) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+    int response;
+
+    if (message == NULL) {
+        return 0;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent,
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_QUESTION,
+        GTK_BUTTONS_YES_NO,
+        "%s",
+        message);
+    if (title != NULL) {
+        gtk_window_set_title(GTK_WINDOW(dialog), title);
+    }
+
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    return response == GTK_RESPONSE_YES;
+}
+
+static void gui_set_error(Gui *gui, ErrorCode code) {
+    const char *message = getErrorMessage(code);
+
+    if (gui != NULL && GTK_IS_WIDGET(gui->status_label) && GTK_IS_LABEL(gui->status_label)) {
+        gui_set_status_text(gui, message);
+        return;
+    }
+
+    gui_show_message_dialog(gui, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Anteater Chess", message);
+}
+
+static void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacing) {
+    if (!gui_window_is_valid(gui)) {
+        return;
+    }
+
+    if (gui->main_box != NULL && GTK_IS_WIDGET(gui->main_box)) {
         gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
     }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
 
-    GtkWidget *label = gtk_label_new("Are you sure you want to quit?");
+    gui_clear_view_refs(gui);
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, spacing);
+    gtk_widget_set_halign(gui->main_box, halign);
+    gtk_widget_set_valign(gui->main_box, valign);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+}
+
+static GtkWidget *create_centered_button(const char *label) {
+    GtkWidget *button = gtk_button_new_with_label(label);
+
+    gtk_widget_set_hexpand(button, TRUE);
+    gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
+    return button;
+}
+
+static void build_difficulty_group(GtkWidget *parent, const char *labelText,
+                                   GtkWidget *buttons[3]) {
+    GtkWidget *label;
+    GtkWidget *box;
+
+    label = gtk_label_new(labelText);
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
 
-    GtkWidget *yes_button = gtk_button_new_with_label("Yes");
-    gtk_widget_set_hexpand(yes_button, TRUE);
-    gtk_widget_set_halign(yes_button, GTK_ALIGN_CENTER);
-    g_signal_connect(yes_button, "clicked", G_CALLBACK(on_yes_clicked), gui);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), yes_button, FALSE, FALSE, 0);
+    box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(parent), box, FALSE, FALSE, 0);
 
-    GtkWidget *no_button = gtk_button_new_with_label("No");
-    gtk_widget_set_hexpand(no_button, TRUE);
-    gtk_widget_set_halign(no_button, GTK_ALIGN_CENTER);
-    g_signal_connect(no_button, "clicked", G_CALLBACK(on_no_clicked), gui);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), no_button, FALSE, FALSE, 0);
-
-    gtk_widget_show_all(gui->window);
+    buttons[0] = gtk_radio_button_new_with_label(NULL, "Easy");
+    buttons[1] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Medium");
+    buttons[2] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Hard");
+    gtk_box_pack_start(GTK_BOX(box), buttons[0], FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), buttons[1], FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), buttons[2], FALSE, FALSE, 0);
 }
 
-void setup_main_menu(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
-    }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+static void build_timer_controls(Gui *gui, GtkWidget *parent) {
+    GtkWidget *timerBox;
+    GtkWidget *hoursLabel;
+    GtkWidget *minutesLabel;
+    GtkWidget *secondsLabel;
 
-    GtkWidget *title = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(title), "<span size='xx-large' weight='bold'>Anteater Chess</span>");
+    gui->setup_timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
+    gtk_widget_set_halign(gui->setup_timer_toggle, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(parent), gui->setup_timer_toggle, FALSE, FALSE, 0);
+
+    timerBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(timerBox, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(parent), timerBox, FALSE, FALSE, 0);
+
+    hoursLabel = gtk_label_new("Hours:");
+    gui->setup_hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
+    gtk_widget_set_size_request(gui->setup_hours_spin, 60, -1);
+
+    minutesLabel = gtk_label_new("Minutes:");
+    gui->setup_minutes_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(gui->setup_minutes_spin, 60, -1);
+
+    secondsLabel = gtk_label_new("Seconds:");
+    gui->setup_seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
+    gtk_widget_set_size_request(gui->setup_seconds_spin, 60, -1);
+
+    gui->setup_timer_widgets[0] = hoursLabel;
+    gui->setup_timer_widgets[1] = gui->setup_hours_spin;
+    gui->setup_timer_widgets[2] = minutesLabel;
+    gui->setup_timer_widgets[3] = gui->setup_minutes_spin;
+    gui->setup_timer_widgets[4] = secondsLabel;
+    gui->setup_timer_widgets[5] = gui->setup_seconds_spin;
+
+    gtk_box_pack_start(GTK_BOX(timerBox), hoursLabel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerBox), gui->setup_hours_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerBox), minutesLabel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerBox), gui->setup_minutes_spin, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerBox), secondsLabel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerBox), gui->setup_seconds_spin, FALSE, FALSE, 0);
+
+    g_signal_connect(gui->setup_timer_toggle, "toggled", G_CALLBACK(on_setup_timer_toggled), gui);
+}
+
+static void apply_difficulty_selection(GtkWidget *buttons[3], AIDifficulty difficulty) {
+    int index = difficulty_index(difficulty);
+
+    if (GTK_IS_TOGGLE_BUTTON(buttons[index])) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(buttons[index]), TRUE);
+    }
+}
+
+static AIDifficulty selected_difficulty(GtkWidget *buttons[3], AIDifficulty fallback) {
+    int index;
+
+    for (index = 0; index < 3; ++index) {
+        if (GTK_IS_TOGGLE_BUTTON(buttons[index])
+            && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(buttons[index]))) {
+            return difficulty_from_index(index);
+        }
+    }
+
+    return fallback;
+}
+
+static void apply_pending_setup_config(Gui *gui) {
+    int totalSeconds;
+    int hours;
+    int minutes;
+    int seconds;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    if (GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle),
+            gui->pendingConfig.timerEnabled ? TRUE : FALSE);
+    }
+
+    totalSeconds = gui->pendingConfig.initialTimeSeconds;
+    hours = totalSeconds / 3600;
+    minutes = (totalSeconds % 3600) / 60;
+    seconds = totalSeconds % 60;
+    if (GTK_IS_SPIN_BUTTON(gui->setup_hours_spin)) {
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(gui->setup_hours_spin), hours);
+    }
+    if (GTK_IS_SPIN_BUTTON(gui->setup_minutes_spin)) {
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(gui->setup_minutes_spin), minutes);
+    }
+    if (GTK_IS_SPIN_BUTTON(gui->setup_seconds_spin)) {
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(gui->setup_seconds_spin), seconds);
+    }
+
+    if (GTK_IS_TOGGLE_BUTTON(gui->setup_side_white) && GTK_IS_TOGGLE_BUTTON(gui->setup_side_black)) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+            (gui->pendingConfig.playerColor == BLACK) ? gui->setup_side_black : gui->setup_side_white), TRUE);
+    }
+
+    if (gui->pendingConfig.mode == MODE_HUMAN_VS_COMPUTER) {
+        if (gui->pendingConfig.playerColor == WHITE) {
+            apply_difficulty_selection(gui->setup_ai_diff_buttons, gui->pendingConfig.aiDifficultyBlack);
+        } else {
+            apply_difficulty_selection(gui->setup_ai_diff_buttons, gui->pendingConfig.aiDifficultyWhite);
+        }
+    } else if (gui->pendingConfig.mode == MODE_COMPUTER_VS_COMPUTER) {
+        apply_difficulty_selection(gui->setup_white_diff_buttons, gui->pendingConfig.aiDifficultyWhite);
+        apply_difficulty_selection(gui->setup_black_diff_buttons, gui->pendingConfig.aiDifficultyBlack);
+    }
+}
+
+static int collect_setup_config(Gui *gui, GameConfig *config, ErrorCode *errorCode) {
+    int hours;
+    int minutes;
+    int seconds;
+    int totalSeconds;
+
+    if (gui == NULL || config == NULL) {
+        if (errorCode != NULL) {
+            *errorCode = ERR_FATAL;
+        }
+        return 1;
+    }
+
+    *config = gui->pendingConfig;
+    initGameConfigForMode(config, gui->pendingConfig.mode);
+
+    config->timerEnabled = (GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)
+        && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle))) ? 1 : 0;
+
+    hours = GTK_IS_SPIN_BUTTON(gui->setup_hours_spin)
+        ? gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(gui->setup_hours_spin)) : 0;
+    minutes = GTK_IS_SPIN_BUTTON(gui->setup_minutes_spin)
+        ? gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(gui->setup_minutes_spin)) : 0;
+    seconds = GTK_IS_SPIN_BUTTON(gui->setup_seconds_spin)
+        ? gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(gui->setup_seconds_spin)) : 0;
+    totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+    if (config->timerEnabled) {
+        if (totalSeconds <= 0) {
+            if (errorCode != NULL) {
+                *errorCode = ERR_INVALID_TIMER_SETTING;
+            }
+            return 1;
+        }
+        config->initialTimeSeconds = totalSeconds;
+    }
+
+    switch (config->mode) {
+        case MODE_HUMAN_VS_HUMAN:
+            config->playerColor = WHITE;
+            config->aiDifficultyWhite = DIFFICULTY_NONE;
+            config->aiDifficultyBlack = DIFFICULTY_NONE;
+            break;
+        case MODE_HUMAN_VS_COMPUTER:
+            config->playerColor = (GTK_IS_TOGGLE_BUTTON(gui->setup_side_black)
+                && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gui->setup_side_black)))
+                ? BLACK : WHITE;
+            if (config->playerColor == WHITE) {
+                config->aiDifficultyWhite = DIFFICULTY_NONE;
+                config->aiDifficultyBlack = selected_difficulty(gui->setup_ai_diff_buttons, DIFFICULTY_EASY);
+            } else {
+                config->aiDifficultyWhite = selected_difficulty(gui->setup_ai_diff_buttons, DIFFICULTY_EASY);
+                config->aiDifficultyBlack = DIFFICULTY_NONE;
+            }
+            break;
+        case MODE_COMPUTER_VS_COMPUTER:
+            config->playerColor = EMPTY_COLOR;
+            config->aiDifficultyWhite = selected_difficulty(gui->setup_white_diff_buttons, DIFFICULTY_EASY);
+            config->aiDifficultyBlack = selected_difficulty(gui->setup_black_diff_buttons, DIFFICULTY_EASY);
+            break;
+        default:
+            if (errorCode != NULL) {
+                *errorCode = ERR_FATAL;
+            }
+            return 1;
+    }
+
+    if (errorCode != NULL) {
+        *errorCode = ERR_FATAL;
+    }
+    return 0;
+}
+
+static const char *get_piece_icon(Piece piece) {
+    static const char *whiteIcons[] = {
+        "gtk-dialog-info",
+        "gtk-dialog-warning",
+        "gtk-dialog-question",
+        "gtk-dialog-error",
+        "gtk-dialog-authentication",
+        "gtk-dialog-password",
+        "gtk-dialog-info"
+    };
+    static const char *blackIcons[] = {
+        "gtk-dialog-warning",
+        "gtk-dialog-question",
+        "gtk-dialog-error",
+        "gtk-dialog-authentication",
+        "gtk-dialog-password",
+        "gtk-dialog-info",
+        "gtk-dialog-warning"
+    };
+    int index;
+
+    if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) {
+        return NULL;
+    }
+
+    index = piece.type - ANT;
+    if (index < 0 || index >= 7) {
+        return NULL;
+    }
+
+    return piece.color == WHITE ? whiteIcons[index] : blackIcons[index];
+}
+
+static void build_main_menu(Gui *gui) {
+    GtkWidget *title;
+
+    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+
+    title = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(title),
+        "<span size='xx-large' weight='bold'>Anteater Chess</span>");
     gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(gui->main_box), title, FALSE, FALSE, 0);
 
-    gui->new_game_button = gtk_button_new_with_label("New Game");
-    gtk_widget_set_hexpand(gui->new_game_button, TRUE);
-    gtk_widget_set_halign(gui->new_game_button, GTK_ALIGN_CENTER);
-    // Pass NULL as user_data, state is accessed via static pointer
-    g_signal_connect(gui->new_game_button, "clicked", G_CALLBACK(on_new_game_clicked), NULL);
+    gui->new_game_button = create_centered_button("New Game");
+    gui->quit_game_button = create_centered_button("Quit Game");
     gtk_box_pack_start(GTK_BOX(gui->main_box), gui->new_game_button, FALSE, FALSE, 0);
-
-    gui->quit_game_button = gtk_button_new_with_label("Quit Game");
-    gtk_widget_set_hexpand(gui->quit_game_button, TRUE);
-    gtk_widget_set_halign(gui->quit_game_button, GTK_ALIGN_CENTER);
-    g_signal_connect(gui->quit_game_button, "clicked", G_CALLBACK(on_quit_game_clicked), gui);
     gtk_box_pack_start(GTK_BOX(gui->main_box), gui->quit_game_button, FALSE, FALSE, 0);
+
+    g_signal_connect(gui->new_game_button, "clicked", G_CALLBACK(on_new_game_clicked), gui);
+    g_signal_connect(gui->quit_game_button, "clicked", G_CALLBACK(on_quit_game_clicked), gui);
+    gtk_widget_show_all(gui->window);
+}
+
+static void build_mode_menu(Gui *gui) {
+    GtkWidget *label;
+    GtkWidget *button;
+    int index;
+    static const struct {
+        const char *label;
+        GameMode mode;
+    } modes[] = {
+        {"Human vs. Human", MODE_HUMAN_VS_HUMAN},
+        {"Human vs. Computer", MODE_HUMAN_VS_COMPUTER},
+        {"Computer vs. Computer", MODE_COMPUTER_VS_COMPUTER}
+    };
+
+    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+
+    label = gtk_label_new("Game Mode Selection");
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+
+    for (index = 0; index < 3; ++index) {
+        button = create_centered_button(modes[index].label);
+        g_object_set_data(G_OBJECT(button), "game-mode", GINT_TO_POINTER(modes[index].mode));
+        g_signal_connect(button, "clicked", G_CALLBACK(on_mode_selected), gui);
+        gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+    }
+
+    button = create_centered_button("Back");
+    g_signal_connect(button, "clicked", G_CALLBACK(on_back_clicked), gui);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+    gtk_widget_show_all(gui->window);
+}
+
+static void build_setup_menu(Gui *gui) {
+    GtkWidget *contentBox;
+    GtkWidget *label;
+    GtkWidget *buttonBox;
+    GtkWidget *backButton;
+    GtkWidget *startButton;
+
+    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_FILL, 24);
+
+    contentBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    gtk_widget_set_halign(contentBox, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(contentBox, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), contentBox, TRUE, TRUE, 0);
+
+    label = gtk_label_new(game_mode_title(gui->pendingConfig.mode));
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(contentBox), label, FALSE, FALSE, 0);
+
+    if (gui->pendingConfig.mode == MODE_HUMAN_VS_COMPUTER) {
+        GtkWidget *sideLabel = gtk_label_new("Select Side");
+        GtkWidget *sideBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+
+        gtk_widget_set_halign(sideLabel, GTK_ALIGN_CENTER);
+        gtk_widget_set_halign(sideBox, GTK_ALIGN_CENTER);
+        gtk_box_pack_start(GTK_BOX(contentBox), sideLabel, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(contentBox), sideBox, FALSE, FALSE, 0);
+
+        gui->setup_side_white = gtk_radio_button_new_with_label(NULL, "White");
+        gui->setup_side_black = gtk_radio_button_new_with_label_from_widget(
+            GTK_RADIO_BUTTON(gui->setup_side_white), "Black");
+        gtk_box_pack_start(GTK_BOX(sideBox), gui->setup_side_white, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(sideBox), gui->setup_side_black, FALSE, FALSE, 0);
+
+        build_difficulty_group(contentBox, "AI Difficulty", gui->setup_ai_diff_buttons);
+    } else if (gui->pendingConfig.mode == MODE_COMPUTER_VS_COMPUTER) {
+        build_difficulty_group(contentBox, "White AI Difficulty", gui->setup_white_diff_buttons);
+        build_difficulty_group(contentBox, "Black AI Difficulty", gui->setup_black_diff_buttons);
+    }
+
+    build_timer_controls(gui, contentBox);
+
+    buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_halign(buttonBox, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), buttonBox, FALSE, FALSE, 0);
+
+    backButton = gtk_button_new_with_label("Back");
+    startButton = gtk_button_new_with_label("Start");
+    gtk_box_pack_start(GTK_BOX(buttonBox), backButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(buttonBox), startButton, FALSE, FALSE, 0);
+
+    g_signal_connect(backButton, "clicked", G_CALLBACK(on_back_clicked), gui);
+    g_signal_connect(startButton, "clicked", G_CALLBACK(on_start_clicked), gui);
+
+    apply_pending_setup_config(gui);
+    gtk_widget_show_all(gui->window);
+    on_setup_timer_toggled(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle), gui);
+}
+
+static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
+    GtkWidget *timeBox;
+    GtkWidget *historyLabel;
+    GtkWidget *scrolledWindow;
+    GtkWidget *enterBox;
+    GtkWidget *moveBox;
+    GtkWidget *submitButton;
+    GtkWidget *undoButton;
+    GtkWidget *hintButton;
+    GtkWidget *buttonBox;
+
+    timeBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(parent), timeBox, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timeBox), gtk_label_new("Time Elapsed:"), FALSE, FALSE, 0);
+    gui->time_display = gtk_label_new("00:00:00");
+    gtk_box_pack_start(GTK_BOX(timeBox), gui->time_display, FALSE, FALSE, 0);
+
+    historyLabel = gtk_label_new("Move History");
+    gtk_widget_set_halign(historyLabel, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(parent), historyLabel, FALSE, FALSE, 0);
+
+    gui->history_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(gui->history_view), FALSE);
+    gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(gui->history_view), FALSE);
+    scrolledWindow = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledWindow),
+        GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(scrolledWindow, -1, 450);
+    gtk_container_add(GTK_CONTAINER(scrolledWindow), gui->history_view);
+    gtk_box_pack_start(GTK_BOX(parent), scrolledWindow, FALSE, FALSE, 0);
+
+    gui->status_label = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(gui->status_label), 0.0f);
+    gtk_box_pack_start(GTK_BOX(parent), gui->status_label, FALSE, FALSE, 0);
+
+    enterBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_box_pack_start(GTK_BOX(parent), enterBox, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(enterBox), gtk_label_new("Enter Move"), FALSE, FALSE, 0);
+
+    moveBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(enterBox), moveBox, FALSE, FALSE, 0);
+    gui->from_entry = gtk_entry_new();
+    gui->to_entry = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(gui->from_entry), "From");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(gui->to_entry), "To");
+    gtk_box_pack_start(GTK_BOX(moveBox), gui->from_entry, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(moveBox), gui->to_entry, TRUE, TRUE, 0);
+
+    submitButton = gtk_button_new_with_label("Submit");
+    gtk_box_pack_start(GTK_BOX(moveBox), submitButton, FALSE, FALSE, 0);
+    g_signal_connect(submitButton, "clicked", G_CALLBACK(on_submit_move_clicked), gui);
+
+    undoButton = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(undoButton),
+        gtk_image_new_from_icon_name("gtk-undo", GTK_ICON_SIZE_BUTTON));
+    gtk_widget_set_size_request(undoButton, 60, 60);
+    g_signal_connect(undoButton, "clicked", G_CALLBACK(on_undo_clicked), gui);
+
+    hintButton = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(hintButton),
+        gtk_image_new_from_icon_name("gtk-info", GTK_ICON_SIZE_BUTTON));
+    gtk_widget_set_size_request(hintButton, 60, 60);
+    g_signal_connect(hintButton, "clicked", G_CALLBACK(on_hint_clicked), gui);
+
+    buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_box_pack_start(GTK_BOX(buttonBox), undoButton, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(buttonBox), hintButton, TRUE, TRUE, 0);
+    gtk_box_pack_end(GTK_BOX(parent), buttonBox, TRUE, FALSE, 20);
+}
+
+static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *state) {
+    GtkWidget *boardBox;
+    GtkWidget *rankGrid;
+    GtkWidget *boardGrid;
+    GtkWidget *fileGrid;
+    int row;
+    int col;
+
+    gui->black_timer_label = gtk_label_new("Black --:--:--");
+    gtk_widget_set_halign(gui->black_timer_label, GTK_ALIGN_END);
+    gtk_box_pack_start(GTK_BOX(parent), gui->black_timer_label, FALSE, FALSE, 0);
+
+    boardBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(parent), boardBox, TRUE, TRUE, 0);
+
+    rankGrid = gtk_grid_new();
+    gtk_grid_set_row_homogeneous(GTK_GRID(rankGrid), TRUE);
+    gtk_grid_set_column_homogeneous(GTK_GRID(rankGrid), TRUE);
+    gtk_widget_set_size_request(rankGrid, 30, -1);
+    gtk_box_pack_start(GTK_BOX(boardBox), rankGrid, FALSE, FALSE, 0);
+    for (row = 0; row < 8; ++row) {
+        char label[2];
+
+        snprintf(label, sizeof(label), "%d", 8 - row);
+        gtk_grid_attach(GTK_GRID(rankGrid), gtk_label_new(label), 0, row, 1, 1);
+    }
+
+    boardGrid = gtk_grid_new();
+    gtk_grid_set_row_homogeneous(GTK_GRID(boardGrid), TRUE);
+    gtk_grid_set_column_homogeneous(GTK_GRID(boardGrid), TRUE);
+    gtk_box_pack_start(GTK_BOX(boardBox), boardGrid, TRUE, TRUE, 0);
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            GtkWidget *image = gtk_image_new();
+            GtkWidget *eventBox = gtk_event_box_new();
+            const char *icon = get_piece_icon(state->board.cells[row][col]);
+
+            if (icon != NULL) {
+                gtk_image_set_from_icon_name(GTK_IMAGE(image), icon, GTK_ICON_SIZE_BUTTON);
+            }
+
+            gui->board_images[row][col] = image;
+            gtk_container_add(GTK_CONTAINER(eventBox), image);
+            gtk_style_context_add_class(gtk_widget_get_style_context(eventBox),
+                ((row + col) % 2) == 0 ? "light-square" : "dark-square");
+            gtk_grid_attach(GTK_GRID(boardGrid), eventBox, col, row, 1, 1);
+        }
+    }
+
+    fileGrid = gtk_grid_new();
+    gtk_widget_set_size_request(fileGrid, -1, 50);
+    gtk_widget_set_hexpand(fileGrid, TRUE);
+    gtk_box_pack_start(GTK_BOX(parent), fileGrid, FALSE, FALSE, 0);
+    {
+        GtkWidget *emptyLabel = gtk_label_new("");
+        gtk_widget_set_size_request(emptyLabel, 30, -1);
+        gtk_grid_attach(GTK_GRID(fileGrid), emptyLabel, 0, 0, 1, 1);
+    }
+    for (col = 0; col < 10; ++col) {
+        char label[2] = {(char) ('A' + col), '\0'};
+        GtkWidget *fileLabel = gtk_label_new(label);
+
+        gtk_widget_set_hexpand(fileLabel, TRUE);
+        gtk_grid_attach(GTK_GRID(fileGrid), fileLabel, col + 1, 0, 1, 1);
+    }
+
+    gui->white_timer_label = gtk_label_new("White --:--:--");
+    gtk_widget_set_halign(gui->white_timer_label, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(parent), gui->white_timer_label, FALSE, FALSE, 0);
+}
+
+static void build_gameplay_ui(Gui *gui, const GameState *state) {
+    GtkWidget *turnLabel;
+    GtkWidget *middleBox;
+    GtkWidget *leftBox;
+    GtkWidget *rightBox;
+    GtkWidget *leaveButton;
+
+    gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 12);
+
+    turnLabel = gtk_label_new("");
+    gtk_widget_set_halign(turnLabel, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), turnLabel, FALSE, FALSE, 0);
+    gui->turn_label = turnLabel;
+
+    middleBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), middleBox, TRUE, TRUE, 0);
+
+    leftBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_widget_set_size_request(leftBox, 400, -1);
+    gtk_box_pack_start(GTK_BOX(middleBox), leftBox, FALSE, FALSE, 0);
+    build_gameplay_sidebar(gui, leftBox);
+
+    rightBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_box_pack_start(GTK_BOX(middleBox), rightBox, TRUE, TRUE, 0);
+    build_gameplay_board(gui, rightBox, state);
+
+    leaveButton = gtk_button_new_with_label("Leave Game");
+    gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
+    gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
+    g_signal_connect(leaveButton, "clicked", G_CALLBACK(on_leave_game_clicked), gui);
 
     gtk_widget_show_all(gui->window);
 }
 
+static void build_endgame_menu(Gui *gui, const GameState *state) {
+    GtkWidget *title;
+    GtkWidget *result;
+    GtkWidget *newGameButton;
+    GtkWidget *mainMenuButton;
+    GtkWidget *exitButton;
+
+    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+
+    title = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(title),
+        "<span size='x-large' weight='bold'>Game Over</span>");
+    gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), title, FALSE, FALSE, 0);
+
+    result = gtk_label_new(game_result_text(state->result));
+    gtk_widget_set_halign(result, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), result, FALSE, FALSE, 0);
+
+    newGameButton = create_centered_button("New Game");
+    mainMenuButton = create_centered_button("Main Menu");
+    exitButton = create_centered_button("Exit");
+    gtk_box_pack_start(GTK_BOX(gui->main_box), newGameButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), mainMenuButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), exitButton, FALSE, FALSE, 0);
+
+    g_signal_connect(newGameButton, "clicked", G_CALLBACK(on_endgame_new_game_clicked), gui);
+    g_signal_connect(mainMenuButton, "clicked", G_CALLBACK(on_endgame_main_menu_clicked), gui);
+    g_signal_connect(exitButton, "clicked", G_CALLBACK(on_endgame_exit_clicked), gui);
+    gtk_widget_show_all(gui->window);
+}
+
+static void build_screen_for_state(Gui *gui, const GameState *state) {
+    if (gui == NULL || state == NULL) {
+        return;
+    }
+
+    switch (state->systemState) {
+        case MAIN_MENU_STATE:
+            build_main_menu(gui);
+            break;
+        case GAME_MODE_SELECTION_STATE:
+            build_mode_menu(gui);
+            break;
+        case GAME_SETUP_STATE:
+            build_setup_menu(gui);
+            break;
+        case GAMEPLAY_STATE:
+            build_gameplay_ui(gui, state);
+            break;
+        case END_GAME_MENU_STATE:
+            build_endgame_menu(gui, state);
+            break;
+        case EXIT_STATE:
+            gui->should_quit = 1;
+            if (gui_window_is_valid(gui)) {
+                gtk_widget_destroy(gui->window);
+            }
+            break;
+        case INIT_STATE:
+        case GAME_TERMINATION_STATE:
+        default:
+            break;
+    }
+}
+
 Gui *gui_create(int *argc, char ***argv) {
+    GtkCssProvider *provider;
+    Gui *gui;
+
     gtk_init(argc, argv);
 
-    Gui *gui = g_new0(Gui, 1);
+    gui = g_new0(Gui, 1);
     gui->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(gui->window), "Anteater Chess");
     gtk_window_set_default_size(GTK_WINDOW(gui->window), 1200, 840);
@@ -152,22 +934,26 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
 
-    // Load CSS for styling
-    GtkCssProvider *provider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(provider, 
+    provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(provider,
         "GtkWindow { background-color: #2c3e50; } "
         ".light-square { background-color: #f0d9b5; } "
-        ".dark-square { background-color: #b58863; }", -1, NULL);
-    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), 
-        GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        ".dark-square { background-color: #b58863; }",
+        -1,
+        NULL);
+    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
+        GTK_STYLE_PROVIDER(provider),
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
 
-    // Connect destroy signal
-    g_signal_connect(gui->window, "destroy", G_CALLBACK(on_window_destroy), NULL);
+    initDefaultGameConfig(&gui->pendingConfig);
+    initController(&gui->controller, &gui->pendingConfig);
+    gui->last_rendered_state = EXIT_STATE;
+    gui->has_rendered_state = 0;
+    gui->sync_source_id = 0;
+    gui->should_quit = 0;
 
-    // Note: destroy signal connection moved to gui_run
-
-
+    g_signal_connect(gui->window, "destroy", G_CALLBACK(on_window_destroy), gui);
     return gui;
 }
 
@@ -175,825 +961,485 @@ void gui_destroy(Gui *gui) {
     if (gui == NULL) {
         return;
     }
-    if (gui->window != NULL && GTK_IS_WIDGET(gui->window)) {
-        gtk_widget_destroy(gui->window);
-        gui->window = NULL;
+
+    if (gui->sync_source_id != 0) {
+        g_source_remove(gui->sync_source_id);
+        gui->sync_source_id = 0;
     }
+
+    if (gui_window_is_valid(gui)) {
+        gtk_widget_destroy(gui->window);
+    }
+
     g_free(gui);
 }
 
 void gui_run(Gui *gui) {
-    (void)gui;
-    g_signal_connect(gui->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    if (!gui_window_is_valid(gui)) {
+        return;
+    }
+
+    gui_sync_from_controller(gui);
+    if (gui->should_quit || !gui_window_is_valid(gui)) {
+        return;
+    }
+
+    if (gui->sync_source_id == 0) {
+        gui->sync_source_id = g_timeout_add(100, on_sync_tick, gui);
+    }
+
+    gtk_widget_show_all(gui->window);
     gtk_main();
 }
 
-// --- Game Mode Menu Setup ---
-static void on_game_mode_selected(GtkButton *button, gpointer user_data) {
-    int index = GPOINTER_TO_INT(user_data);
-    setGameModeSelection(index);
+void gui_sync_from_controller(Gui *gui) {
+    const GameState *state;
+
+    if (!gui_window_is_valid(gui)) {
+        return;
+    }
+
+    if (controllerRunUntilIdle(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    state = controllerGetState(&gui->controller);
+    if (state == NULL) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    if (!gui->has_rendered_state || gui->last_rendered_state != state->systemState) {
+        build_screen_for_state(gui, state);
+        gui->last_rendered_state = state->systemState;
+        gui->has_rendered_state = 1;
+    }
+
+    if (state->systemState == GAMEPLAY_STATE) {
+        update_board(gui, state);
+        update_movelist(gui, state);
+        update_clock(gui);
+        update_timers(gui, state);
+        gui_display_turn(gui, state->currentTurn);
+    }
 }
 
-void setup_game_mode_menu(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
-    }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
-
-    GtkWidget *label = gtk_label_new("Game Mode Selection");
-    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
-
-    const char *button_labels[] = {
-        "Human vs. Human",
-        "Human vs. Computer",
-        "Computer vs. Computer",
-        "Back"
-    };
-    for (int i = 0; i < 4; ++i) {
-        GtkWidget *button = gtk_button_new_with_label(button_labels[i]);
-        gtk_widget_set_hexpand(button, TRUE);
-        gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
-        if (i < 3) {
-            g_signal_connect(button, "clicked", G_CALLBACK(on_game_mode_selected), GINT_TO_POINTER(i));
-        } else {
-            g_signal_connect(button, "clicked", G_CALLBACK(on_back_clicked), NULL);
-        }
-        gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+int gui_render_snapshot(Gui *gui, const GameState *state) {
+    if (gui == NULL || state == NULL) {
+        return -1;
     }
 
-    gtk_widget_show_all(gui->window);
+    gui->controller.state = *state;
+    gui->controller.queue = (EventQueue){0};
+    gui->pendingConfig = state->config;
+    gui->has_rendered_state = 0;
+    gui_sync_from_controller(gui);
+    return gui->should_quit ? -1 : 0;
 }
 
-void setup_gameplay_ui(Gui *gui, const GameState *gameState) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
-    }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
-
-    // Top: Turn label
-    GtkWidget *turn_label = gtk_label_new("White's Turn"); // Placeholder, should be based on gameState->currentPlayer
-    gtk_widget_set_halign(turn_label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), turn_label, FALSE, FALSE, 0);
-    gui->turn_label = turn_label;
-
-    // Middle: Horizontal box for utility and board
-    GtkWidget *middle_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), middle_box, TRUE, TRUE, 0);
-
-    // Left panel: Utility (1/3 width)
-    GtkWidget *left_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    gtk_widget_set_size_request(left_box, 400, -1);
-    gtk_box_pack_start(GTK_BOX(middle_box), left_box, FALSE, FALSE, 0);
-
-    // Time Elapsed
-    // Time Elapsed
-    GtkWidget *time_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-    gtk_box_pack_start(GTK_BOX(left_box), time_box, FALSE, FALSE, 0);
-    GtkWidget *time_label = gtk_label_new("Time Elapsed:");
-    gtk_box_pack_start(GTK_BOX(time_box), time_label, FALSE, FALSE, 0);
-    // Time display in HH:MM:SS format
-    int64_t elapsed = getElapsedTimeSeconds();
-    int hours = elapsed / 3600;
-    int mins = (elapsed % 3600) / 60;
-    int secs = elapsed % 60;
-    char time_str[20];
-    sprintf(time_str, "%02d:%02d:%02d", hours, mins, secs);
-    GtkWidget *time_display = gtk_label_new(time_str);
-    gtk_box_pack_start(GTK_BOX(time_box), time_display, FALSE, FALSE, 0);
-    gui->time_display = time_display;
-
-    // Move History
-    GtkWidget *history_label = gtk_label_new("Move History");
-    gtk_box_pack_start(GTK_BOX(left_box), history_label, FALSE, FALSE, 0);
-
-    GtkWidget *history_view = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(history_view), FALSE);
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(history_view));
-    gtk_text_buffer_set_text(buffer, "Move 1: e2-e4\nMove 2: e7-e5\n", -1);
-
-    GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_widget_set_size_request(scrolled_window, -1, 450);
-    gtk_container_add(GTK_CONTAINER(scrolled_window), history_view);
-    gtk_box_pack_start(GTK_BOX(left_box), scrolled_window, FALSE, FALSE, 0);
-    gui->history_view = history_view;
-
-    // Enter Move section
-    GtkWidget *enter_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    gtk_box_pack_start(GTK_BOX(left_box), enter_box, FALSE, FALSE, 0);
-
-    GtkWidget *enter_label = gtk_label_new("Enter Move");
-    gtk_box_pack_start(GTK_BOX(enter_box), enter_label, FALSE, FALSE, 0);
-
-    GtkWidget *move_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-    gtk_box_pack_start(GTK_BOX(enter_box), move_box, FALSE, FALSE, 0);
-
-    GtkWidget *from_entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(from_entry), "From:");
-    gtk_box_pack_start(GTK_BOX(move_box), from_entry, TRUE, TRUE, 0);
-
-    GtkWidget *to_entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(to_entry), "To:");
-    gtk_box_pack_start(GTK_BOX(move_box), to_entry, TRUE, TRUE, 0);
-
-    GtkWidget *submit_button = gtk_button_new_with_label("Submit");
-    gtk_box_pack_start(GTK_BOX(move_box), submit_button, FALSE, FALSE, 0);
-
-    // Undo button at bottom of left
-    GtkWidget *undo_button = gtk_button_new();
-    gtk_button_set_image(GTK_BUTTON(undo_button), gtk_image_new_from_icon_name("gtk-undo", GTK_ICON_SIZE_BUTTON));
-    gtk_widget_set_size_request(undo_button, 60, 60);
-
-    // Hint button underneath undo
-    GtkWidget *hint_button = gtk_button_new();
-    gtk_button_set_image(GTK_BUTTON(hint_button), gtk_image_new_from_icon_name("gtk-info", GTK_ICON_SIZE_BUTTON));
-    gtk_widget_set_size_request(hint_button, 60, 60);
-
-    // Button box for horizontal layout
-    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-    gtk_box_pack_start(GTK_BOX(button_box), undo_button, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(button_box), hint_button, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(left_box), button_box, TRUE, FALSE, 20);
-
-    // Right panel: Board area
-    GtkWidget *right_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    gtk_box_pack_start(GTK_BOX(middle_box), right_box, TRUE, TRUE, 0);
-
-    // Top: Black Timer
-    GtkWidget *black_timer_label = gtk_label_new("Black Timer: 00:00");
-    gtk_widget_set_halign(black_timer_label, GTK_ALIGN_END);
-    gtk_box_pack_start(GTK_BOX(right_box), black_timer_label, FALSE, FALSE, 0);
-    gui->black_timer_label = black_timer_label;
-
-    // Middle: Board grid with rank labels
-    GtkWidget *board_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_box_pack_start(GTK_BOX(right_box), board_box, TRUE, TRUE, 0);
-
-    // Left: Rank labels (8 to 1)
-    GtkWidget *rank_grid = gtk_grid_new();
-    gtk_grid_set_row_homogeneous(GTK_GRID(rank_grid), TRUE);
-    gtk_grid_set_column_homogeneous(GTK_GRID(rank_grid), TRUE);
-    gtk_widget_set_size_request(rank_grid, 30, -1); // fixed width, height expands
-    gtk_box_pack_start(GTK_BOX(board_box), rank_grid, FALSE, FALSE, 0);
-    for (int r = 0; r < 8; ++r) {
-        int rank_num = 8 - r;
-        char label[2];
-        sprintf(label, "%d", rank_num);
-        GtkWidget *rank_label = gtk_label_new(label);
-        gtk_grid_attach(GTK_GRID(rank_grid), rank_label, 0, r, 1, 1);
+const GameState *gui_get_state(const Gui *gui) {
+    if (gui == NULL) {
+        return NULL;
     }
 
-    // Center: 8x10 grid for pieces
-    GtkWidget *board_grid = gtk_grid_new();
-    gtk_grid_set_row_homogeneous(GTK_GRID(board_grid), TRUE);
-    gtk_grid_set_column_homogeneous(GTK_GRID(board_grid), TRUE);
-    gtk_box_pack_start(GTK_BOX(board_box), board_grid, TRUE, TRUE, 0);
-
-    // Create images for each cell (8 rows x 10 columns)
-    for (int row = 0; row < 8; ++row) {
-        for (int col = 0; col < 10; ++col) {
-            GtkWidget *image = gtk_image_new();
-            Piece piece = gameState->board.cells[row][col];
-            const char *icon = get_piece_icon(piece);
-            if (icon) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(image), icon, GTK_ICON_SIZE_BUTTON);
-            }
-            gui->board_images[row][col] = image;
-
-            GtkWidget *eventbox = gtk_event_box_new();
-            gtk_container_add(GTK_CONTAINER(eventbox), image);
-            gtk_style_context_add_class(gtk_widget_get_style_context(eventbox), 
-                (row + col) % 2 == 0 ? "light-square" : "dark-square");
-            gtk_grid_attach(GTK_GRID(board_grid), eventbox, col, row, 1, 1);
-
-            // Connect click signals
-            g_signal_connect(eventbox, "button-press-event", G_CALLBACK(on_square_clicked), GINT_TO_POINTER(row * 10 + col));
-        }
-    }
-
-    // Bottom: File labels (A to J)
-    GtkWidget *file_grid = gtk_grid_new();
-    // Not homogeneous to allow fixed width for empty
-    gtk_widget_set_size_request(file_grid, -1, 50); // width expands, fixed height
-    gtk_widget_set_hexpand(file_grid, TRUE);
-    gtk_box_pack_start(GTK_BOX(right_box), file_grid, FALSE, FALSE, 0);
-    // Empty space for rank labels
-    GtkWidget *empty_left = gtk_label_new("");
-    gtk_widget_set_size_request(empty_left, 30, -1);
-    gtk_grid_attach(GTK_GRID(file_grid), empty_left, 0, 0, 1, 1);
-    for (int c = 0; c < 10; ++c) {
-        char label[2] = {'A' + c, '\0'};
-        GtkWidget *file_label = gtk_label_new(label);
-        gtk_widget_set_hexpand(file_label, TRUE);
-        gtk_grid_attach(GTK_GRID(file_grid), file_label, c + 1, 0, 1, 1);
-    }
-
-    // Bottom: White Timer
-    GtkWidget *white_timer_label = gtk_label_new("White Timer: 00:00");
-    gtk_widget_set_halign(white_timer_label, GTK_ALIGN_END);
-    gtk_box_pack_end(GTK_BOX(right_box), white_timer_label, FALSE, FALSE, 0);
-    gui->white_timer_label = white_timer_label;
-
-    // Bottom: Leave Game button
-    GtkWidget *leave_button = gtk_button_new_with_label("Leave Game");
-    gtk_widget_set_halign(leave_button, GTK_ALIGN_CENTER);
-    gtk_box_pack_end(GTK_BOX(gui->main_box), leave_button, FALSE, FALSE, 0);
-    g_signal_connect(leave_button, "clicked", G_CALLBACK(on_leave_game_clicked), NULL);
-
-    gtk_widget_show_all(gui->window);
+    return controllerGetState(&gui->controller);
 }
 
-void gui_reset_selections(void) {
-    resetMainMenuSelection();
-    resetGameModeSelection();
-    resetBackButtonClicked();
-    resetStartPressed();
-    resetLeaveChoice();
+Controller *gui_get_controller(Gui *gui) {
+    if (gui == NULL) {
+        return NULL;
+    }
+
+    return &gui->controller;
 }
 
 int gui_process_events(void) {
-    if (quit_flag) return 0;
     while (gtk_events_pending()) {
         gtk_main_iteration();
     }
+
     return 1;
 }
 
-int gui_window_is_valid(Gui *gui) {
-    return gui && GTK_IS_WIDGET(gui->window);
+int gui_window_is_valid(const Gui *gui) {
+    return gui != NULL && gui->window != NULL && GTK_IS_WIDGET(gui->window);
 }
 
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf) {
-    if (!gui || row < 0 || row >= 8 || col < 0 || col >= 10) return;
+    if (gui == NULL || row < 0 || row >= 8 || col < 0 || col >= 10) {
+        return;
+    }
+
+    if (!GTK_IS_IMAGE(gui->board_images[row][col])) {
+        return;
+    }
+
     gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
 }
 
-// Update functions for gameplay UI
 void update_board(Gui *gui, const GameState *state) {
-    for (int row = 0; row < 8; ++row) {
-        for (int col = 0; col < 10; ++col) {
-            Piece piece = state->board.cells[row][col];
-            const char *icon = get_piece_icon(piece);
-            if (icon && GTK_IS_IMAGE(gui->board_images[row][col])) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]), icon, GTK_ICON_SIZE_BUTTON);
-                gtk_widget_queue_draw(gui->board_images[row][col]);
+    int row;
+    int col;
+
+    if (gui == NULL || state == NULL) {
+        return;
+    }
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            const char *icon;
+
+            if (!GTK_IS_IMAGE(gui->board_images[row][col])) {
+                continue;
+            }
+
+            icon = get_piece_icon(state->board.cells[row][col]);
+            if (icon != NULL) {
+                gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]),
+                    icon,
+                    GTK_ICON_SIZE_BUTTON);
+            } else {
+                gtk_image_clear(GTK_IMAGE(gui->board_images[row][col]));
             }
         }
     }
 }
 
 void update_movelist(Gui *gui, const GameState *state) {
-    if (!GTK_IS_WIDGET(gui->history_view) || !GTK_IS_TEXT_VIEW(gui->history_view)) return;
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gui->history_view));
-    // Clear buffer
-    gtk_text_buffer_set_text(buffer, "", -1);
-    // Add moves from state->moveHistory
-    char text[1024] = "";
-    for (int i = 0; i < state->moveHistory.count; ++i) {
-        Move m = state->moveHistory.moves[i];
-        char from_file = 'a' + m.from.col;
-        char from_rank = '8' - m.from.row;
-        char to_file = 'a' + m.to.col;
-        char to_rank = '8' - m.to.row;
-        char move_str[10];
-        sprintf(move_str, "%c%c-%c%c\n", from_file, from_rank, to_file, to_rank);
-        strcat(text, move_str);
+    GString *text;
+    GtkTextBuffer *buffer;
+    int index;
+
+    if (gui == NULL || state == NULL
+        || !GTK_IS_WIDGET(gui->history_view) || !GTK_IS_TEXT_VIEW(gui->history_view)) {
+        return;
     }
-    gtk_text_buffer_set_text(buffer, text, -1);
+
+    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gui->history_view));
+    text = g_string_new("");
+
+    for (index = 0; index < state->moveHistory.count; ++index) {
+        Move move = state->moveHistory.moves[index];
+        char fromText[8];
+        char toText[8];
+
+        format_position_text(move.from, fromText);
+        format_position_text(move.to, toText);
+        g_string_append_printf(text, "%d. %s-%s\n", index + 1, fromText, toText);
+    }
+
+    gtk_text_buffer_set_text(buffer, text->str, -1);
+    g_string_free(text, TRUE);
 }
 
 void update_clock(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->time_display) || !GTK_IS_LABEL(gui->time_display)) return;
-    int64_t elapsed = getElapsedTimeSeconds();
-    int hours = elapsed / 3600;
-    int mins = (elapsed % 3600) / 60;
-    int secs = elapsed % 60;
-    char time_str[20];
-    sprintf(time_str, "%02d:%02d:%02d", hours, mins, secs);
-    gtk_label_set_text(GTK_LABEL(gui->time_display), time_str);
+    char timeText[32];
+
+    if (gui == NULL || !GTK_IS_WIDGET(gui->time_display) || !GTK_IS_LABEL(gui->time_display)) {
+        return;
+    }
+
+    format_elapsed_text(timeText, getElapsedTimeSeconds());
+    gtk_label_set_text(GTK_LABEL(gui->time_display), timeText);
 }
 
 void update_timers(Gui *gui, const GameState *state) {
-    if (!GTK_IS_WIDGET(gui->black_timer_label) || !GTK_IS_LABEL(gui->black_timer_label) ||
-        !GTK_IS_WIDGET(gui->white_timer_label) || !GTK_IS_LABEL(gui->white_timer_label)) return;
-    if (state->config.timerEnabled) {
-        updateTurnTimer((GameState *)state);
-        int white_rem = getRemainingTime(state, WHITE);
-        int black_rem = getRemainingTime(state, BLACK);
-        // Format and display
-        int w_h = white_rem / 3600;
-        int w_m = (white_rem % 3600) / 60;
-        int w_s = white_rem % 60;
-        char w_str[25];
-        sprintf(w_str, "White: %02d:%02d:%02d", w_h, w_m, w_s);
-        gtk_label_set_text(GTK_LABEL(gui->white_timer_label), w_str);
+    char whiteText[32];
+    char blackText[32];
+    int whiteRemaining;
+    int blackRemaining;
 
-        int b_h = black_rem / 3600;
-        int b_m = (black_rem % 3600) / 60;
-        int b_s = black_rem % 60;
-        char b_str[25];
-        sprintf(b_str, "Black: %02d:%02d:%02d", b_h, b_m, b_s);
-        gtk_label_set_text(GTK_LABEL(gui->black_timer_label), b_str);
-    } else {
-        gtk_label_set_text(GTK_LABEL(gui->white_timer_label), "White: -- : --");
-        gtk_label_set_text(GTK_LABEL(gui->black_timer_label), "Black: -- : --");
+    if (gui == NULL || state == NULL) {
+        return;
     }
+
+    if (!GTK_IS_WIDGET(gui->white_timer_label) || !GTK_IS_LABEL(gui->white_timer_label)
+        || !GTK_IS_WIDGET(gui->black_timer_label) || !GTK_IS_LABEL(gui->black_timer_label)) {
+        return;
+    }
+
+    if (!state->config.timerEnabled) {
+        gtk_label_set_text(GTK_LABEL(gui->white_timer_label), "White --:--:--");
+        gtk_label_set_text(GTK_LABEL(gui->black_timer_label), "Black --:--:--");
+        return;
+    }
+
+    whiteRemaining = getRemainingTime(state, WHITE);
+    blackRemaining = getRemainingTime(state, BLACK);
+    format_timer_text(whiteText, "White", whiteRemaining);
+    format_timer_text(blackText, "Black", blackRemaining);
+    gtk_label_set_text(GTK_LABEL(gui->white_timer_label), whiteText);
+    gtk_label_set_text(GTK_LABEL(gui->black_timer_label), blackText);
 }
 
 void gui_display_turn(Gui *gui, Color turn) {
-    if (!GTK_IS_WIDGET(gui->turn_label) || !GTK_IS_LABEL(gui->turn_label)) return;
-    const char *text = (turn == WHITE) ? "White's Turn" : "Black's Turn";
+    const char *text;
+
+    if (gui == NULL || !GTK_IS_WIDGET(gui->turn_label) || !GTK_IS_LABEL(gui->turn_label)) {
+        return;
+    }
+
+    if (turn == WHITE) {
+        text = "White's Turn";
+    } else if (turn == BLACK) {
+        text = "Black's Turn";
+    } else {
+        text = "Waiting...";
+    }
+
     gtk_label_set_text(GTK_LABEL(gui->turn_label), text);
 }
 
-const char *get_piece_icon(Piece piece) {
-    if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) return NULL;
-    const char *white_icons[] = {
-        "gtk-dialog-info",      // ANT
-        "gtk-dialog-warning",   // ROOK
-        "gtk-dialog-question",  // KNIGHT
-        "gtk-dialog-error",     // BISHOP
-        "gtk-dialog-authentication", // QUEEN
-        "gtk-dialog-password",  // KING
-        "gtk-dialog-info"       // ANTEATER
-    };
-    const char *black_icons[] = {
-        "gtk-dialog-warning",   // ANT
-        "gtk-dialog-question",  // ROOK
-        "gtk-dialog-error",     // KNIGHT
-        "gtk-dialog-authentication", // BISHOP
-        "gtk-dialog-password",  // QUEEN
-        "gtk-dialog-info",      // KING
-        "gtk-dialog-warning"    // ANTEATER
-    };
-    int index = piece.type - ANT;
-    if (index < 0 || index >= 7) return NULL;
-    return piece.color == WHITE ? white_icons[index] : black_icons[index];
+static gboolean on_sync_tick(gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    if (gui == NULL || gui->should_quit) {
+        return G_SOURCE_REMOVE;
+    }
+
+    gui_sync_from_controller(gui);
+    if (gui->should_quit) {
+        gui->sync_source_id = 0;
+        return G_SOURCE_REMOVE;
+    }
+
+    return G_SOURCE_CONTINUE;
 }
 
-static void on_turn_timer_toggled(GtkToggleButton *toggle, gpointer user_data) {
-    GtkWidget **widgets = (GtkWidget **)user_data;
-    gboolean active = gtk_toggle_button_get_active(toggle);
-    for (int i = 0; i < 6; ++i) {  // 3 labels + 3 combos
-        if (active) {
-            gtk_widget_show(widgets[i]);
-        } else {
-            gtk_widget_hide(widgets[i]);
-        }
+static void on_window_destroy(GtkWidget *widget, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)widget;
+    if (gui == NULL) {
+        gtk_main_quit();
+        return;
     }
+
+    gui->should_quit = 1;
+    if (gui->sync_source_id != 0) {
+        g_source_remove(gui->sync_source_id);
+        gui->sync_source_id = 0;
+    }
+    gui->window = NULL;
+    gui_clear_view_refs(gui);
+    gtk_main_quit();
 }
+
+static void on_new_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)button;
+    if (controllerRequestNewGame(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    gui_sync_from_controller(gui);
+}
+
+static void on_quit_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)button;
+    if (!gui_confirm(gui, "Quit Game", "Are you sure you want to quit?")) {
+        return;
+    }
+
+    if (controllerRequestExit(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    gui_sync_from_controller(gui);
+}
+
+static void on_mode_selected(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+    GameMode mode = (GameMode) GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "game-mode"));
+
+    initGameConfigForMode(&gui->pendingConfig, mode);
+    if (controllerRequestNewGame(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    gui_sync_from_controller(gui);
+}
+
 static void on_back_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Back button clicked\n");
-    setBackButtonClicked(1);
-}
+    Gui *gui = (Gui *) user_data;
 
-static void on_side_selected(GtkToggleButton *button, gpointer user_data) {
-    if (gtk_toggle_button_get_active(button)) {
-        Color color = (Color)user_data;
-        GameConfig config;
-        getGameSetupConfig(&config);
-        setPlayerColor(color);
-        if (color == WHITE) {
-            // Human white, AI black, set AI difficulty to previous white
-            AIDifficulty ai_diff = config.aiDifficultyWhite;
-            if (ai_diff == DIFFICULTY_NONE) ai_diff = DIFFICULTY_EASY;
-            setAIDifficultyWhite(DIFFICULTY_NONE);
-            setAIDifficultyBlack(ai_diff);
-        } else {
-            // Human black, AI white, set AI difficulty to previous black
-            AIDifficulty ai_diff = config.aiDifficultyBlack;
-            if (ai_diff == DIFFICULTY_NONE) ai_diff = DIFFICULTY_EASY;
-            setAIDifficultyBlack(DIFFICULTY_NONE);
-            setAIDifficultyWhite(ai_diff);
-        }
+    (void)button;
+    if (controllerRequestBack(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
     }
-}
 
-static void on_difficulty_selected(GtkToggleButton *button, gpointer user_data) {
-    if (gtk_toggle_button_get_active(button)) {
-        AIDifficulty diff = (AIDifficulty)user_data;
-        GameConfig config;
-        getGameSetupConfig(&config);
-        if (config.mode == MODE_HUMAN_VS_COMPUTER) {
-            if (config.playerColor == WHITE) {
-                setAIDifficultyBlack(diff);
-                setAIDifficultyWhite(DIFFICULTY_NONE);
-            } else {
-                setAIDifficultyWhite(diff);
-                setAIDifficultyBlack(DIFFICULTY_NONE);
-            }
-        } else {
-            // computer vs computer
-            int which = (int)(long)g_object_get_data(G_OBJECT(button), "which");
-            if (which == 0) {
-                setAIDifficultyWhite(diff);
-            } else {
-                setAIDifficultyBlack(diff);
-            }
-        }
-    }
-}
-
-static void on_timer_toggled_config(GtkToggleButton *button, gpointer user_data) {
-    GtkSpinButton *minutes_spin = GTK_SPIN_BUTTON(user_data);
-    int active = gtk_toggle_button_get_active(button);
-    if (active) {
-        GameConfig config;
-        getGameSetupConfig(&config);
-        if (config.initialTimeSeconds == 0) {
-            setInitialTimeSeconds(60); // default to 1 minute
-            gtk_spin_button_set_value(minutes_spin, 1);
-        }
-        setTimerEnabled(1);
-    } else {
-        setTimerEnabled(0);
-    }
-}
-
-static void on_time_changed(GtkSpinButton *spin, gpointer user_data) {
-    // Assume user_data is the hours spin
-    GtkSpinButton *hours_spin = GTK_SPIN_BUTTON(user_data);
-    GtkSpinButton *minutes_spin = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(spin), "minutes"));
-    GtkSpinButton *seconds_spin = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(spin), "seconds"));
-    int hours = gtk_spin_button_get_value_as_int(hours_spin);
-    int minutes = gtk_spin_button_get_value_as_int(minutes_spin);
-    int seconds = gtk_spin_button_get_value_as_int(seconds_spin);
-    int total_seconds = hours * 3600 + minutes * 60 + seconds;
-    if (total_seconds == 0) {
-        total_seconds = 1;
-        gtk_spin_button_set_value(seconds_spin, 1);
-    }
-    setInitialTimeSeconds(total_seconds);
+    gui_sync_from_controller(gui);
 }
 
 static void on_start_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Start button clicked\n");
-    setStartPressed(1);
-}
-void setup_game_setup_menu_human_vs_human(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
-    }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+    Gui *gui = (Gui *) user_data;
+    GameConfig config;
+    ErrorCode errorCode;
 
-    // Content box for the setup options
-    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
-
-    GtkWidget *label = gtk_label_new("Human vs. Human");
-    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
-
-    // Turn timer toggle
-    GtkWidget *timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
-    gtk_widget_set_halign(timer_toggle, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), timer_toggle, FALSE, FALSE, 0);
-
-    // Timer settings box
-    GtkWidget *timer_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(timer_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), timer_box, FALSE, FALSE, 0);
-
-    // Hours spin
-    GtkWidget *hours_label = gtk_label_new("Hours:");
-    GtkWidget *hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
-    gtk_widget_set_size_request(hours_spin, 50, -1);
-
-    // Minutes spin
-    GtkWidget *minutes_label = gtk_label_new("Minutes:");
-    GtkWidget *minutes_spin = gtk_spin_button_new_with_range(0, 59, 1);
-    gtk_widget_set_size_request(minutes_spin, 50, -1);
-
-    // Seconds spin
-    GtkWidget *seconds_label = gtk_label_new("Seconds:");
-    GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
-    gtk_widget_set_size_request(seconds_spin, 50, -1);
-    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
-    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
-    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-
-    // Pack into timer_box
-    gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), hours_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), minutes_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), minutes_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), seconds_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), seconds_spin, FALSE, FALSE, 0);
-
-    // Array of widgets to show/hide
-    static GtkWidget *timer_widgets[6];
-    timer_widgets[0] = hours_label;
-    timer_widgets[1] = hours_spin;
-    timer_widgets[2] = minutes_label;
-    timer_widgets[3] = minutes_spin;
-    timer_widgets[4] = seconds_label;
-    timer_widgets[5] = seconds_spin;
-
-    // Initially hide
-    for (int i = 0; i < 6; ++i) {
-        gtk_widget_hide(timer_widgets[i]);
+    (void)button;
+    if (collect_setup_config(gui, &config, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
+        return;
     }
 
-    // Connect signal
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), minutes_spin);
-
-    // Add buttons at the bottom
-    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
-
-    GtkWidget *back_button = gtk_button_new_with_label("Back");
-    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
-
-    GtkWidget *start_button = gtk_button_new_with_label("Start");
-    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
-
-    // Connect signals for buttons
-    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
-    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
-
-    gtk_widget_show_all(gui->main_box);
-    // Re-hide the timer widgets since show_all showed them
-    for (int i = 0; i < 6; ++i) {
-        gtk_widget_hide(timer_widgets[i]);
+    if (controllerStartConfiguredGame(&gui->controller, &config) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
     }
-    gtk_widget_show(gui->window);
+
+    gui->pendingConfig = config;
+    gui_sync_from_controller(gui);
 }
 
-void setup_game_setup_menu_human_vs_computer(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
-    }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+static void on_setup_timer_toggled(GtkToggleButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+    gboolean active;
+    int index;
 
-    // Content box for the setup options
-    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
-
-    GtkWidget *label = gtk_label_new("Human vs. Computer");
-    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
-
-    // Select Side
-    GtkWidget *side_label = gtk_label_new("Select Side");
-    gtk_widget_set_halign(side_label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), side_label, FALSE, FALSE, 0);
-
-    GtkWidget *side_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(side_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), side_box, FALSE, FALSE, 0);
-
-    GtkWidget *white_radio = gtk_radio_button_new_with_label(NULL, "White");
-    gtk_box_pack_start(GTK_BOX(side_box), white_radio, FALSE, FALSE, 0);
-
-    GtkWidget *black_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_radio), "Black");
-    gtk_box_pack_start(GTK_BOX(side_box), black_radio, FALSE, FALSE, 0);
-
-    g_signal_connect(white_radio, "toggled", G_CALLBACK(on_side_selected), (gpointer)WHITE);
-    g_signal_connect(black_radio, "toggled", G_CALLBACK(on_side_selected), (gpointer)BLACK);
-
-    // Select Difficulty
-    GtkWidget *diff_label = gtk_label_new("Select Difficulty");
-    gtk_widget_set_halign(diff_label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), diff_label, FALSE, FALSE, 0);
-
-    GtkWidget *diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(diff_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), diff_box, FALSE, FALSE, 0);
-
-    GtkWidget *easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
-    gtk_box_pack_start(GTK_BOX(diff_box), easy_radio, FALSE, FALSE, 0);
-
-    GtkWidget *medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(easy_radio), "Medium");
-    gtk_box_pack_start(GTK_BOX(diff_box), medium_radio, FALSE, FALSE, 0);
-
-    GtkWidget *hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(easy_radio), "Hard");
-    gtk_box_pack_start(GTK_BOX(diff_box), hard_radio, FALSE, FALSE, 0);
-
-    g_object_set_data(G_OBJECT(easy_radio), "which", (gpointer)1);
-    g_object_set_data(G_OBJECT(medium_radio), "which", (gpointer)1);
-    g_object_set_data(G_OBJECT(hard_radio), "which", (gpointer)1);
-    g_signal_connect(easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
-    g_signal_connect(medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
-    g_signal_connect(hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
-
-    // Turn timer toggle
-    GtkWidget *timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
-    gtk_widget_set_halign(timer_toggle, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), timer_toggle, FALSE, FALSE, 0);
-
-    // Timer settings box
-    GtkWidget *timer_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(timer_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), timer_box, FALSE, FALSE, 0);
-
-    // Hours spin
-    GtkWidget *hours_label = gtk_label_new("Hours:");
-    GtkWidget *hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
-    gtk_widget_set_size_request(hours_spin, 50, -1);
-
-    // Minutes spin
-    GtkWidget *minutes_label = gtk_label_new("Minutes:");
-    GtkWidget *minutes_spin = gtk_spin_button_new_with_range(0, 59, 1);
-    gtk_widget_set_size_request(minutes_spin, 50, -1);
-
-    // Seconds spin
-    GtkWidget *seconds_label = gtk_label_new("Seconds:");
-    GtkWidget *seconds_spin = gtk_spin_button_new_with_range(0, 59, 1);
-    gtk_widget_set_size_request(seconds_spin, 50, -1);
-    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
-    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(hours_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(minutes_spin), "seconds", seconds_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "minutes", minutes_spin);
-    g_object_set_data(G_OBJECT(seconds_spin), "seconds", seconds_spin);
-    g_signal_connect(hours_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(minutes_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-    g_signal_connect(seconds_spin, "value-changed", G_CALLBACK(on_time_changed), hours_spin);
-
-    // Pack into timer_box
-    gtk_box_pack_start(GTK_BOX(timer_box), hours_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), hours_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), minutes_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), minutes_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), seconds_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timer_box), seconds_spin, FALSE, FALSE, 0);
-
-    // Array of widgets to show/hide
-    static GtkWidget *timer_widgets[6];
-    timer_widgets[0] = hours_label;
-    timer_widgets[1] = hours_spin;
-    timer_widgets[2] = minutes_label;
-    timer_widgets[3] = minutes_spin;
-    timer_widgets[4] = seconds_label;
-    timer_widgets[5] = seconds_spin;
-
-    // Initially hide
-    for (int i = 0; i < 6; ++i) {
-        gtk_widget_hide(timer_widgets[i]);
+    (void)button;
+    if (gui == NULL) {
+        return;
     }
 
-    // Connect signal
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_turn_timer_toggled), timer_widgets);
-    g_signal_connect(timer_toggle, "toggled", G_CALLBACK(on_timer_toggled_config), minutes_spin);
+    active = GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)
+        ? gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle))
+        : FALSE;
 
-    // Add buttons at the bottom
-    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
+    for (index = 0; index < 6; ++index) {
+        if (!GTK_IS_WIDGET(gui->setup_timer_widgets[index])) {
+            continue;
+        }
 
-    GtkWidget *back_button = gtk_button_new_with_label("Back");
-    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
-
-    GtkWidget *start_button = gtk_button_new_with_label("Start");
-    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
-
-    // Connect signals for buttons
-    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
-    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
-
-    gtk_widget_show_all(gui->main_box);
-    // Re-hide the timer widgets since show_all showed them
-    for (int i = 0; i < 6; ++i) {
-        gtk_widget_hide(timer_widgets[i]);
+        if (active) {
+            gtk_widget_show(gui->setup_timer_widgets[index]);
+        } else {
+            gtk_widget_hide(gui->setup_timer_widgets[index]);
+        }
     }
-    gtk_widget_show(gui->window);
 }
 
-void setup_game_setup_menu_computer_vs_computer(Gui *gui) {
-    if (!GTK_IS_WIDGET(gui->window)) return;
-    if (gui->main_box) {
-        gtk_widget_destroy(gui->main_box);
-        gui->main_box = NULL;
+static void on_submit_move_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+    const GameState *state;
+    const char *fromText;
+    const char *toText;
+    Command command;
+
+    (void)button;
+    if (gui == NULL || !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
     }
-    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(gui->main_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(gui->main_box, GTK_ALIGN_FILL);
-    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
 
-    // Content box for the setup options
-    GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
-    gtk_widget_set_halign(content_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(content_box, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), content_box, TRUE, TRUE, 0);
+    state = controllerGetState(&gui->controller);
+    if (state == NULL || state->systemState != GAMEPLAY_STATE) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
 
-    GtkWidget *label = gtk_label_new("Computer vs. Computer");
-    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
+    if (current_turn_is_ai(state)) {
+        gui_set_error(gui, ERR_NOT_YOUR_TURN);
+        return;
+    }
 
-    // White AI Difficulty
-    GtkWidget *white_diff_label = gtk_label_new("White AI Difficulty");
-    gtk_widget_set_halign(white_diff_label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), white_diff_label, FALSE, FALSE, 0);
+    fromText = gtk_entry_get_text(GTK_ENTRY(gui->from_entry));
+    toText = gtk_entry_get_text(GTK_ENTRY(gui->to_entry));
+    if (parseMoveCommand(fromText, toText, &command) != 0) {
+        gui_set_error(gui, ERR_INVALID_MOVE_FORMAT);
+        return;
+    }
 
-    GtkWidget *white_diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(white_diff_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), white_diff_box, FALSE, FALSE, 0);
+    if (controllerSubmitMove(&gui->controller, command) != 0) {
+        gui_set_error(gui, ERR_ILLEGAL_MOVE);
+        return;
+    }
 
-    GtkWidget *white_easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
-    gtk_box_pack_start(GTK_BOX(white_diff_box), white_easy_radio, FALSE, FALSE, 0);
+    gtk_entry_set_text(GTK_ENTRY(gui->from_entry), "");
+    gtk_entry_set_text(GTK_ENTRY(gui->to_entry), "");
+    gui_set_status_text(gui, "");
+    gui_sync_from_controller(gui);
+}
 
-    GtkWidget *white_medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_easy_radio), "Medium");
-    gtk_box_pack_start(GTK_BOX(white_diff_box), white_medium_radio, FALSE, FALSE, 0);
+static void on_undo_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
 
-    GtkWidget *white_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(white_easy_radio), "Hard");
-    gtk_box_pack_start(GTK_BOX(white_diff_box), white_hard_radio, FALSE, FALSE, 0);
+    (void)button;
+    if (controllerRequestUndo(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_UNDO_UNAVAILABLE);
+        return;
+    }
 
-    g_object_set_data(G_OBJECT(white_easy_radio), "which", (gpointer)0);
-    g_object_set_data(G_OBJECT(white_medium_radio), "which", (gpointer)0);
-    g_object_set_data(G_OBJECT(white_hard_radio), "which", (gpointer)0);
-    g_signal_connect(white_easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
-    g_signal_connect(white_medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
-    g_signal_connect(white_hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
+    gui_set_status_text(gui, "");
+    gui_sync_from_controller(gui);
+}
 
-    // Black AI Difficulty
-    GtkWidget *black_diff_label = gtk_label_new("Black AI Difficulty");
-    gtk_widget_set_halign(black_diff_label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), black_diff_label, FALSE, FALSE, 0);
+static void on_hint_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+    Move move;
+    char hintText[64];
 
-    GtkWidget *black_diff_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(black_diff_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(content_box), black_diff_box, FALSE, FALSE, 0);
+    (void)button;
+    if (controllerGetHint(&gui->controller, &move) != 0) {
+        gui_set_error(gui, ERR_HINT_UNAVAILABLE);
+        return;
+    }
 
-    GtkWidget *black_easy_radio = gtk_radio_button_new_with_label(NULL, "Easy");
-    gtk_box_pack_start(GTK_BOX(black_diff_box), black_easy_radio, FALSE, FALSE, 0);
+    format_hint_text(move, hintText);
+    gui_set_status_text(gui, hintText);
+}
 
-    GtkWidget *black_medium_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(black_easy_radio), "Medium");
-    gtk_box_pack_start(GTK_BOX(black_diff_box), black_medium_radio, FALSE, FALSE, 0);
+static void on_leave_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
 
-    GtkWidget *black_hard_radio = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(black_easy_radio), "Hard");
-    gtk_box_pack_start(GTK_BOX(black_diff_box), black_hard_radio, FALSE, FALSE, 0);
+    (void)button;
+    if (controllerRequestLeaveGame(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
 
-    g_object_set_data(G_OBJECT(black_easy_radio), "which", (gpointer)1);
-    g_object_set_data(G_OBJECT(black_medium_radio), "which", (gpointer)1);
-    g_object_set_data(G_OBJECT(black_hard_radio), "which", (gpointer)1);
-    g_signal_connect(black_easy_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_EASY);
-    g_signal_connect(black_medium_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_MEDIUM);
-    g_signal_connect(black_hard_radio, "toggled", G_CALLBACK(on_difficulty_selected), (gpointer)DIFFICULTY_HARD);
+    gui_sync_from_controller(gui);
+}
 
-    // Add buttons at the bottom
-    GtkWidget *button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(button_box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), button_box, FALSE, FALSE, 0);
+static void on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
 
-    GtkWidget *back_button = gtk_button_new_with_label("Back");
-    gtk_box_pack_start(GTK_BOX(button_box), back_button, FALSE, FALSE, 0);
+    (void)button;
+    if (controllerRequestNewGame(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
 
-    GtkWidget *start_button = gtk_button_new_with_label("Start");
-    gtk_box_pack_start(GTK_BOX(button_box), start_button, FALSE, FALSE, 0);
+    gui_sync_from_controller(gui);
+}
 
-    // Connect signals for buttons
-    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), gui);
-    g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_clicked), gui);
+static void on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
 
-    gtk_widget_show_all(gui->main_box);
-    gtk_widget_show(gui->window);
+    (void)button;
+    if (controllerRequestBack(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    gui_sync_from_controller(gui);
+}
+
+static void on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)button;
+    if (controllerRequestExit(&gui->controller) != 0) {
+        gui_set_error(gui, ERR_FATAL);
+        return;
+    }
+
+    gui_sync_from_controller(gui);
 }

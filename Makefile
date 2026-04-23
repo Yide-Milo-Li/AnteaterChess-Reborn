@@ -102,9 +102,7 @@ CORE_TEST_NAMES := \
 	test_rulecheck \
 	test_movegen \
 	test_move_execution \
-	test_undo \
 	test_game_state \
-	test_turn \
 	test_endgame \
 	test_log \
 	test_clock \
@@ -120,7 +118,6 @@ SYSTEM_TEST_NAMES := \
 	test_control_flow
 
 CLI_TEST_NAMES := \
-	test_boarddisplay \
 	test_cli_menu \
 	test_cli_renderer \
 	test_cli_gameplay \

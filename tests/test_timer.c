@@ -43,6 +43,55 @@ static GameState create_timer_state(int timerEnabled, int initialTimeSeconds) {
     return state;
 }
 
+/* Verify basic turn helpers still toggle and report the active side. */
+static void test_turn_helpers_report_expected_active_side(void) {
+    GameState state = create_timer_state(0, 0);
+
+    assert(getCurrentTurn(&state) == WHITE);
+    assert(isPlayerTurn(&state, WHITE) == 1);
+    assert(isPlayerTurn(&state, BLACK) == 0);
+
+    assert(switchTurn(&state) == 0);
+    assert(getCurrentTurn(&state) == BLACK);
+    assert(isPlayerTurn(&state, WHITE) == 0);
+    assert(isPlayerTurn(&state, BLACK) == 1);
+
+    assert(switchTurn(&state) == 0);
+    assert(getCurrentTurn(&state) == WHITE);
+}
+
+/* Verify invalid turn state inputs fail cleanly, including undo turn rebuild. */
+static void test_turn_helpers_reject_invalid_state(void) {
+    GameState state = create_timer_state(0, 0);
+    Move whiteMove;
+    Move blackMove;
+
+    state.currentTurn = EMPTY_COLOR;
+    assert(switchTurn(NULL) == 1);
+    assert(switchTurn(&state) == 1);
+    assert(getCurrentTurn(NULL) == EMPTY_COLOR);
+    assert(getCurrentTurn(&state) == EMPTY_COLOR);
+    assert(isPlayerTurn(NULL, WHITE) == 0);
+    assert(isPlayerTurn(&state, EMPTY_COLOR) == 0);
+
+    state.currentTurn = BLACK;
+    assert(restoreTurnAfterUndo(&state) == 0);
+    assert(state.currentTurn == WHITE);
+
+    whiteMove = createMove(createPosition(6, 4), createPosition(5, 4), createPiece(ANT, WHITE));
+    blackMove = createMove(createPosition(1, 4), createPosition(2, 4), createPiece(ANT, BLACK));
+
+    assert(addMoveToHistory(&state, whiteMove) == 0);
+    state.currentTurn = WHITE;
+    assert(restoreTurnAfterUndo(&state) == 0);
+    assert(state.currentTurn == BLACK);
+
+    assert(addMoveToHistory(&state, blackMove) == 0);
+    state.currentTurn = BLACK;
+    assert(restoreTurnAfterUndo(&state) == 0);
+    assert(state.currentTurn == WHITE);
+}
+
 /* Verify initialization and countdown for the active player only. */
 static void test_turn_timer_counts_down_only_for_active_player(void) {
     GameState state = create_timer_state(1, 2);
@@ -112,6 +161,8 @@ static void test_turn_timer_disable_and_expiration_paths(void) {
 
 /* Run the per-turn timer regression suite. */
 int main(void) {
+    test_turn_helpers_report_expected_active_side();
+    test_turn_helpers_reject_invalid_state();
     test_turn_timer_counts_down_only_for_active_player();
     test_turn_timer_resets_after_switch_and_undo();
     test_turn_timer_disable_and_expiration_paths();

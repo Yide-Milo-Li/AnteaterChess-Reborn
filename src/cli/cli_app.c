@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stddef.h>
 
-#include "ai/ai.h"
 #include "cli/cli_feedback.h"
 #include "cli/cli_gameplay.h"
 #include "cli/cli_menu.h"
@@ -270,10 +269,10 @@ static int collect_main_menu_event(Controller *controller) {
     }
 
     if (selection == 1) {
-        return controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME));
+        return controllerRequestNewGame(controller);
     }
 
-    return controllerEnqueueEvent(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
+    return controllerRequestExit(controller);
 }
 
 /* Collect the next game-mode event for the CLI frontend. */
@@ -286,21 +285,18 @@ static int collect_mode_selection_event(Controller *controller, GameConfig *pend
 
     switch (selection) {
         case 1:
-            initDefaultGameConfig(pendingConfig);
-            pendingConfig->mode = MODE_HUMAN_VS_HUMAN;
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_HUMAN_VS_HUMAN);
+            return controllerRequestNewGame(controller);
         case 2:
-            initDefaultGameConfig(pendingConfig);
-            pendingConfig->mode = MODE_HUMAN_VS_COMPUTER;
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_HUMAN_VS_COMPUTER);
+            return controllerRequestNewGame(controller);
         case 3:
-            initDefaultGameConfig(pendingConfig);
-            pendingConfig->mode = MODE_COMPUTER_VS_COMPUTER;
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME));
+            initGameConfigForMode(pendingConfig, MODE_COMPUTER_VS_COMPUTER);
+            return controllerRequestNewGame(controller);
         case 4:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_BACK));
+            return controllerRequestBack(controller);
         case 5:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
+            return controllerRequestExit(controller);
         default:
             return 1;
     }
@@ -393,14 +389,37 @@ static int collect_gameplay_event(Controller *controller) {
                     continue;
                 }
 
+                /* Keep move input as a low-level event so the outer CLI tick can
+                 * print the exact processed move, timeout, or error event. */
                 return controllerEnqueueEvent(controller, createMoveInputEvent(command));
             }
         case 2:
-            return controllerEnqueueEvent(controller, createUndoEvent());
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            if (controllerRequestUndo(controller) != 0) {
+                cliShowErrorMessage(ERR_UNDO_UNAVAILABLE);
+            }
+            return 0;
         case 3:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_LEAVE_GAME));
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            return controllerRequestLeaveGame(controller);
         case 4:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
+            return controllerRequestExit(controller);
         case 5:
             if (enqueue_timer_expiry_if_needed(controller) != 0) {
                 return 1;
@@ -412,7 +431,7 @@ static int collect_gameplay_event(Controller *controller) {
             if (state == NULL) {
                 return 1;
             }
-            if (generateHintMove(state, &hintMove) != 0) {
+            if (controllerGetHint(controller, &hintMove) != 0) {
                 cliShowErrorMessage(ERR_HINT_UNAVAILABLE);
                 return 0;
             }
@@ -433,11 +452,11 @@ static int collect_endgame_event(const GameState *state, Controller *controller)
 
     switch (selection) {
         case 1:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME));
+            return controllerRequestNewGame(controller);
         case 2:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_BACK));
+            return controllerRequestBack(controller);
         case 3:
-            return controllerEnqueueEvent(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
+            return controllerRequestExit(controller);
         default:
             return 1;
     }

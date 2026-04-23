@@ -16,7 +16,8 @@ static GameState fresh_state(void) {
     return state;
 }
 
-/* Check the normal forward path from boot to the end-game menu. */
+/* Check the compatibility FSM path from boot to the end-game menu. Controller
+ * is the preferred integration layer, but direct FSM entrypoints stay covered. */
 static void test_forward_state_progression(void) {
     GameState state = fresh_state();
 
@@ -71,10 +72,27 @@ static void test_timer_expiry_and_fatal_error_paths(void) {
     assert(state.systemState == EXIT_STATE);
 }
 
+/* Check that the legacy hint event remains rejected by FSM gameplay; hints are
+ * now exposed as controllerGetHint() read-only queries. */
+static void test_legacy_hint_event_is_rejected_in_gameplay(void) {
+    GameState state = fresh_state();
+
+    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+
+    assert(processEvent(&state, createSystemEvent(EVENT_HINT)) != 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+    assert(state.moveHistory.count == 0);
+}
+
 /* Run the Phase E FSM regression suite. */
 int main(void) {
     test_forward_state_progression();
     test_transition_validation();
     test_timer_expiry_and_fatal_error_paths();
+    test_legacy_hint_event_is_rejected_in_gameplay();
     return 0;
 }

@@ -246,7 +246,9 @@ static int handle_undo(GameState *state) {
     return rebuildLogFromHistory(state);
 }
 
-/* Handle gameplay-state events, including move application and timeouts. */
+/* Handle gameplay-state events, including move application and timeouts. The
+ * controller decides when a timeout event is emitted; the FSM decides how that
+ * event mutates gameplay state. */
 static int handle_gameplay_event(GameState *state, Event event) {
     if (state == NULL) {
         return 1;
@@ -269,6 +271,8 @@ static int handle_gameplay_event(GameState *state, Event event) {
             setGameOver(state);
             return transitionState(state, GAME_TERMINATION_STATE);
         case EVENT_HINT:
+            /* Hints are a read-only controller query. This legacy event remains
+             * rejected so gameplay state cannot be changed by a hint request. */
             return 1;
         case EVENT_EXIT_PROGRAM:
             return transitionState(state, EXIT_STATE);
@@ -277,8 +281,69 @@ static int handle_gameplay_event(GameState *state, Event event) {
     }
 }
 
-/* Advance a termination state into the end-game menu after final logging. */
-static int handle_game_termination(GameState *state) {
+/* EVENT_NONE is the compatibility payload normally used to advance out of INIT. */
+static int handle_init_state(GameState *state, Event event) {
+    (void)event;
+    return transitionState(state, MAIN_MENU_STATE);
+}
+
+/* Handle only main-menu events. Event polling and queue priority live in the controller. */
+static int handle_main_menu_event(GameState *state, Event event) {
+    switch (event.type) {
+        case EVENT_NEW_GAME:
+            return transitionState(state, GAME_MODE_SELECTION_STATE);
+        case EVENT_EXIT_PROGRAM:
+            return transitionState(state, EXIT_STATE);
+        default:
+            return 0;
+    }
+}
+
+/* Handle only game-mode selection events. */
+static int handle_game_mode_selection_event(GameState *state, Event event) {
+    switch (event.type) {
+        case EVENT_NEW_GAME:
+            return transitionState(state, GAME_SETUP_STATE);
+        case EVENT_BACK:
+            return transitionState(state, MAIN_MENU_STATE);
+        case EVENT_EXIT_PROGRAM:
+            return transitionState(state, EXIT_STATE);
+        default:
+            return 0;
+    }
+}
+
+/* Start gameplay from setup after initializing gameplay-only services. */
+static int handle_game_setup_event(GameState *state, Event event) {
+    switch (event.type) {
+        case EVENT_NEW_GAME:
+            if (initClock() != 0) {
+                return 1;
+            }
+            if (initTurnTimer(state) != 0) {
+                return 1;
+            }
+            if (initLog(&state->config) != 0) {
+                return 1;
+            }
+            if (logGameStart(&state->config) != 0) {
+                return 1;
+            }
+            return transitionState(state, GAMEPLAY_STATE);
+        case EVENT_BACK:
+            return transitionState(state, GAME_MODE_SELECTION_STATE);
+        case EVENT_EXIT_PROGRAM:
+            return transitionState(state, EXIT_STATE);
+        default:
+            return 0;
+    }
+}
+
+/* Advance a termination state into the end-game menu after final logging. The
+ * event payload is ignored for compatibility; controller normally sends EVENT_NONE. */
+static int handle_game_termination_event(GameState *state, Event event) {
+    (void)event;
+
     if (state == NULL) {
         return 1;
     }
@@ -287,6 +352,20 @@ static int handle_game_termination(GameState *state) {
      * in a narrow test harness path. */
     (void)logGameEnd(state);
     return transitionState(state, END_GAME_MENU_STATE);
+}
+
+/* Handle only end-game menu events. */
+static int handle_end_game_menu_event(GameState *state, Event event) {
+    switch (event.type) {
+        case EVENT_NEW_GAME:
+            return transitionState(state, GAME_MODE_SELECTION_STATE);
+        case EVENT_BACK:
+            return transitionState(state, MAIN_MENU_STATE);
+        case EVENT_EXIT_PROGRAM:
+            return transitionState(state, EXIT_STATE);
+        default:
+            return 0;
+    }
 }
 
 /* Process one event according to the current FSM state stored in GameState.
@@ -304,65 +383,19 @@ int processEvent(GameState *state, Event event) {
 
     switch (state->systemState) {
         case INIT_STATE:
-            return transitionState(state, MAIN_MENU_STATE);
+            return handle_init_state(state, event);
         case MAIN_MENU_STATE:
-            switch (event.type) {
-                case EVENT_NEW_GAME:
-                    return transitionState(state, GAME_MODE_SELECTION_STATE);
-                case EVENT_EXIT_PROGRAM:
-                    return transitionState(state, EXIT_STATE);
-                default:
-                    return 0;
-            }
+            return handle_main_menu_event(state, event);
         case GAME_MODE_SELECTION_STATE:
-            switch (event.type) {
-                case EVENT_NEW_GAME:
-                    return transitionState(state, GAME_SETUP_STATE);
-                case EVENT_BACK:
-                    return transitionState(state, MAIN_MENU_STATE);
-                case EVENT_EXIT_PROGRAM:
-                    return transitionState(state, EXIT_STATE);
-                default:
-                    return 0;
-            }
+            return handle_game_mode_selection_event(state, event);
         case GAME_SETUP_STATE:
-            switch (event.type) {
-                case EVENT_NEW_GAME:
-                    if (initClock() != 0) {
-                        return 1;
-                    }
-                    if (initTurnTimer(state) != 0) {
-                        return 1;
-                    }
-                    if (initLog(&state->config) != 0) {
-                        return 1;
-                    }
-                    if (logGameStart(&state->config) != 0) {
-                        return 1;
-                    }
-                    return transitionState(state, GAMEPLAY_STATE);
-                case EVENT_BACK:
-                    return transitionState(state, GAME_MODE_SELECTION_STATE);
-                case EVENT_EXIT_PROGRAM:
-                    return transitionState(state, EXIT_STATE);
-                default:
-                    return 0;
-            }
+            return handle_game_setup_event(state, event);
         case GAMEPLAY_STATE:
             return handle_gameplay_event(state, event);
         case GAME_TERMINATION_STATE:
-            return handle_game_termination(state);
+            return handle_game_termination_event(state, event);
         case END_GAME_MENU_STATE:
-            switch (event.type) {
-                case EVENT_NEW_GAME:
-                    return transitionState(state, GAME_MODE_SELECTION_STATE);
-                case EVENT_BACK:
-                    return transitionState(state, MAIN_MENU_STATE);
-                case EVENT_EXIT_PROGRAM:
-                    return transitionState(state, EXIT_STATE);
-                default:
-                    return 0;
-            }
+            return handle_end_game_menu_event(state, event);
         case EXIT_STATE:
             return 0;
         default:

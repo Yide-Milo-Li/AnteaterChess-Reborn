@@ -155,7 +155,29 @@ static void test_controller_start_configured_game_enters_gameplay(void) {
     assert(state->moveHistory.count == 0);
 }
 
-/* Check that the façade-style new-game request bootstraps INIT before
+/* Check that gameplay background work is controller-owned: run-until-idle
+ * schedules and applies the opening AI move after configured startup. */
+static void test_controller_run_until_idle_auto_plays_ai_turn(void) {
+    Controller controller;
+    GameConfig config;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.players[WHITE].type == AI);
+    assert(controller.state.moveHistory.count == 0);
+
+    assert(controllerRunUntilIdle(&controller) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
+}
+
+/* Check that the facade-style new-game request bootstraps INIT before
  * advancing to the next UI-facing menu. */
 static void test_controller_request_new_game_advances_to_mode_menu(void) {
     Controller controller = fresh_controller();
@@ -164,7 +186,7 @@ static void test_controller_request_new_game_advances_to_mode_menu(void) {
     assert(controller.state.systemState == GAME_MODE_SELECTION_STATE);
 }
 
-/* Check that the façade-style back request drains the transition to the main
+/* Check that the facade-style back request drains the transition to the main
  * menu. */
 static void test_controller_request_back_returns_to_main_menu(void) {
     Controller controller = fresh_controller();
@@ -174,7 +196,7 @@ static void test_controller_request_back_returns_to_main_menu(void) {
     assert(controller.state.systemState == MAIN_MENU_STATE);
 }
 
-/* Check that the façade-style exit request reaches EXIT without exposing queue
+/* Check that the facade-style exit request reaches EXIT without exposing queue
  * details to the caller. */
 static void test_controller_request_exit_reaches_exit_state(void) {
     Controller controller = fresh_controller();
@@ -183,7 +205,7 @@ static void test_controller_request_exit_reaches_exit_state(void) {
     assert(controller.state.systemState == EXIT_STATE);
 }
 
-/* Check that the façade move-submission helper applies one valid move and
+/* Check that the facade move-submission helper applies one valid move and
  * drains follow-up controller work. */
 static void test_controller_submit_move_applies_valid_move(void) {
     Controller controller;
@@ -202,7 +224,7 @@ static void test_controller_submit_move_applies_valid_move(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
-/* Check that the façade undo helper rewinds back to the previous human turn
+/* Check that the facade undo helper rewinds back to the previous human turn
  * and leaves the controller idle again. */
 static void test_controller_request_undo_restores_position(void) {
     Controller controller;
@@ -222,7 +244,7 @@ static void test_controller_request_undo_restores_position(void) {
     assert(controller.state.moveHistory.count == 0);
 }
 
-/* Check that the façade leave-game helper drains the termination handshake
+/* Check that the facade leave-game helper drains the termination handshake
  * into the end-game menu. */
 static void test_controller_request_leave_game_reaches_endgame_menu(void) {
     Controller controller;
@@ -237,7 +259,7 @@ static void test_controller_request_leave_game_reaches_endgame_menu(void) {
     assert(controller.state.result == RESULT_TERMINATED_BY_USER);
 }
 
-/* Check that the façade hint helper returns one legal move without mutating
+/* Check that the facade hint helper returns one legal move without mutating
  * controller-owned gameplay state. */
 static void test_controller_get_hint_returns_move_without_mutating_state(void) {
     Controller controller;
@@ -313,6 +335,7 @@ int main(void) {
     test_controller_run_until_idle_bootstraps_init_state();
     test_controller_run_until_idle_completes_termination_handshake();
     test_controller_start_configured_game_enters_gameplay();
+    test_controller_run_until_idle_auto_plays_ai_turn();
     test_controller_request_new_game_advances_to_mode_menu();
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();

@@ -90,9 +90,51 @@ static int enqueue_controller_event(Controller *controller, Event event) {
     return enqueueEvent(&controller->queue, event, queue_type_for_event(event.type));
 }
 
-/* Enqueue controller-synthesized work such as boot, termination, timers, and
- * AI turns. */
-static int seed_internal_events(Controller *controller) {
+/* Lifecycle advancement is the only controller path that synthesizes
+ * EVENT_NONE. It keeps INIT and termination compatibility out of frontend code. */
+static int seed_lifecycle_event(Controller *controller) {
+    GameState *state;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    state = &controller->state;
+    if (state->systemState != INIT_STATE && state->systemState != GAME_TERMINATION_STATE) {
+        return 0;
+    }
+
+    return enqueue_controller_event(controller, createSystemEvent(EVENT_NONE));
+}
+
+/* Timer checks belong to controller orchestration. The FSM only decides what
+ * EVENT_TIMER_EXPIRED means once this event reaches gameplay state. */
+static int seed_timer_expiry_if_needed(Controller *controller) {
+    GameState *state;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    state = &controller->state;
+    if (state->systemState != GAMEPLAY_STATE || !state->config.timerEnabled) {
+        return 0;
+    }
+
+    if (updateTurnTimer(state) != 0) {
+        return 1;
+    }
+
+    if (isTimeUp(state) == 1) {
+        return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
+    }
+
+    return 0;
+}
+
+/* AI scheduling is controller-owned background work. The selected move is still
+ * applied by the FSM after it receives EVENT_AI_MOVE. */
+static int seed_ai_turn_if_needed(Controller *controller) {
     GameState *state;
     Move move;
 
@@ -101,25 +143,7 @@ static int seed_internal_events(Controller *controller) {
     }
 
     state = &controller->state;
-    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
-        return enqueue_controller_event(controller, createSystemEvent(EVENT_NONE));
-    }
-
-    if (state->systemState != GAMEPLAY_STATE) {
-        return 0;
-    }
-
-    if (state->config.timerEnabled) {
-        if (updateTurnTimer(state) != 0) {
-            return 1;
-        }
-
-        if (isTimeUp(state) == 1) {
-            return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
-        }
-    }
-
-    if (!current_turn_is_ai(state)) {
+    if (state->systemState != GAMEPLAY_STATE || !current_turn_is_ai(state)) {
         return 0;
     }
 
@@ -127,23 +151,70 @@ static int seed_internal_events(Controller *controller) {
         return 1;
     }
 
-    if (state->config.timerEnabled) {
-        if (updateTurnTimer(state) != 0) {
-            return 1;
-        }
+    if (seed_timer_expiry_if_needed(controller) != 0) {
+        return 1;
+    }
 
-        if (isTimeUp(state) == 1) {
-            return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
-        }
+    if (!all_queues_empty(&controller->queue)) {
+        return 0;
     }
 
     return enqueue_controller_event(controller, createAIMoveEvent(move));
 }
 
-/* Settle one controller into the next stable user-facing state before an
- * external request runs, so INIT and termination handshakes do not swallow the
- * caller's intent event. */
-static int settle_for_external_request(Controller *controller) {
+/* Background work only covers gameplay timers and AI turns. It never performs
+ * lifecycle EVENT_NONE advancement. */
+static int seed_background_events(Controller *controller) {
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        return 0;
+    }
+
+    if (seed_timer_expiry_if_needed(controller) != 0) {
+        return 1;
+    }
+
+    if (!all_queues_empty(&controller->queue)) {
+        return 0;
+    }
+
+    return seed_ai_turn_if_needed(controller);
+}
+
+/* Seed exactly one category of controller-owned work when external queues are
+ * empty: lifecycle first, then gameplay background work. */
+static int seed_controller_owned_events(Controller *controller) {
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (seed_lifecycle_event(controller) != 0) {
+        return 1;
+    }
+
+    if (!all_queues_empty(&controller->queue)) {
+        return 0;
+    }
+
+    return seed_background_events(controller);
+}
+
+/* Dispatch one chosen event into the FSM. Queue selection and event synthesis
+ * have already happened before this point. */
+static int dispatch_controller_event(Controller *controller, Event event) {
+    if (controller == NULL) {
+        return 1;
+    }
+
+    return processEvent(&controller->state, event);
+}
+
+/* Bring the controller to a user-facing state before accepting a frontend
+ * intent, so lifecycle compatibility events do not consume that intent. */
+static int advance_lifecycle_before_external_request(Controller *controller) {
     if (controller == NULL) {
         return 1;
     }
@@ -159,7 +230,7 @@ static int settle_for_external_request(Controller *controller) {
 /* Apply one external request by routing it through the public queue policy and
  * draining follow-up controller work before returning to the caller. */
 static int apply_external_request(Controller *controller, Event event) {
-    if (settle_for_external_request(controller) != 0) {
+    if (advance_lifecycle_before_external_request(controller) != 0) {
         return 1;
     }
 
@@ -229,7 +300,7 @@ int controllerTick(Controller *controller, Event *processedEvent) {
     }
 
     if (all_queues_empty(&controller->queue)) {
-        if (seed_internal_events(controller) != 0) {
+        if (seed_controller_owned_events(controller) != 0) {
             return 1;
         }
 
@@ -243,7 +314,7 @@ int controllerTick(Controller *controller, Event *processedEvent) {
         *processedEvent = event;
     }
 
-    return processEvent(&controller->state, event);
+    return dispatch_controller_event(controller, event);
 }
 
 /* Drain queued and controller-synthesized work until the controller becomes
@@ -283,41 +354,80 @@ int controllerRunUntilIdle(Controller *controller) {
     return 0;
 }
 
-/* Rebuild a controller from configuration and drive only the setup-to-gameplay
- * bootstrap path, leaving the first gameplay tick to the caller. */
-int controllerStartConfiguredGame(Controller *controller, const GameConfig *config) {
+/* Process one explicit system event and verify that the FSM reached the
+ * expected menu state. This keeps the configured-start path readable while
+ * preserving the public menu graph. */
+static int drive_system_event_to_state(Controller *controller, EventType type, SystemState expectedState) {
     Event processedEvent;
 
     if (controller == NULL) {
         return 1;
     }
 
+    if (controllerEnqueueEvent(controller, createSystemEvent(type)) != 0
+        || controllerTick(controller, &processedEvent) != 0) {
+        return 1;
+    }
+
+    if (processedEvent.type != type) {
+        return 1;
+    }
+
+    return (controller->state.systemState == expectedState) ? 0 : 1;
+}
+
+/* Drive boot compatibility into the first visible menu. */
+static int drive_boot_to_main_menu(Controller *controller) {
+    Event processedEvent;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (controllerTick(controller, &processedEvent) != 0) {
+        return 1;
+    }
+
+    if (processedEvent.type != EVENT_NONE) {
+        return 1;
+    }
+
+    return (controller->state.systemState == MAIN_MENU_STATE) ? 0 : 1;
+}
+
+/* Drive the public menu path up to the setup screen without starting gameplay. */
+static int drive_to_configured_game_setup(Controller *controller) {
+    if (drive_boot_to_main_menu(controller) != 0) {
+        return 1;
+    }
+
+    if (drive_system_event_to_state(controller, EVENT_NEW_GAME, GAME_MODE_SELECTION_STATE) != 0) {
+        return 1;
+    }
+
+    return drive_system_event_to_state(controller, EVENT_NEW_GAME, GAME_SETUP_STATE);
+}
+
+/* Start gameplay from setup, leaving the first gameplay background tick to the
+ * caller so AI openings can still be observed as processed events. */
+static int drive_setup_to_gameplay(Controller *controller) {
+    return drive_system_event_to_state(controller, EVENT_NEW_GAME, GAMEPLAY_STATE);
+}
+
+/* Rebuild a controller from configuration and drive only the setup-to-gameplay
+ * bootstrap path, leaving the first gameplay tick to the caller. */
+int controllerStartConfiguredGame(Controller *controller, const GameConfig *config) {
+    if (controller == NULL) {
+        return 1;
+    }
+
     initController(controller, config);
 
-    if (controllerTick(controller, &processedEvent) != 0
-        || controller->state.systemState != MAIN_MENU_STATE) {
+    if (drive_to_configured_game_setup(controller) != 0) {
         return 1;
     }
 
-    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
-        || controllerTick(controller, &processedEvent) != 0
-        || controller->state.systemState != GAME_MODE_SELECTION_STATE) {
-        return 1;
-    }
-
-    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
-        || controllerTick(controller, &processedEvent) != 0
-        || controller->state.systemState != GAME_SETUP_STATE) {
-        return 1;
-    }
-
-    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
-        || controllerTick(controller, &processedEvent) != 0
-        || controller->state.systemState != GAMEPLAY_STATE) {
-        return 1;
-    }
-
-    return 0;
+    return drive_setup_to_gameplay(controller);
 }
 
 /* Advance one controller along the public "new game" flow until it next goes
@@ -345,7 +455,7 @@ int controllerSubmitMove(Controller *controller, Command command) {
         return 1;
     }
 
-    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
         return 1;
     }
 
@@ -363,7 +473,7 @@ int controllerSubmitMove(Controller *controller, Command command) {
 /* Request one undo and drain controller-owned follow-up work before the GUI
  * reads back state again. */
 int controllerRequestUndo(Controller *controller) {
-    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
         return 1;
     }
 
@@ -381,7 +491,7 @@ int controllerRequestUndo(Controller *controller) {
 /* Request user-triggered gameplay termination and drain the transition into
  * the next stable menu state. */
 int controllerRequestLeaveGame(Controller *controller) {
-    if (settle_for_external_request(controller) != 0 || controller == NULL) {
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
         return 1;
     }
 

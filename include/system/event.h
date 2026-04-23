@@ -16,7 +16,11 @@ typedef enum {
     EVENT_EXIT_PROGRAM,
     EVENT_ERROR,
     EVENT_FATAL_ERROR,
+    /* Compatibility-only as an event. New callers should request hints through
+     * controllerGetHint(), which is a read-only query rather than an FSM event. */
     EVENT_HINT,
+    /* Compatibility sentinel used by queues and controller-owned lifecycle
+     * advancement. New frontends should not submit this directly. */
     EVENT_NONE
 } EventType;
 

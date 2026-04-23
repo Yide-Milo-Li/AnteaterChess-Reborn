@@ -325,6 +325,88 @@ static void append_en_passant_moves(
     }
 }
 
+/* Anteater chain capture paths cannot revisit ants that were already eaten
+ * earlier in the same move. */
+static int move_already_captures_square(const Move *move, Position pos) {
+    int index;
+
+    if (move == NULL) {
+        return 0;
+    }
+
+    for (index = 0; index < move->captureCount; ++index) {
+        if (positionEqual(move->captures[index].pos, pos)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/* Anteater chains expose their full eaten route through path[] so explicit
+ * validation can distinguish different multi-capture choices. */
+static void finalize_anteater_capture_move(Move *move) {
+    int index;
+
+    if (move == NULL) {
+        return;
+    }
+
+    setSpecialMove(move, ANTEATER_CAPTURE);
+    move->pathLength = 0;
+    if (move->captureCount < 2) {
+        return;
+    }
+
+    for (index = 0; index < move->captureCount; ++index) {
+        addPathStep(move, move->captures[index].pos);
+    }
+}
+
+/* After the first adjacent ant is eaten, the anteater may continue by eating
+ * orthogonally adjacent ants, turning as needed, and stopping on any chosen
+ * prefix endpoint. */
+static void append_anteater_capture_paths(
+    const Board *board,
+    Position current,
+    Piece piece,
+    Move partialMove,
+    MoveList *list
+) {
+    static const int rowSteps[] = {-1, 1, 0, 0};
+    static const int colSteps[] = {0, 0, -1, 1};
+    int index;
+    Move emittedMove;
+
+    emittedMove = partialMove;
+    emittedMove.to = current;
+    finalize_anteater_capture_move(&emittedMove);
+    add_candidate_move(list, emittedMove);
+
+    if (partialMove.captureCount >= MAX_CHAIN) {
+        return;
+    }
+
+    for (index = 0; index < 4; ++index) {
+        Position next = createPosition(current.row + rowSteps[index], current.col + colSteps[index]);
+        Piece target;
+        Move extendedMove;
+
+        if (!position_is_reachable(next) || move_already_captures_square(&partialMove, next)) {
+            continue;
+        }
+
+        target = getPiece(board, next);
+        if (target.type != ANT || target.color == piece.color) {
+            continue;
+        }
+
+        extendedMove = partialMove;
+        addCapture(&extendedMove, next, target);
+        append_anteater_capture_paths(board, next, piece, extendedMove, list);
+    }
+}
+
 /* Sliding pieces all share the same scan pattern: stop at the first occupied
  * square and only keep the capture if that blocker belongs to the opponent. */
 static void scan_sliding_direction(
@@ -431,8 +513,8 @@ static void generate_ant_moves(
 }
 
 /* Anteaters can move one square in any direction, but they only capture ants.
- * The special chain capture is a straight orthogonal run through enemy ants,
- * and each longer prefix of that run is a valid destination. */
+ * A capture may start on any adjacent ant, then continue recursively through
+ * orthogonally adjacent ants, turning as needed, and stopping on any prefix. */
 static void generate_anteater_moves(
     const Board *board,
     Position from,
@@ -441,8 +523,6 @@ static void generate_anteater_moves(
 ) {
     static const int rowSteps[] = {-1, -1, -1, 0, 0, 1, 1, 1};
     static const int colSteps[] = {-1, 0, 1, -1, 1, -1, 0, 1};
-    static const int chainRowSteps[] = {-1, 1, 0, 0};
-    static const int chainColSteps[] = {0, 0, -1, 1};
     int index;
 
     for (index = 0; index < 8; ++index) {
@@ -466,42 +546,10 @@ static void generate_anteater_moves(
         }
 
         if (target.type == ANT && target.color != piece.color) {
-            addCapture(&move, to, target);
-            setSpecialMove(&move, ANTEATER_CAPTURE);
-            add_candidate_move(list, move);
-        }
-    }
+            Move captureMove = move;
 
-    for (index = 0; index < 4; ++index) {
-        Move chainMove;
-        Position current;
-        int captureCount;
-
-        current = createPosition(from.row + chainRowSteps[index], from.col + chainColSteps[index]);
-        chainMove = createMove(from, current, piece);
-        captureCount = 0;
-
-        while (position_is_reachable(current)) {
-            Piece target = getPiece(board, current);
-
-            if (target.type != ANT || target.color == piece.color) {
-                break;
-            }
-
-            addPathStep(&chainMove, current);
-            addCapture(&chainMove, current, target);
-            setSpecialMove(&chainMove, ANTEATER_CAPTURE);
-            ++captureCount;
-
-            /* Distance-one orthogonal captures are already covered by the
-             * standard one-step rule, so only longer chains are emitted here. */
-            if (captureCount >= 2) {
-                chainMove.to = current;
-                add_candidate_move(list, chainMove);
-            }
-
-            current.row += chainRowSteps[index];
-            current.col += chainColSteps[index];
+            addCapture(&captureMove, to, target);
+            append_anteater_capture_paths(board, to, piece, captureMove, list);
         }
     }
 }

@@ -180,6 +180,30 @@ static void test_validate_move_accepts_supported_special_moves(void) {
     assert(validateMove(&enPassantState, move) == 1);
 }
 
+/* Verify explicit anteater recursion metadata is accepted when it matches a
+ * generated legal turning chain exactly. */
+static void test_validate_move_accepts_recursive_anteater_capture(void) {
+    GameState state = create_test_state(WHITE);
+    Move move;
+
+    setPiece(&state.board, createPosition(4, 4), createPiece(ANTEATER, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(3, 6), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(4, 6), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(3, 7), createPiece(ANT, BLACK));
+
+    move = createMove(createPosition(4, 4), createPosition(4, 6),
+                      createPiece(ANTEATER, WHITE));
+    addCapture(&move, createPosition(3, 5), createPiece(ANT, BLACK));
+    addCapture(&move, createPosition(3, 6), createPiece(ANT, BLACK));
+    addCapture(&move, createPosition(4, 6), createPiece(ANT, BLACK));
+    addPathStep(&move, createPosition(3, 5));
+    addPathStep(&move, createPosition(3, 6));
+    addPathStep(&move, createPosition(4, 6));
+    setSpecialMove(&move, ANTEATER_CAPTURE);
+    assert(validateMove(&state, move) == 1);
+}
+
 /* Verify illegal special moves and mismatched metadata are rejected. */
 static void test_validate_move_rejects_illegal_special_moves(void) {
     GameState castlingState = create_test_state(WHITE);
@@ -212,6 +236,7 @@ int main(void) {
     test_validate_move_checks_explicit_capture_metadata();
     test_validate_move_rejects_self_check_positions();
     test_validate_move_accepts_supported_special_moves();
+    test_validate_move_accepts_recursive_anteater_capture();
     test_validate_move_rejects_illegal_special_moves();
     return 0;
 }

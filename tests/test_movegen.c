@@ -129,6 +129,54 @@ static void test_anteater_moves_and_chain_capture(void) {
     assert(positionEqual(chainCapture->path[1], createPosition(4, 6)) == 1);
 }
 
+/* Check that anteater capture chains may start diagonally, turn orthogonally,
+ * and stop on a chosen prefix instead of consuming every reachable branch. */
+static void test_anteater_recursive_turning_capture_paths(void) {
+    GameState state = create_test_state(WHITE);
+    MoveList list;
+    Move *singleCapture;
+    Move *intermediateCapture;
+    Move *turnedCapture;
+    Move *branchCapture;
+
+    setPiece(&state.board, createPosition(4, 4), createPiece(ANTEATER, WHITE));
+    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(3, 6), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(4, 6), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(3, 7), createPiece(ANT, BLACK));
+
+    assert(generateLegalMovesForPosition(&state, createPosition(4, 4), &list) == 0);
+
+    singleCapture = find_move(&list, createPosition(3, 5), ANTEATER_CAPTURE);
+    assert(singleCapture != NULL);
+    assert(singleCapture->captureCount == 1);
+    assert(singleCapture->pathLength == 0);
+
+    intermediateCapture = find_move(&list, createPosition(3, 6), ANTEATER_CAPTURE);
+    assert(intermediateCapture != NULL);
+    assert(intermediateCapture->captureCount == 2);
+    assert(intermediateCapture->pathLength == 2);
+    assert(positionEqual(intermediateCapture->path[0], createPosition(3, 5)) == 1);
+    assert(positionEqual(intermediateCapture->path[1], createPosition(3, 6)) == 1);
+
+    turnedCapture = find_move(&list, createPosition(4, 6), ANTEATER_CAPTURE);
+    assert(turnedCapture != NULL);
+    assert(turnedCapture->captureCount == 3);
+    assert(turnedCapture->pathLength == 3);
+    assert(positionEqual(turnedCapture->path[0], createPosition(3, 5)) == 1);
+    assert(positionEqual(turnedCapture->path[1], createPosition(3, 6)) == 1);
+    assert(positionEqual(turnedCapture->path[2], createPosition(4, 6)) == 1);
+    assert(positionEqual(turnedCapture->captures[2].pos, createPosition(4, 6)) == 1);
+
+    branchCapture = find_move(&list, createPosition(3, 7), ANTEATER_CAPTURE);
+    assert(branchCapture != NULL);
+    assert(branchCapture->captureCount == 3);
+    assert(branchCapture->pathLength == 3);
+    assert(positionEqual(branchCapture->path[0], createPosition(3, 5)) == 1);
+    assert(positionEqual(branchCapture->path[1], createPosition(3, 6)) == 1);
+    assert(positionEqual(branchCapture->path[2], createPosition(3, 7)) == 1);
+}
+
 /* Check that sliding pieces stop at the first blocker in each direction. */
 static void test_sliding_piece_blocking(void) {
     GameState state = create_test_state(WHITE);
@@ -360,6 +408,7 @@ int main(void) {
     test_generate_moves_only_for_current_turn();
     test_ant_moves_and_capture();
     test_anteater_moves_and_chain_capture();
+    test_anteater_recursive_turning_capture_paths();
     test_sliding_piece_blocking();
     test_bishop_and_queen_generation();
     test_knight_and_king_moves();

@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stddef.h>
+
 #include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
@@ -7,23 +8,32 @@
 #include "core/movelist.h"
 #include "core/piece.h"
 #include "input/command.h"
+#include "system/controller.h"
 #include "system/event.h"
-#include "system/fsm.h"
 #include "system/system_state.h"
 
-/* Build a fresh gameplay-ready state through the public FSM setup path. */
-static GameState fresh_gameplay_state(void) {
+/* Build a fresh gameplay-ready controller through the public controller
+ * startup path. */
+static Controller fresh_gameplay_controller(void) {
+    Controller controller;
     GameConfig config;
-    GameState state;
 
     initDefaultGameConfig(&config);
-    initGameState(&state, &config);
-    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
-    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
-    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
-    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
-    assert(state.systemState == GAMEPLAY_STATE);
-    return state;
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    return controller;
+}
+
+/* Enqueue one external event and process exactly one controller tick. */
+static int enqueue_and_tick(Controller *controller, Event event) {
+    Event processedEvent;
+
+    assert(controller != NULL);
+    if (controllerEnqueueEvent(controller, event) != 0) {
+        return 1;
+    }
+
+    return controllerTick(controller, &processedEvent);
 }
 
 /* Prepare a minimal board where one white ant has exactly one simple forward
@@ -80,262 +90,263 @@ static void push_history_move(GameState *state, Move move) {
     ++state->moveCount;
 }
 
-/* Check that a valid move command is applied through the public FSM path. */
-static void test_process_event_applies_valid_move(void) {
-    GameState state = fresh_gameplay_state();
+/* Check that a valid move command is applied through the public controller
+ * path. */
+static void test_controller_applies_valid_move(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_simple_ant_position(&state);
+    seed_simple_ant_position(&controller.state);
     assert(createMoveCommand(&command, createPosition(6, 0),
                              createPosition(5, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
-    assert(state.currentTurn == BLACK);
-    assert(state.moveHistory.count == 1);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == ANT);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
 }
 
 /* Check that an illegal move command is rejected without mutating the board. */
-static void test_process_event_rejects_illegal_move(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_rejects_illegal_move(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_simple_ant_position(&state);
+    seed_simple_ant_position(&controller.state);
     assert(createMoveCommand(&command, createPosition(6, 0),
                              createPosition(6, 1)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) != 0);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(4, 0)).type == EMPTY_PIECE);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 0);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) != 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(4, 0)).type == EMPTY_PIECE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
 }
 
 /* Check that human-vs-human undo rewinds a single opening move back to the
  * initial position. */
-static void test_process_event_undo_restores_position(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_undo_restores_position(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_simple_ant_position(&state);
-    state.config.mode = MODE_HUMAN_VS_HUMAN;
+    seed_simple_ant_position(&controller.state);
+    controller.state.config.mode = MODE_HUMAN_VS_HUMAN;
     assert(createMoveCommand(&command, createPosition(6, 0),
                              createPosition(5, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
-    assert(processEvent(&state, createUndoEvent()) == 0);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 0);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(enqueue_and_tick(&controller, createUndoEvent()) == 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
 }
 
 /* Check that human-vs-human undo rewinds a full round instead of stopping
  * after only Black's latest move. */
-static void test_process_event_hvh_undo_rewinds_full_round(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_hvh_undo_rewinds_full_round(void) {
+    Controller controller = fresh_gameplay_controller();
     Command whiteCommand;
     Command blackCommand;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    state.config.mode = MODE_HUMAN_VS_HUMAN;
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    controller.state.config.mode = MODE_HUMAN_VS_HUMAN;
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
     assert(createMoveCommand(&whiteCommand, createPosition(6, 0),
         createPosition(5, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(whiteCommand)) == 0);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(whiteCommand)) == 0);
     assert(createMoveCommand(&blackCommand, createPosition(1, 0),
         createPosition(2, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(blackCommand)) == 0);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 2);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(blackCommand)) == 0);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 2);
 
-    assert(processEvent(&state, createUndoEvent()) == 0);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
-    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 0);
+    assert(enqueue_and_tick(&controller, createUndoEvent()) == 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&controller.state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(2, 0)).type == EMPTY_PIECE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
 }
 
 /* Check that human-vs-computer undo rewinds White games to the previous human
  * turn instead of stopping on the AI turn. */
-static void test_process_event_hvc_undo_returns_to_previous_white_human_turn(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_hvc_undo_returns_to_previous_white_human_turn(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
     Move aiMove;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    seed_human_vs_computer_players(&state, WHITE);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    seed_human_vs_computer_players(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
     assert(createMoveCommand(&command, createPosition(6, 0),
         createPosition(5, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
 
     aiMove = createMove(createPosition(1, 0), createPosition(2, 0), createPiece(ANT, BLACK));
-    assert(processEvent(&state, createAIMoveEvent(aiMove)) == 0);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 2);
+    assert(enqueue_and_tick(&controller, createAIMoveEvent(aiMove)) == 0);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 2);
 
-    assert(processEvent(&state, createUndoEvent()) == 0);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
-    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
-    assert(state.currentTurn == WHITE);
-    assert(state.moveHistory.count == 0);
+    assert(enqueue_and_tick(&controller, createUndoEvent()) == 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&controller.state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(2, 0)).type == EMPTY_PIECE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
 }
 
 /* Check that human-vs-computer undo rewinds Black games to the previous human
  * turn after White's opening AI move. */
-static void test_process_event_hvc_undo_returns_to_previous_black_human_turn(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_hvc_undo_returns_to_previous_black_human_turn(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
     Move aiOpeningMove;
     Move aiReplyMove;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    seed_human_vs_computer_players(&state, BLACK);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    seed_human_vs_computer_players(&controller.state, BLACK);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
     aiOpeningMove = createMove(createPosition(6, 0), createPosition(5, 0), createPiece(ANT, WHITE));
-    assert(processEvent(&state, createAIMoveEvent(aiOpeningMove)) == 0);
+    assert(enqueue_and_tick(&controller, createAIMoveEvent(aiOpeningMove)) == 0);
 
     assert(createMoveCommand(&command, createPosition(1, 0),
         createPosition(2, 0)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
 
     aiReplyMove = createMove(createPosition(5, 0), createPosition(4, 0), createPiece(ANT, WHITE));
-    assert(processEvent(&state, createAIMoveEvent(aiReplyMove)) == 0);
-    assert(state.currentTurn == BLACK);
-    assert(state.moveHistory.count == 3);
+    assert(enqueue_and_tick(&controller, createAIMoveEvent(aiReplyMove)) == 0);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 3);
 
-    assert(processEvent(&state, createUndoEvent()) == 0);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(4, 0)).type == EMPTY_PIECE);
-    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
-    assert(state.currentTurn == BLACK);
-    assert(state.moveHistory.count == 1);
+    assert(enqueue_and_tick(&controller, createUndoEvent()) == 0);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(4, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&controller.state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(2, 0)).type == EMPTY_PIECE);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
 }
 
 /* Check that Black cannot undo White's opening AI move before Black has taken
  * a turn. */
-static void test_process_event_hvc_black_opening_undo_unavailable(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_hvc_black_opening_undo_unavailable(void) {
+    Controller controller = fresh_gameplay_controller();
     Move aiOpeningMove;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    seed_human_vs_computer_players(&state, BLACK);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    seed_human_vs_computer_players(&controller.state, BLACK);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
     aiOpeningMove = createMove(createPosition(6, 0), createPosition(5, 0), createPiece(ANT, WHITE));
-    assert(processEvent(&state, createAIMoveEvent(aiOpeningMove)) == 0);
+    assert(enqueue_and_tick(&controller, createAIMoveEvent(aiOpeningMove)) == 0);
 
-    assert(processEvent(&state, createUndoEvent()) != 0);
-    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
-    assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
-    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
-    assert(state.currentTurn == BLACK);
-    assert(state.moveHistory.count == 1);
+    assert(enqueue_and_tick(&controller, createUndoEvent()) != 0);
+    assert(getPiece(&controller.state.board, createPosition(5, 0)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&controller.state.board, createPosition(1, 0)).type == ANT);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
 }
 
 /* Check that public move input auto-promotes to queen without changing the
  * command interface. */
-static void test_process_event_auto_promotes_to_queen(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_auto_promotes_to_queen(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    setPiece(&state.board, createPosition(1, 2), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(1, 2), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
 
     assert(createMoveCommand(&command, createPosition(1, 2),
         createPosition(0, 2)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
-    assert(getPiece(&state.board, createPosition(0, 2)).type == QUEEN);
-    assert(getPiece(&state.board, createPosition(0, 2)).color == WHITE);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).type == QUEEN);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
 }
 
 /* Check that castling resolves correctly from the existing from/to command
  * input format. */
-static void test_process_event_applies_castling(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_applies_castling(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
 
     assert(createMoveCommand(&command, createPosition(7, 5),
         createPosition(7, 7)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
-    assert(getPiece(&state.board, createPosition(7, 7)).type == KING);
-    assert(getPiece(&state.board, createPosition(7, 6)).type == ROOK);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&controller.state.board, createPosition(7, 7)).type == KING);
+    assert(getPiece(&controller.state.board, createPosition(7, 6)).type == ROOK);
 }
 
 /* Check that en passant resolves correctly from the existing from/to command
  * input format and latest move history. */
-static void test_process_event_applies_en_passant(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_applies_en_passant(void) {
+    Controller controller = fresh_gameplay_controller();
     Command command;
 
-    seed_empty_gameplay_position(&state, WHITE);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state.board, createPosition(3, 4), createPiece(ANT, WHITE));
-    setPiece(&state.board, createPosition(3, 5), createPiece(ANT, BLACK));
-    push_history_move(&state,
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(3, 4), createPiece(ANT, WHITE));
+    setPiece(&controller.state.board, createPosition(3, 5), createPiece(ANT, BLACK));
+    push_history_move(&controller.state,
         createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK)));
 
     assert(createMoveCommand(&command, createPosition(3, 4),
         createPosition(2, 5)) == 0);
-    assert(processEvent(&state, createMoveInputEvent(command)) == 0);
-    assert(getPiece(&state.board, createPosition(2, 5)).type == ANT);
-    assert(getPiece(&state.board, createPosition(3, 5)).type == EMPTY_PIECE);
+    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(getPiece(&controller.state.board, createPosition(2, 5)).type == ANT);
+    assert(getPiece(&controller.state.board, createPosition(3, 5)).type == EMPTY_PIECE);
 }
 
 /* Check that timer expiry skips the active turn and keeps gameplay running. */
-static void test_process_event_timer_expiry_passes_turn(void) {
-    GameState state = fresh_gameplay_state();
+static void test_controller_timer_expiry_passes_turn(void) {
+    Controller controller = fresh_gameplay_controller();
 
-    seed_empty_gameplay_position(&state, WHITE);
-    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
 
-    assert(processEvent(&state, createSystemEvent(EVENT_TIMER_EXPIRED)) == 0);
-    assert(state.systemState == GAMEPLAY_STATE);
-    assert(state.currentTurn == BLACK);
-    assert(state.result == RESULT_NONE);
-    assert(state.gameOver == 0);
+    assert(enqueue_and_tick(&controller, createSystemEvent(EVENT_TIMER_EXPIRED)) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.result == RESULT_NONE);
+    assert(controller.state.gameOver == 0);
 }
 
-/* Run the Phase E control-flow integration tests. */
+/* Run the control-flow integration tests through the public controller API. */
 int main(void) {
-    test_process_event_applies_valid_move();
-    test_process_event_rejects_illegal_move();
-    test_process_event_undo_restores_position();
-    test_process_event_hvh_undo_rewinds_full_round();
-    test_process_event_hvc_undo_returns_to_previous_white_human_turn();
-    test_process_event_hvc_undo_returns_to_previous_black_human_turn();
-    test_process_event_hvc_black_opening_undo_unavailable();
-    test_process_event_auto_promotes_to_queen();
-    test_process_event_applies_castling();
-    test_process_event_applies_en_passant();
-    test_process_event_timer_expiry_passes_turn();
+    test_controller_applies_valid_move();
+    test_controller_rejects_illegal_move();
+    test_controller_undo_restores_position();
+    test_controller_hvh_undo_rewinds_full_round();
+    test_controller_hvc_undo_returns_to_previous_white_human_turn();
+    test_controller_hvc_undo_returns_to_previous_black_human_turn();
+    test_controller_hvc_black_opening_undo_unavailable();
+    test_controller_auto_promotes_to_queen();
+    test_controller_applies_castling();
+    test_controller_applies_en_passant();
+    test_controller_timer_expiry_passes_turn();
     return 0;
 }

@@ -2,14 +2,16 @@
 
 #include <stddef.h>
 
-#include "system/event.h"
+#include "ai/ai.h"
 #include "system/fsm.h"
 #include "turn/turn_timer.h"
 
 /*
  * Alignment assumptions for future extensions:
- * - controller.h is the truth source for the public loop entrypoint.
- * - This file owns queue draining and priority ordering, not gameplay rule decisions.
+ * - controller.h is the preferred public integration layer for future UI work.
+ * - This file owns runtime orchestration concerns such as queue draining,
+ *   priority ordering, and controller-synthesized events.
+ * - Gameplay rule decisions and event semantics still belong to the FSM.
  * - Queue helpers that are not declared in headers remain private to the controller.
  */
 
@@ -42,7 +44,7 @@ static int all_queues_empty(const EventQueue *queue) {
         && isGameplayQueueEmpty(queue);
 }
 
-/* Remove the highest-priority available event from the local controller queue. */
+/* Remove the highest-priority available event from the controller queue. */
 static Event dequeue_next_event(EventQueue *queue) {
     if (!isControlQueueEmpty(queue)) {
         return dequeueControlEvent(queue);
@@ -55,60 +57,254 @@ static Event dequeue_next_event(EventQueue *queue) {
     return dequeueGameplayEvent(queue);
 }
 
-/* Enqueue controller-synthesized work such as boot and termination handshakes. */
-static int seed_internal_events(GameState *state, EventQueue *queue) {
-    Event event;
+/* Report whether the current side to move is AI-controlled. */
+static int current_turn_is_ai(const GameState *state) {
+    if (state == NULL || state->currentTurn < WHITE || state->currentTurn > BLACK) {
+        return 0;
+    }
 
-    if (state == NULL || queue == NULL) {
+    return state->players[state->currentTurn].type == AI;
+}
+
+/* Report whether an externally submitted gameplay event should still honor the
+ * active human turn timer before it enters the queue. */
+static int is_human_gameplay_input(EventType type) {
+    switch (type) {
+        case EVENT_MOVE_INPUT:
+        case EVENT_UNDO:
+        case EVENT_LEAVE_GAME:
+        case EVENT_EXIT_PROGRAM:
+        case EVENT_HINT:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+/* Enqueue one event using the controller's priority policy. */
+static int enqueue_controller_event(Controller *controller, Event event) {
+    if (controller == NULL) {
         return 1;
     }
 
-    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
-        event = createSystemEvent(EVENT_NONE);
-        return enqueueEvent(queue, event, queue_type_for_event(event.type));
+    return enqueueEvent(&controller->queue, event, queue_type_for_event(event.type));
+}
+
+/* Enqueue controller-synthesized work such as boot, termination, timers, and
+ * AI turns. */
+static int seed_internal_events(Controller *controller) {
+    GameState *state;
+    Move move;
+
+    if (controller == NULL) {
+        return 1;
     }
 
-    if (state->systemState == GAMEPLAY_STATE) {
+    state = &controller->state;
+    if (state->systemState == INIT_STATE || state->systemState == GAME_TERMINATION_STATE) {
+        return enqueue_controller_event(controller, createSystemEvent(EVENT_NONE));
+    }
+
+    if (state->systemState != GAMEPLAY_STATE) {
+        return 0;
+    }
+
+    if (state->config.timerEnabled) {
         if (updateTurnTimer(state) != 0) {
             return 1;
         }
 
         if (isTimeUp(state) == 1) {
-            event = createSystemEvent(EVENT_TIMER_EXPIRED);
-            return enqueueEvent(queue, event, queue_type_for_event(event.type));
+            return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
         }
+    }
+
+    if (!current_turn_is_ai(state)) {
+        return 0;
+    }
+
+    if (generateAIMove(state, &move) != 0) {
+        return 1;
+    }
+
+    if (state->config.timerEnabled) {
+        if (updateTurnTimer(state) != 0) {
+            return 1;
+        }
+
+        if (isTimeUp(state) == 1) {
+            return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
+        }
+    }
+
+    return enqueue_controller_event(controller, createAIMoveEvent(move));
+}
+
+/* Initialize one controller value with a fresh game state and an empty queue. */
+void initController(Controller *controller, const GameConfig *config) {
+    if (controller == NULL) {
+        return;
+    }
+
+    initGameState(&controller->state, config);
+    controller->queue = (EventQueue){0};
+}
+
+/* Return the read-only runtime state owned by one controller. */
+const GameState *controllerGetState(const Controller *controller) {
+    if (controller == NULL) {
+        return NULL;
+    }
+
+    return &controller->state;
+}
+
+/* Route one externally supplied event through the controller queue policy. */
+int controllerEnqueueEvent(Controller *controller, Event event) {
+    GameState *state;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    state = &controller->state;
+    if (state->systemState == GAMEPLAY_STATE
+        && state->config.timerEnabled
+        && !current_turn_is_ai(state)
+        && is_human_gameplay_input(event.type)) {
+        if (updateTurnTimer(state) != 0) {
+            return 1;
+        }
+
+        if (isTimeUp(state) == 1) {
+            return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
+        }
+    }
+
+    return enqueue_controller_event(controller, event);
+}
+
+/* Process at most one queued or controller-synthesized event. EVENT_NONE in
+ * processedEvent means either one compatibility no-op event was processed or
+ * the controller was already idle. */
+int controllerTick(Controller *controller, Event *processedEvent) {
+    Event event;
+
+    if (processedEvent != NULL) {
+        *processedEvent = createSystemEvent(EVENT_NONE);
+    }
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (all_queues_empty(&controller->queue)) {
+        if (seed_internal_events(controller) != 0) {
+            return 1;
+        }
+
+        if (all_queues_empty(&controller->queue)) {
+            return 0;
+        }
+    }
+
+    event = dequeue_next_event(&controller->queue);
+    if (processedEvent != NULL) {
+        *processedEvent = event;
+    }
+
+    return processEvent(&controller->state, event);
+}
+
+/* Drain queued and controller-synthesized work until the controller becomes
+ * idle. This helper never blocks for UI input. */
+int controllerRunUntilIdle(Controller *controller) {
+    Event processedEvent;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    for (;;) {
+        SystemState previousState;
+        int hadPendingEvents;
+
+        previousState = controller->state.systemState;
+        hadPendingEvents = !all_queues_empty(&controller->queue);
+        if (controllerTick(controller, &processedEvent) != 0) {
+            return 1;
+        }
+
+        if (processedEvent.type != EVENT_NONE) {
+            continue;
+        }
+
+        if (previousState != controller->state.systemState || hadPendingEvents) {
+            continue;
+        }
+
+        if (!all_queues_empty(&controller->queue)) {
+            continue;
+        }
+
+        break;
     }
 
     return 0;
 }
 
-/* Drain the available event work until the queue empties or a terminal condition is reached. */
+/* Rebuild a controller from configuration and drive only the setup-to-gameplay
+ * bootstrap path, leaving the first gameplay tick to the caller. */
+int controllerStartConfiguredGame(Controller *controller, const GameConfig *config) {
+    Event processedEvent;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    initController(controller, config);
+
+    if (controllerTick(controller, &processedEvent) != 0
+        || controller->state.systemState != MAIN_MENU_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
+        || controllerTick(controller, &processedEvent) != 0
+        || controller->state.systemState != GAME_MODE_SELECTION_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
+        || controllerTick(controller, &processedEvent) != 0
+        || controller->state.systemState != GAME_SETUP_STATE) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createSystemEvent(EVENT_NEW_GAME)) != 0
+        || controllerTick(controller, &processedEvent) != 0
+        || controller->state.systemState != GAMEPLAY_STATE) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Drive one legacy public runtime loop by copying state into a temporary
+ * controller, draining controller-owned work, then copying state back out. */
 int runGameLoop(GameState *state) {
-    EventQueue queue = {0};
+    Controller controller;
 
     if (state == NULL) {
         return 1;
     }
 
-    while (state->systemState != EXIT_STATE) {
-        if (all_queues_empty(&queue)) {
-            if (seed_internal_events(state, &queue) != 0) {
-                return 1;
-            }
-
-            if (all_queues_empty(&queue)) {
-                break;
-            }
-        }
-
-        if (processEvent(state, dequeue_next_event(&queue)) != 0) {
-            return 1;
-        }
-
-        if (state->gameOver && state->systemState == END_GAME_MENU_STATE) {
-            break;
-        }
+    controller.state = *state;
+    controller.queue = (EventQueue){0};
+    if (controllerRunUntilIdle(&controller) != 0) {
+        return 1;
     }
 
+    *state = controller.state;
     return 0;
 }

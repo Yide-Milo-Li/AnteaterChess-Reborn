@@ -13,8 +13,12 @@
 
 /*
  * Alignment assumptions for future extensions:
- * - fsm.h is the truth source for public FSM entrypoints and transition helpers.
- * - This file owns system-state transitions, not event polling or queue priority policy.
+ * - This file is the internal event/state execution engine behind the
+ *   controller-facing runtime layer.
+ * - fsm.h remains exported as a compatibility surface for existing tests and
+ *   temporary frontends, but future UI work should prefer controller.h.
+ * - This file owns system-state transitions and gameplay side effects, not
+ *   event polling or queue priority policy.
  * - Helpers that are not declared in headers stay private to the FSM implementation.
  */
 
@@ -285,7 +289,9 @@ static int handle_game_termination(GameState *state) {
     return transitionState(state, END_GAME_MENU_STATE);
 }
 
-/* Process one event according to the current FSM state stored in GameState. */
+/* Process one event according to the current FSM state stored in GameState.
+ * This remains callable for compatibility, but it is not the preferred
+ * long-term UI integration surface. */
 int processEvent(GameState *state, Event event) {
     if (state == NULL) {
         return 1;
@@ -364,7 +370,8 @@ int processEvent(GameState *state, Event event) {
     }
 }
 
-/* Attempt one explicit state transition if the FSM table allows it. */
+/* Attempt one explicit state transition if the FSM table allows it. This
+ * helper remains exported mainly for compatibility-oriented tests. */
 int transitionState(GameState *state, SystemState newState) {
     if (state == NULL) {
         return 1;

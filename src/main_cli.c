@@ -7,7 +7,8 @@
 /*
  * Alignment assumptions for future extensions:
  * - This file is the dedicated CLI entrypoint and must stay separate from any GUI launcher.
- * - The CLI runtime owns its own orchestration through runCliApp().
+ * - The CLI remains a temporary frontend, but runCliApp() now drives gameplay
+ *   through the public controller layer instead of calling the FSM directly.
  * - Future GUI work should add its own main source instead of modifying this entrypoint.
  */
 
@@ -29,7 +30,7 @@ static void initialize_cli_console(void) {
 #endif
 }
 
-/* Enter the standalone CLI application runtime. */
+/* Enter the temporary standalone CLI application runtime. */
 int main(void) {
     initialize_cli_console();
     return runCliApp();

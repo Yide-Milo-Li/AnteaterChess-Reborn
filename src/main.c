@@ -6,12 +6,15 @@
 
 /*
  * Alignment assumptions for future extensions:
- * - main only wires together public contracts and should not depend on controller internals.
+ * - main only wires together public contracts and should not depend on
+ *   controller or FSM internals.
+ * - The intended public stack is main -> controller -> fsm.
  * - controller.h is the truth source for the system loop entrypoint.
  * - Initial system state comes from GameState initialization, not hidden FSM globals.
  */
 
-/* Boot one default game state and hand control to the public controller loop. */
+/* Boot one default game state and hand control to the public controller loop,
+ * which in turn drives the FSM. */
 int main(void) {
     GameConfig config;
     GameState state;

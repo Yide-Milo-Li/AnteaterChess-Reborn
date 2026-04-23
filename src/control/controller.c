@@ -3,6 +3,8 @@
 #include <stddef.h>
 
 #include "ai/ai.h"
+#include "gameplay/move_resolver.h"
+#include "input/move_request.h"
 #include "system/fsm.h"
 #include "turn/turn_timer.h"
 
@@ -28,6 +30,7 @@ static QueueType queue_type_for_event(EventType type) {
         case EVENT_TIMER_EXPIRED:
             return QUEUE_SYSTEM;
         case EVENT_MOVE_INPUT:
+        case EVENT_PLAYER_MOVE:
         case EVENT_AI_MOVE:
         case EVENT_UNDO:
         case EVENT_HINT:
@@ -71,6 +74,7 @@ static int current_turn_is_ai(const GameState *state) {
 static int is_human_gameplay_input(EventType type) {
     switch (type) {
         case EVENT_MOVE_INPUT:
+        case EVENT_PLAYER_MOVE:
         case EVENT_UNDO:
         case EVENT_LEAVE_GAME:
         case EVENT_EXIT_PROGRAM:
@@ -88,6 +92,32 @@ static int enqueue_controller_event(Controller *controller, Event event) {
     }
 
     return enqueueEvent(&controller->queue, event, queue_type_for_event(event.type));
+}
+
+/* Resolve one frontend move request before it reaches the FSM. */
+static int enqueue_move_request(Controller *controller, MoveRequest request) {
+    Move resolvedMove;
+
+    if (controller == NULL) {
+        return 1;
+    }
+
+    if (resolveMoveRequest(&controller->state, request, &resolvedMove) != 0) {
+        return 1;
+    }
+
+    return enqueue_controller_event(controller, createPlayerMoveEvent(resolvedMove));
+}
+
+/* Keep legacy command events usable without making the FSM parse commands. */
+static int enqueue_legacy_move_input(Controller *controller, Command command) {
+    MoveRequest request;
+
+    if (createMoveRequestFromCommand(&request, command) != 0) {
+        return 1;
+    }
+
+    return enqueue_move_request(controller, request);
 }
 
 /* Lifecycle advancement is the only controller path that synthesizes
@@ -282,6 +312,10 @@ int controllerEnqueueEvent(Controller *controller, Event event) {
         }
     }
 
+    if (event.type == EVENT_MOVE_INPUT) {
+        return enqueue_legacy_move_input(controller, event.data.command);
+    }
+
     return enqueue_controller_event(controller, event);
 }
 
@@ -448,12 +482,10 @@ int controllerRequestExit(Controller *controller) {
     return apply_external_request(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
 }
 
-/* Submit one already parsed move command and drain controller-owned follow-up
+/* Submit one already parsed move request and drain controller-owned follow-up
  * work such as AI replies, timers, or termination transitions. */
-int controllerSubmitMove(Controller *controller, Command command) {
-    if (command.type != CMD_MOVE) {
-        return 1;
-    }
+int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
+    Move resolvedMove;
 
     if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
         return 1;
@@ -463,11 +495,27 @@ int controllerSubmitMove(Controller *controller, Command command) {
         return 1;
     }
 
-    if (controllerEnqueueEvent(controller, createMoveInputEvent(command)) != 0) {
+    if (resolveMoveRequest(&controller->state, request, &resolvedMove) != 0) {
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createPlayerMoveEvent(resolvedMove)) != 0) {
         return 1;
     }
 
     return controllerRunUntilIdle(controller);
+}
+
+/* Submit one legacy move command by converting it to the richer frontend move
+ * request format. */
+int controllerSubmitMove(Controller *controller, Command command) {
+    MoveRequest request;
+
+    if (createMoveRequestFromCommand(&request, command) != 0) {
+        return 1;
+    }
+
+    return controllerSubmitMoveRequest(controller, request);
 }
 
 /* Request one undo and drain controller-owned follow-up work before the GUI

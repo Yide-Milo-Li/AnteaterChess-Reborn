@@ -6,7 +6,9 @@
 #include "input/command.h"
 
 typedef enum {
+    /* Legacy command payload. Controller resolves it before FSM dispatch. */
     EVENT_MOVE_INPUT,
+    EVENT_PLAYER_MOVE,
     EVENT_AI_MOVE,
     EVENT_UNDO,
     EVENT_TIMER_EXPIRED,
@@ -34,6 +36,7 @@ typedef struct {
 } Event;
 
 Event createMoveInputEvent(Command cmd);
+Event createPlayerMoveEvent(Move move);
 Event createAIMoveEvent(Move move);
 Event createSystemEvent(EventType type);
 Event createUndoEvent(void);

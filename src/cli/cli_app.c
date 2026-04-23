@@ -10,9 +10,10 @@
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "core/board.h"
+#include "gameplay/move_resolver.h"
 #include "input/input.h"
+#include "input/move_request.h"
 #include "core/position.h"
-#include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 #include "system/controller.h"
 #include "system/event.h"
@@ -158,77 +159,19 @@ static void print_timeout_skip_message(Color expiredSide) {
  * error code. */
 static ErrorCode classify_move_error(const GameState *state, Command command);
 
-/* Promotion ambiguity is intentionally normalized to queen for the human CLI
- * because the public command interface still carries only from/to. */
-static int is_promotion_move(SpecialMove type) {
-    return type == PROMOTION_QUEEN
-        || type == PROMOTION_ROOK
-        || type == PROMOTION_BISHOP
-        || type == PROMOTION_KNIGHT;
-}
-
 /* Resolve one parsed CLI move command against the current legal move list. */
 static int resolve_cli_move_command(const GameState *state, Command command, Move *resolvedMove) {
-    MoveList candidates;
-    Piece movingPiece;
-    Move *promotionQueenCandidate;
-    int matchingCount;
-    int allMatchesArePromotions;
-    int index;
+    MoveRequest request;
 
     if (state == NULL || resolvedMove == NULL || command.type != CMD_MOVE) {
         return 1;
     }
 
-    if (validateSelection(state, command.from) != SELECT_VALID || !isValidPosition(command.to)) {
+    if (createMoveRequestFromCommand(&request, command) != 0) {
         return 1;
     }
 
-    movingPiece = getPiece(&state->board, command.from);
-    if (movingPiece.type == EMPTY_PIECE) {
-        return 1;
-    }
-
-    if (generateLegalMovesForPosition(state, command.from, &candidates) != 0) {
-        return 1;
-    }
-
-    promotionQueenCandidate = NULL;
-    matchingCount = 0;
-    allMatchesArePromotions = 1;
-    for (index = 0; index < getMoveCount(&candidates); ++index) {
-        Move *candidate = getMove(&candidates, index);
-
-        if (candidate == NULL
-            || !positionEqual(candidate->from, command.from)
-            || !positionEqual(candidate->to, command.to)
-            || candidate->movedPiece.type != movingPiece.type
-            || candidate->movedPiece.color != movingPiece.color) {
-            continue;
-        }
-
-        ++matchingCount;
-        if (candidate->specialType == PROMOTION_QUEEN) {
-            promotionQueenCandidate = candidate;
-        } else if (!is_promotion_move(candidate->specialType)) {
-            allMatchesArePromotions = 0;
-        }
-
-        if (matchingCount == 1) {
-            *resolvedMove = *candidate;
-        }
-    }
-
-    if (matchingCount == 1) {
-        return 0;
-    }
-
-    if (matchingCount > 1 && allMatchesArePromotions && promotionQueenCandidate != NULL) {
-        *resolvedMove = *promotionQueenCandidate;
-        return 0;
-    }
-
-    return 1;
+    return resolveMoveRequest(state, request, resolvedMove);
 }
 
 /* Print one concise CLI move summary for AI moves and hint suggestions. */
@@ -529,6 +472,11 @@ static int collect_next_cli_event(Controller *controller, GameConfig *pendingCon
 static void report_processing_error(const GameState *state, Event event) {
     if (event.type == EVENT_MOVE_INPUT) {
         cliShowErrorMessage(classify_move_error(state, event.data.command));
+        return;
+    }
+
+    if (event.type == EVENT_PLAYER_MOVE) {
+        cliShowErrorMessage(ERR_ILLEGAL_MOVE);
         return;
     }
 

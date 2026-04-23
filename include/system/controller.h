@@ -3,6 +3,7 @@
 
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "input/move_request.h"
 #include "system/event.h"
 #include "system/event_queue.h"
 
@@ -36,6 +37,7 @@ int controllerStartConfiguredGame(Controller *controller, const GameConfig *conf
 int controllerRequestNewGame(Controller *controller);
 int controllerRequestBack(Controller *controller);
 int controllerRequestExit(Controller *controller);
+int controllerSubmitMoveRequest(Controller *controller, MoveRequest request);
 int controllerSubmitMove(Controller *controller, Command command);
 int controllerRequestUndo(Controller *controller);
 int controllerRequestLeaveGame(Controller *controller);

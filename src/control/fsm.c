@@ -4,7 +4,6 @@
 
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
-#include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 #include "log/log.h"
 #include "time/clock.h"
@@ -120,70 +119,6 @@ static int find_undo_target_history_count(const GameState *state, int *targetCou
     return 1;
 }
 
-/* Build the exact legal move candidate that matches one move command. */
-static int find_command_move(const GameState *state, Command command, Move *resolvedMove) {
-    MoveList candidates;
-    Piece movingPiece;
-    Move *promotionQueenCandidate;
-    int matchingCount;
-    int allMatchesArePromotions;
-    int index;
-
-    if (state == NULL || resolvedMove == NULL || command.type != CMD_MOVE) {
-        return 1;
-    }
-
-    if (validateSelection(state, command.from) != SELECT_VALID || !isValidPosition(command.to)) {
-        return 1;
-    }
-
-    movingPiece = getPiece(&state->board, command.from);
-    if (movingPiece.type == EMPTY_PIECE) {
-        return 1;
-    }
-
-    if (generateLegalMovesForPosition(state, command.from, &candidates) != 0) {
-        return 1;
-    }
-
-    promotionQueenCandidate = NULL;
-    matchingCount = 0;
-    allMatchesArePromotions = 1;
-    for (index = 0; index < getMoveCount(&candidates); ++index) {
-        Move *candidate = getMove(&candidates, index);
-
-        if (candidate != NULL
-            && positionEqual(candidate->from, command.from)
-            && positionEqual(candidate->to, command.to)
-            && candidate->movedPiece.type == movingPiece.type
-            && candidate->movedPiece.color == movingPiece.color) {
-            ++matchingCount;
-            if (candidate->specialType == PROMOTION_QUEEN) {
-                promotionQueenCandidate = candidate;
-            } else if (candidate->specialType != PROMOTION_ROOK
-                && candidate->specialType != PROMOTION_BISHOP
-                && candidate->specialType != PROMOTION_KNIGHT) {
-                allMatchesArePromotions = 0;
-            }
-
-            if (matchingCount == 1) {
-                *resolvedMove = *candidate;
-            }
-        }
-    }
-
-    if (matchingCount == 1) {
-        return 0;
-    }
-
-    if (matchingCount > 1 && allMatchesArePromotions && promotionQueenCandidate != NULL) {
-        *resolvedMove = *promotionQueenCandidate;
-        return 0;
-    }
-
-    return 1;
-}
-
 /* Apply one already validated move and update logging, timer, and endgame state. */
 static int apply_resolved_move(GameState *state, Move move) {
     if (state == NULL) {
@@ -209,19 +144,8 @@ static int apply_resolved_move(GameState *state, Move move) {
     return resetTurnTimer(state);
 }
 
-/* Handle a player-entered move command while gameplay is active. */
-static int handle_move_input(GameState *state, Command command) {
-    Move move;
-
-    if (find_command_move(state, command, &move) != 0) {
-        return 1;
-    }
-
-    return apply_resolved_move(state, move);
-}
-
-/* Handle an AI-selected move while gameplay is active. */
-static int handle_ai_move(GameState *state, Move move) {
+/* Handle an already resolved move while gameplay is active. */
+static int handle_resolved_move(GameState *state, Move move) {
     return apply_resolved_move(state, move);
 }
 
@@ -256,9 +180,10 @@ static int handle_gameplay_event(GameState *state, Event event) {
 
     switch (event.type) {
         case EVENT_MOVE_INPUT:
-            return handle_move_input(state, event.data.command);
+            return 1;
+        case EVENT_PLAYER_MOVE:
         case EVENT_AI_MOVE:
-            return handle_ai_move(state, event.data.move);
+            return handle_resolved_move(state, event.data.move);
         case EVENT_UNDO:
             return handle_undo(state);
         case EVENT_TIMER_EXPIRED:

@@ -28,9 +28,15 @@ static void test_event_constructors(void) {
     assert(positionEqual(event.data.move.from, createPosition(6, 0)) == 1);
     assert(positionEqual(event.data.move.to, createPosition(4, 0)) == 1);
 
+    event = createPlayerMoveEvent(move);
+    assert(event.type == EVENT_PLAYER_MOVE);
+    assert(positionEqual(event.data.move.from, createPosition(6, 0)) == 1);
+    assert(positionEqual(event.data.move.to, createPosition(4, 0)) == 1);
+
     assert(createSystemEvent(EVENT_BACK).type == EVENT_BACK);
     assert(createSystemEvent(EVENT_EXIT_PROGRAM).type == EVENT_EXIT_PROGRAM);
     assert(createSystemEvent(EVENT_MOVE_INPUT).type == EVENT_NONE);
+    assert(createSystemEvent(EVENT_PLAYER_MOVE).type == EVENT_NONE);
 
     event = createUndoEvent();
     assert(event.type == EVENT_UNDO);

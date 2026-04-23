@@ -1,7 +1,11 @@
 #include <assert.h>
 
+#include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/move.h"
+#include "core/piece.h"
+#include "gameplay/validation.h"
 #include "system/event.h"
 #include "system/fsm.h"
 #include "system/system_state.h"
@@ -88,11 +92,38 @@ static void test_legacy_hint_event_is_rejected_in_gameplay(void) {
     assert(state.moveHistory.count == 0);
 }
 
+/* Check that the FSM applies resolved player moves without parsing commands. */
+static void test_resolved_player_move_is_applied_in_gameplay(void) {
+    GameState state = fresh_state();
+    Move move;
+
+    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+
+    initBoard(&state.board);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    state.currentTurn = WHITE;
+
+    move = createMove(createPosition(6, 0), createPosition(5, 0),
+        createPiece(ANT, WHITE));
+    assert(validateMove(&state, move) == 1);
+    assert(processEvent(&state, createPlayerMoveEvent(move)) == 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == ANT);
+    assert(state.currentTurn == BLACK);
+}
+
 /* Run the Phase E FSM regression suite. */
 int main(void) {
     test_forward_state_progression();
     test_transition_validation();
     test_timer_expiry_and_fatal_error_paths();
     test_legacy_hint_event_is_rejected_in_gameplay();
+    test_resolved_player_move_is_applied_in_gameplay();
     return 0;
 }

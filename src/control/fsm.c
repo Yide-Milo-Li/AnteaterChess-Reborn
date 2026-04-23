@@ -85,6 +85,15 @@ static int find_undo_target_history_count(const GameState *state, int *targetCou
         return 1;
     }
 
+    if (state->config.mode == MODE_HUMAN_VS_HUMAN) {
+        if (state->moveHistory.count >= 2) {
+            *targetCount = state->moveHistory.count - 2;
+        } else {
+            *targetCount = 0;
+        }
+        return 0;
+    }
+
     if (state->config.mode != MODE_HUMAN_VS_COMPUTER) {
         *targetCount = state->moveHistory.count - 1;
         return 0;

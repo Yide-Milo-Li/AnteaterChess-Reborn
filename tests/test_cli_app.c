@@ -96,6 +96,40 @@ static void test_cli_app_full_session(void) {
     assert(strstr(buffer, "Result: Terminated by User") != NULL);
 }
 
+/* Check that human-vs-human undo after White and Black move rewinds the full
+ * round back to White's original turn. */
+static void test_cli_app_human_vs_human_undo_rewinds_full_round(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        "1\n1\n2\n1\nE2 E4\n1\nE7 E5\n2\n3\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Selected mode: Human vs Human") != NULL);
+    assert(strstr(buffer, "Undo unavailable.") == NULL);
+    assert(count_occurrences(buffer, "WHITE TO MOVE") >= 3);
+    assert(count_occurrences(buffer, "BLACK TO MOVE") == 1);
+}
+
+/* Check that human-vs-human undo still rewinds a single opening move back to
+ * the initial position. */
+static void test_cli_app_human_vs_human_single_move_undo_returns_to_initial_state(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        "1\n1\n2\n1\nE2 E4\n2\n3\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Selected mode: Human vs Human") != NULL);
+    assert(strstr(buffer, "Undo unavailable.") == NULL);
+    assert(count_occurrences(buffer, "WHITE TO MOVE") >= 2);
+    assert(count_occurrences(buffer, "BLACK TO MOVE") == 1);
+}
+
 /* Check that human-vs-computer setup, hint output, and AI replies all work together. */
 static void test_cli_app_human_vs_computer_white_session(void) {
     char buffer[32768];
@@ -173,6 +207,8 @@ static void test_cli_app_human_vs_computer_black_opening_undo_unavailable(void) 
 /* Run the standalone CLI app regression suite. */
 int main(void) {
     test_cli_app_full_session();
+    test_cli_app_human_vs_human_undo_rewinds_full_round();
+    test_cli_app_human_vs_human_single_move_undo_returns_to_initial_state();
     test_cli_app_human_vs_computer_white_session();
     test_cli_app_human_vs_computer_undo_returns_to_human_turn();
     test_cli_app_human_vs_computer_black_session();

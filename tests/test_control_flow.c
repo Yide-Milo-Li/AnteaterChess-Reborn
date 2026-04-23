@@ -110,19 +110,52 @@ static void test_process_event_rejects_illegal_move(void) {
     assert(state.moveHistory.count == 0);
 }
 
-/* Check that undo flows back through the FSM and restores the previous
- * position. */
+/* Check that human-vs-human undo rewinds a single opening move back to the
+ * initial position. */
 static void test_process_event_undo_restores_position(void) {
     GameState state = fresh_gameplay_state();
     Command command;
 
     seed_simple_ant_position(&state);
+    state.config.mode = MODE_HUMAN_VS_HUMAN;
     assert(createMoveCommand(&command, createPosition(6, 0),
                              createPosition(5, 0)) == 0);
     assert(processEvent(&state, createMoveInputEvent(command)) == 0);
     assert(processEvent(&state, createUndoEvent()) == 0);
     assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
     assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 0);
+}
+
+/* Check that human-vs-human undo rewinds a full round instead of stopping
+ * after only Black's latest move. */
+static void test_process_event_hvh_undo_rewinds_full_round(void) {
+    GameState state = fresh_gameplay_state();
+    Command whiteCommand;
+    Command blackCommand;
+
+    seed_empty_gameplay_position(&state, WHITE);
+    state.config.mode = MODE_HUMAN_VS_HUMAN;
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ANT, WHITE));
+    setPiece(&state.board, createPosition(1, 0), createPiece(ANT, BLACK));
+
+    assert(createMoveCommand(&whiteCommand, createPosition(6, 0),
+        createPosition(5, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(whiteCommand)) == 0);
+    assert(createMoveCommand(&blackCommand, createPosition(1, 0),
+        createPosition(2, 0)) == 0);
+    assert(processEvent(&state, createMoveInputEvent(blackCommand)) == 0);
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 2);
+
+    assert(processEvent(&state, createUndoEvent()) == 0);
+    assert(getPiece(&state.board, createPosition(6, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(5, 0)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(1, 0)).type == ANT);
+    assert(getPiece(&state.board, createPosition(2, 0)).type == EMPTY_PIECE);
     assert(state.currentTurn == WHITE);
     assert(state.moveHistory.count == 0);
 }
@@ -296,6 +329,7 @@ int main(void) {
     test_process_event_applies_valid_move();
     test_process_event_rejects_illegal_move();
     test_process_event_undo_restores_position();
+    test_process_event_hvh_undo_rewinds_full_round();
     test_process_event_hvc_undo_returns_to_previous_white_human_turn();
     test_process_event_hvc_undo_returns_to_previous_black_human_turn();
     test_process_event_hvc_black_opening_undo_unavailable();

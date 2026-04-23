@@ -46,7 +46,7 @@ typedef struct {
     int nodes;
     unsigned char generation;
     MoveList *moveBuffers;
-    HashState hashStack[AI_MAX_PLY + 1];
+    HashState hashStack[AI_MAX_PLY + 1]; // Length 49
     Move killerMoves[AI_MAX_PLY][2];
     unsigned char killerValid[AI_MAX_PLY][2];
     int history[2][ROWS * COLS][ROWS * COLS];
@@ -57,15 +57,18 @@ typedef struct {
     unsigned char nullMoveActive[AI_MAX_PLY + 1];
 } SearchContext;
 
+static TTEntry g_transpositionTable[TT_SIZE];
+static unsigned char g_ttGeneration;
+
 // Piece-Square Table
 static const int PST_ANT[ROWS][COLS] = {
     {0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
-    {0,  5,  5,  5,  5,  5,  5,  5,  5,  0 },
-    {5,  5,  10, 15, 15, 15, 15, 10, 5,  5 },
-    {10, 10, 15, 20, 25, 25, 20, 15, 10, 10},
-    {10, 10, 15, 20, 25, 25, 20, 15, 10, 10},
-    {5,  5,  10, 15, 15, 15, 15, 10, 5,  5 },
-    {0,  5,  5,  5,  5,  5,  5,  5,  5,  0 },
+    {0,  0,  0,  5,  5,  5,  5,  0,  0,  0 },
+    {5,  5,  10, 15, 20, 20, 15, 10, 5,  5 },
+    {5,  10, 15, 25, 30, 30, 25, 15, 10, 5 },
+    {10, 15, 25, 35, 40, 40, 35, 25, 15, 10},
+    {20, 25, 35, 45, 50, 50, 45, 35, 25, 20},
+    {50, 50, 50, 50, 50, 50, 50, 50, 50, 50},
     {0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }
 };
 
@@ -122,6 +125,17 @@ static const int PST_KING_MID[ROWS][COLS] = {
     {-30, -40, -40, -50, -50, -50, -50, -40, -40, -30},
     {-30, -40, -40, -50, -50, -50, -50, -40, -40, -30},
     {-30, -40, -40, -50, -50, -50, -50, -40, -40, -30}
+};
+
+static const int PST_KING_END[ROWS][COLS] = {
+    {-50, -40, -30, -20, -20, -20, -20, -30, -40, -50},
+    {-30, -15, -5,  5,   5,   5,   5,   -5,  -15, -30},
+    {-20, -5,  10,  15,  20,  20,  15,  10,  -5,  -20},
+    {-10, 0,   15,  25,  30,  30,  25,  15,  0,   -10},
+    {-10, 0,   15,  25,  30,  30,  25,  15,  0,   -10},
+    {-20, -5,  10,  15,  20,  20,  15,  10,  -5,  -20},
+    {-30, -15, -5,  5,   5,   5,   5,   -5,  -15, -30},
+    {-50, -40, -30, -20, -20, -20, -20, -30, -40, -50}
 };
 
 static const int PST_ANTEATER[ROWS][COLS] = {

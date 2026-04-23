@@ -9,6 +9,7 @@
 #include "system/controller.h"
 #include "system/event.h"
 #include "system/system_state.h"
+#include "input/move_request.h"
 
 /* Build a fresh controller using the public default configuration. */
 static Controller fresh_controller(void) {
@@ -224,6 +225,47 @@ static void test_controller_submit_move_applies_valid_move(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
+/* Check that the richer facade move request applies an explicit promotion
+ * choice without exposing arbitrary Move construction to callers. */
+static void test_controller_submit_move_request_applies_promotion_choice(void) {
+    Controller controller;
+    GameConfig config;
+    MoveRequest request;
+
+    initDefaultGameConfig(&config);
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(1, 2), createPiece(ANT, WHITE));
+
+    assert(createMoveRequest(&request, createPosition(1, 2),
+        createPosition(0, 2), PROMOTION_CHOICE_ROOK) == 0);
+    assert(controllerSubmitMoveRequest(&controller, request) == 0);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).type == ROOK);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
+}
+
+/* Check that legacy command submission still defaults promotion to queen. */
+static void test_controller_submit_move_legacy_promotion_defaults_to_queen(void) {
+    Controller controller;
+    GameConfig config;
+    Command command;
+
+    initDefaultGameConfig(&config);
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    seed_empty_gameplay_position(&controller.state, WHITE);
+    setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&controller.state.board, createPosition(1, 2), createPiece(ANT, WHITE));
+
+    assert(createMoveCommand(&command, createPosition(1, 2),
+        createPosition(0, 2)) == 0);
+    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).type == QUEEN);
+    assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
+}
+
 /* Check that the facade undo helper rewinds back to the previous human turn
  * and leaves the controller idle again. */
 static void test_controller_request_undo_restores_position(void) {
@@ -340,6 +382,8 @@ int main(void) {
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();
     test_controller_submit_move_applies_valid_move();
+    test_controller_submit_move_request_applies_promotion_choice();
+    test_controller_submit_move_legacy_promotion_defaults_to_queen();
     test_controller_request_undo_restores_position();
     test_controller_request_leave_game_reaches_endgame_menu();
     test_controller_get_hint_returns_move_without_mutating_state();

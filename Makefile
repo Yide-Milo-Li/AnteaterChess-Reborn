@@ -51,11 +51,13 @@ GAMEPLAY_SRCS := \
 	src/gameplay/execution.c \
 	src/gameplay/endgame.c \
 	src/gameplay/movegen.c \
+	src/gameplay/move_resolver.c \
 	src/gameplay/rules.c
 
 INPUT_SRCS := \
 	src/input/command.c \
 	src/input/command_parser.c \
+	src/input/move_request.c \
 	src/input/input.c
 
 SYSTEM_SRCS := \
@@ -101,6 +103,7 @@ CORE_TEST_NAMES := \
 	test_move \
 	test_rulecheck \
 	test_movegen \
+	test_move_resolver \
 	test_move_execution \
 	test_game_state \
 	test_endgame \

@@ -26,6 +26,14 @@ Event createMoveInputEvent(Command cmd) {
     return event;
 }
 
+/* Build one human-selected move event after controller-side request resolution. */
+Event createPlayerMoveEvent(Move move) {
+    Event event = blankEvent(EVENT_PLAYER_MOVE);
+
+    event.data.move = move;
+    return event;
+}
+
 /* Build one AI move event from an already selected move payload. */
 Event createAIMoveEvent(Move move) {
     Event event = blankEvent(EVENT_AI_MOVE);

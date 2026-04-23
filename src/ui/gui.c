@@ -4,7 +4,9 @@
 #include <string.h>
 
 #include "error/error.h"
+#include "gameplay/move_resolver.h"
 #include "input/command_parser.h"
+#include "input/move_request.h"
 #include "time/clock.h"
 #include "turn/turn_timer.h"
 
@@ -230,6 +232,13 @@ static void format_hint_text(Move move, char buffer[64]) {
     snprintf(buffer, 64, "Hint: %s -> %s", fromText, toText);
 }
 
+static int is_promotion_special(SpecialMove type) {
+    return type == PROMOTION_QUEEN
+        || type == PROMOTION_ROOK
+        || type == PROMOTION_BISHOP
+        || type == PROMOTION_KNIGHT;
+}
+
 static void gui_set_status_text(Gui *gui, const char *text) {
     if (gui == NULL || !GTK_IS_WIDGET(gui->status_label) || !GTK_IS_LABEL(gui->status_label)) {
         return;
@@ -293,6 +302,46 @@ static int gui_confirm(Gui *gui, const char *title, const char *message) {
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     return response == GTK_RESPONSE_YES;
+}
+
+static int gui_select_promotion_choice(Gui *gui, PromotionChoice *choice) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+    int response;
+
+    if (choice == NULL) {
+        return 1;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent,
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_QUESTION,
+        GTK_BUTTONS_NONE,
+        "%s",
+        "Choose promotion piece");
+    gtk_window_set_title(GTK_WINDOW(dialog), "Promotion");
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Queen", PROMOTION_CHOICE_QUEEN);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Rook", PROMOTION_CHOICE_ROOK);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Bishop", PROMOTION_CHOICE_BISHOP);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Knight", PROMOTION_CHOICE_KNIGHT);
+
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch (response) {
+        case PROMOTION_CHOICE_QUEEN:
+        case PROMOTION_CHOICE_ROOK:
+        case PROMOTION_CHOICE_BISHOP:
+        case PROMOTION_CHOICE_KNIGHT:
+            *choice = (PromotionChoice)response;
+            return 0;
+        default:
+            return 1;
+    }
 }
 
 static void gui_set_error(Gui *gui, ErrorCode code) {
@@ -1332,6 +1381,8 @@ static void on_submit_move_clicked(GtkButton *button, gpointer user_data) {
     const char *fromText;
     const char *toText;
     Command command;
+    MoveRequest request;
+    Move resolvedMove;
 
     (void)button;
     if (gui == NULL || !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
@@ -1357,7 +1408,22 @@ static void on_submit_move_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
-    if (controllerSubmitMove(&gui->controller, command) != 0) {
+    if (createMoveRequestFromCommand(&request, command) != 0
+        || resolveMoveRequest(state, request, &resolvedMove) != 0) {
+        gui_set_error(gui, ERR_ILLEGAL_MOVE);
+        return;
+    }
+
+    if (is_promotion_special(resolvedMove.specialType)) {
+        PromotionChoice promotion;
+
+        if (gui_select_promotion_choice(gui, &promotion) != 0) {
+            return;
+        }
+        request.promotion = promotion;
+    }
+
+    if (controllerSubmitMoveRequest(&gui->controller, request) != 0) {
         gui_set_error(gui, ERR_ILLEGAL_MOVE);
         return;
     }

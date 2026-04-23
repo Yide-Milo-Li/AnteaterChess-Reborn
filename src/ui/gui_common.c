@@ -1,0 +1,147 @@
+#include "gui_internal.h"
+
+#include "error/error.h"
+
+void gui_clear_view_refs(Gui *gui) {
+    int row;
+    int col;
+    int index;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->main_box = NULL;
+    gui->new_game_button = NULL;
+    gui->quit_game_button = NULL;
+    gui->turn_label = NULL;
+    gui->time_display = NULL;
+    gui->history_view = NULL;
+    gui->black_timer_label = NULL;
+    gui->white_timer_label = NULL;
+    gui->status_label = NULL;
+    gui->from_entry = NULL;
+    gui->to_entry = NULL;
+    gui->setup_timer_toggle = NULL;
+    gui->setup_hours_spin = NULL;
+    gui->setup_minutes_spin = NULL;
+    gui->setup_seconds_spin = NULL;
+    gui->setup_side_white = NULL;
+    gui->setup_side_black = NULL;
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            gui->board_images[row][col] = NULL;
+        }
+    }
+
+    for (index = 0; index < 6; ++index) {
+        gui->setup_timer_widgets[index] = NULL;
+    }
+
+    for (index = 0; index < 3; ++index) {
+        gui->setup_ai_diff_buttons[index] = NULL;
+        gui->setup_white_diff_buttons[index] = NULL;
+        gui->setup_black_diff_buttons[index] = NULL;
+    }
+}
+
+void gui_set_status_text(Gui *gui, const char *text) {
+    if (gui == NULL || !GTK_IS_WIDGET(gui->status_label) || !GTK_IS_LABEL(gui->status_label)) {
+        return;
+    }
+
+    gtk_label_set_text(GTK_LABEL(gui->status_label), (text != NULL) ? text : "");
+}
+
+void gui_show_message_dialog(Gui *gui, GtkMessageType type,
+                             GtkButtonsType buttons,
+                             const char *title,
+                             const char *message) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+
+    if (message == NULL) {
+        return;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent,
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        type,
+        buttons,
+        "%s",
+        message);
+    if (title != NULL) {
+        gtk_window_set_title(GTK_WINDOW(dialog), title);
+    }
+
+    (void)gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+int gui_confirm(Gui *gui, const char *title, const char *message) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+    int response;
+
+    if (message == NULL) {
+        return 0;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent,
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_QUESTION,
+        GTK_BUTTONS_YES_NO,
+        "%s",
+        message);
+    if (title != NULL) {
+        gtk_window_set_title(GTK_WINDOW(dialog), title);
+    }
+
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    return response == GTK_RESPONSE_YES;
+}
+
+void gui_set_error(Gui *gui, ErrorCode code) {
+    const char *message = getErrorMessage(code);
+
+    if (gui != NULL && GTK_IS_WIDGET(gui->status_label) && GTK_IS_LABEL(gui->status_label)) {
+        gui_set_status_text(gui, message);
+        return;
+    }
+
+    gui_show_message_dialog(gui, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Anteater Chess", message);
+}
+
+void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacing) {
+    if (!gui_window_is_valid(gui)) {
+        return;
+    }
+
+    if (gui->main_box != NULL && GTK_IS_WIDGET(gui->main_box)) {
+        gtk_widget_destroy(gui->main_box);
+    }
+
+    gui_clear_view_refs(gui);
+    gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, spacing);
+    gtk_widget_set_halign(gui->main_box, halign);
+    gtk_widget_set_valign(gui->main_box, valign);
+    gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
+}
+
+GtkWidget *gui_create_centered_button(const char *label) {
+    GtkWidget *button = gtk_button_new_with_label(label);
+
+    gtk_widget_set_hexpand(button, TRUE);
+    gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
+    return button;
+}

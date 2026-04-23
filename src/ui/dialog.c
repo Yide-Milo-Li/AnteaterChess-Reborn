@@ -1,8 +1,8 @@
 #include "../../include/ui/dialog.h"
 
-int quit_choice = 0;
-int leave_choice = 0;
-int back_button_clicked = 0;
+static int quit_choice = 0;
+static int leave_choice = 0;
+static int back_button_clicked = 0;
 // Sets the quit choice (1 for yes, 0 for no), shouldn't be called outside of GUI callbacks
 void setQuitChoice(int choice) {
     quit_choice = choice;

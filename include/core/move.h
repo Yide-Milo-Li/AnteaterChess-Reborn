@@ -38,5 +38,6 @@ Move createMove(Position from, Position to, Piece piece);
 void addCapture(Move *move, Position pos, Piece piece);
 void addPathStep(Move *move, Position pos);
 void setSpecialMove(Move *move, SpecialMove type);
+int isPromotionSpecialMove(SpecialMove type);
 
 #endif

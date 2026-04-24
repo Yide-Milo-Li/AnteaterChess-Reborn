@@ -81,10 +81,24 @@ static void test_movelist_operations(void) {
     assert(removeLastMove(&list) != 0);
 }
 
+static void test_promotion_special_move_detection(void) {
+    assert(isPromotionSpecialMove(PROMOTION_QUEEN) == 1);
+    assert(isPromotionSpecialMove(PROMOTION_ROOK) == 1);
+    assert(isPromotionSpecialMove(PROMOTION_BISHOP) == 1);
+    assert(isPromotionSpecialMove(PROMOTION_KNIGHT) == 1);
+
+    assert(isPromotionSpecialMove(NO_SPECIAL_MOVE) == 0);
+    assert(isPromotionSpecialMove(CASTLING_KINGSIDE) == 0);
+    assert(isPromotionSpecialMove(CASTLING_QUEENSIDE) == 0);
+    assert(isPromotionSpecialMove(EN_PASSANT) == 0);
+    assert(isPromotionSpecialMove(ANTEATER_CAPTURE) == 0);
+}
+
 int main(void) {
     test_create_move_defaults();
     test_move_path_and_captures();
     test_move_capacity_limits();
     test_movelist_operations();
+    test_promotion_special_move_detection();
     return 0;
 }

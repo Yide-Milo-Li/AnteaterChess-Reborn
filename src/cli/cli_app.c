@@ -318,17 +318,35 @@ static int collect_gameplay_event(Controller *controller) {
 
     switch (action) {
         case 1:
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
             if (cliShowMoveFormatHint() != 0) {
                 return 1;
             }
             for (;;) {
                 if (cliGetMoveCommand(&command) != 0) {
                     cliShowErrorMessage(ERR_INVALID_MOVE_FORMAT);
+                    if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                        return 1;
+                    }
+                    if (!controller_queue_is_empty(controller)) {
+                        return 0;
+                    }
                     continue;
                 }
 
                 if (resolve_cli_move_command(state, command, &resolvedMove) != 0) {
                     cliShowErrorMessage(classify_move_error(state, command));
+                    if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                        return 1;
+                    }
+                    if (!controller_queue_is_empty(controller)) {
+                        return 0;
+                    }
                     continue;
                 }
 

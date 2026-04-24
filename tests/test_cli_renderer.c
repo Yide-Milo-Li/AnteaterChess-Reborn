@@ -170,7 +170,7 @@ static void test_board_renderer_reflects_modified_board_contents(void) {
     assert(strstr(stripped, "Legend: White = uppercase cyan, Black = lowercase gold.") != NULL);
     assert(strcmp(row8, "  8 |   |   |   |   |   |   |   |   |   | r |  8") == 0);
     assert(strcmp(row4, "  4 |   |   |   |   | Q |   |   |   |   |   |  4") == 0);
-    assert(strcmp(row2, "  2 |   | E |   |   |   |   |   |   |   |   |  2") == 0);
+    assert(strcmp(row2, "  2 |   | A |   |   |   |   |   |   |   |   |  2") == 0);
 }
 
 /* Check that the status block prints turn and timer details. */

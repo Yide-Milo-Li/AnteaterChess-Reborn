@@ -225,6 +225,29 @@ static void test_controller_submit_move_applies_valid_move(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
+/* Check that a legal submitted move at history capacity becomes a draw through
+ * the public controller path. */
+static void test_controller_submit_move_draws_at_history_capacity(void) {
+    Controller controller;
+    GameConfig config;
+    Command command;
+
+    initDefaultGameConfig(&config);
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    initBoard(&controller.state.board);
+    controller.state.currentTurn = WHITE;
+    controller.state.moveHistory.count = MAX_MOVES;
+    controller.state.moveCount = MAX_MOVES;
+
+    assert(createMoveCommand(&command, createPosition(7, 1),
+        createPosition(5, 2)) == 0);
+    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(controller.state.systemState == END_GAME_MENU_STATE);
+    assert(controller.state.result == RESULT_DRAW);
+    assert(getPiece(&controller.state.board, createPosition(7, 1)).type == KNIGHT);
+    assert(getPiece(&controller.state.board, createPosition(5, 2)).type == EMPTY_PIECE);
+}
+
 /* Check that the richer facade move request applies an explicit promotion
  * choice without exposing arbitrary Move construction to callers. */
 static void test_controller_submit_move_request_applies_promotion_choice(void) {
@@ -382,6 +405,7 @@ int main(void) {
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();
     test_controller_submit_move_applies_valid_move();
+    test_controller_submit_move_draws_at_history_capacity();
     test_controller_submit_move_request_applies_promotion_choice();
     test_controller_submit_move_legacy_promotion_defaults_to_queen();
     test_controller_request_undo_restores_position();

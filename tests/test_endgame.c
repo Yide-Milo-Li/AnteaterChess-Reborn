@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "gameplay/endgame.h"
+#include "gameplay/execution.h"
 
 /*
  * Alignment assumptions for future extensions:
@@ -174,6 +176,66 @@ void test_detect_game_result_updates_game_state(void) {
     assert(isGameOver(&state) == 0);
 }
 
+/* Apply one ordinary move in a repetition test sequence. */
+static void apply_test_move(GameState *state, Position from, Position to) {
+    Piece piece;
+    Move move;
+
+    assert(state != NULL);
+    piece = getPiece(&state->board, from);
+    move = createMove(from, to, piece);
+    assert(applyMove(state, move) == 0);
+}
+
+/* Repeat both knights out and back twice, returning to the initial full
+ * position for a third occurrence with White to move. */
+static void play_knight_repetition_sequence(GameState *state) {
+    int cycle;
+
+    for (cycle = 0; cycle < 2; ++cycle) {
+        apply_test_move(state, createPosition(7, 1), createPosition(5, 2));
+        apply_test_move(state, createPosition(0, 1), createPosition(2, 2));
+        apply_test_move(state, createPosition(5, 2), createPosition(7, 1));
+        apply_test_move(state, createPosition(2, 2), createPosition(0, 1));
+    }
+}
+
+static void test_threefold_repetition_detects_repeated_position(void) {
+    GameState state;
+
+    initGameState(&state, NULL);
+    play_knight_repetition_sequence(&state);
+
+    assert(state.currentTurn == WHITE);
+    assert(state.moveHistory.count == 8);
+    assert(isThreefoldRepetition(&state) == 1);
+}
+
+static void test_threefold_auto_draw_only_in_computer_vs_computer(void) {
+    GameConfig config;
+    GameState state;
+
+    initGameConfigForMode(&config, MODE_COMPUTER_VS_COMPUTER);
+    initGameState(&state, &config);
+    play_knight_repetition_sequence(&state);
+    assert(detectGameResult(&state) == 1);
+    assert(getGameResult(&state) == RESULT_DRAW);
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_HUMAN);
+    initGameState(&state, &config);
+    play_knight_repetition_sequence(&state);
+    assert(isThreefoldRepetition(&state) == 1);
+    assert(detectGameResult(&state) == 0);
+    assert(getGameResult(&state) == RESULT_NONE);
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_COMPUTER);
+    initGameState(&state, &config);
+    play_knight_repetition_sequence(&state);
+    assert(isThreefoldRepetition(&state) == 1);
+    assert(detectGameResult(&state) == 0);
+    assert(getGameResult(&state) == RESULT_NONE);
+}
+
 /* Check that mate detection still works when move history storage is already full. */
 void test_endgame_detection_ignores_history_capacity_limit(void) {
     GameState state;
@@ -202,6 +264,8 @@ int main(void) {
     test_insufficient_material_detects_simple_draws();
     test_insufficient_material_detects_boundary_combinations();
     test_detect_game_result_updates_game_state();
+    test_threefold_repetition_detects_repeated_position();
+    test_threefold_auto_draw_only_in_computer_vs_computer();
     test_endgame_detection_ignores_history_capacity_limit();
     return 0;
 }

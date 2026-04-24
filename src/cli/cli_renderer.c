@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "time/clock.h"
 #include "turn/turn_timer.h"
@@ -50,35 +51,13 @@ static char cli_piece_token(Piece piece) {
         return ' ';
     }
 
-    switch (piece.type) {
-        case ANT:
-            token = 'A';
-            break;
-        case ANTEATER:
-            token = 'E';
-            break;
-        case ROOK:
-            token = 'R';
-            break;
-        case KNIGHT:
-            token = 'N';
-            break;
-        case BISHOP:
-            token = 'B';
-            break;
-        case QUEEN:
-            token = 'Q';
-            break;
-        case KING:
-            token = 'K';
-            break;
-        case EMPTY_PIECE:
-        default:
-            return ' ';
+    token = getPieceSymbol(piece);
+    if (token == '.') {
+        return ' ';
     }
 
     if (piece.color == BLACK) {
-        token = (char)(token - 'A' + 'a');
+        token = (char)tolower((unsigned char)token);
     }
 
     return token;

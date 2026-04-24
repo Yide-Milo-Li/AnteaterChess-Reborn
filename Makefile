@@ -45,7 +45,8 @@ CORE_SRCS := \
 	src/core/move.c \
 	src/core/movelist.c \
 	src/core/gameconfig.c \
-	src/core/gamestate.c
+	src/core/gamestate.c \
+	src/core/hash.c
 
 GAMEPLAY_SRCS := \
 	src/gameplay/execution.c \

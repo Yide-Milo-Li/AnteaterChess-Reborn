@@ -118,6 +118,33 @@ static void test_resolved_player_move_is_applied_in_gameplay(void) {
     assert(state.currentTurn == BLACK);
 }
 
+/* Check that a legal move at move-history capacity ends cleanly as a draw
+ * instead of surfacing as an illegal move. */
+static void test_full_move_history_capacity_draws_in_gameplay(void) {
+    GameState state = fresh_state();
+    Move move;
+
+    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(processEvent(&state, createSystemEvent(EVENT_NEW_GAME)) == 0);
+    assert(state.systemState == GAMEPLAY_STATE);
+
+    initBoard(&state.board);
+    state.currentTurn = WHITE;
+    state.moveHistory.count = MAX_MOVES;
+    state.moveCount = MAX_MOVES;
+
+    move = createMove(createPosition(7, 1), createPosition(5, 2),
+        createPiece(KNIGHT, WHITE));
+    assert(validateMove(&state, move) == 1);
+    assert(processEvent(&state, createPlayerMoveEvent(move)) == 0);
+    assert(state.systemState == GAME_TERMINATION_STATE);
+    assert(state.result == RESULT_DRAW);
+    assert(getPiece(&state.board, createPosition(7, 1)).type == KNIGHT);
+    assert(getPiece(&state.board, createPosition(5, 2)).type == EMPTY_PIECE);
+}
+
 /* Run the Phase E FSM regression suite. */
 int main(void) {
     test_forward_state_progression();
@@ -125,5 +152,6 @@ int main(void) {
     test_timer_expiry_and_fatal_error_paths();
     test_legacy_hint_event_is_rejected_in_gameplay();
     test_resolved_player_move_is_applied_in_gameplay();
+    test_full_move_history_capacity_draws_in_gameplay();
     return 0;
 }

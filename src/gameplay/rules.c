@@ -40,16 +40,6 @@ static int move_requests_explicit_special_semantics(Move move) {
     return move.specialType != NO_SPECIAL_MOVE || move.captureCount > 0 || move.pathLength > 0;
 }
 
-/* Promotion ambiguity is resolved internally to the queen variant when callers
- * only know from/to and the only competing moves are the four promotion
- * choices. */
-static int is_promotion_move(SpecialMove type) {
-    return type == PROMOTION_QUEEN
-        || type == PROMOTION_ROOK
-        || type == PROMOTION_BISHOP
-        || type == PROMOTION_KNIGHT;
-}
-
 /* Callers sometimes only know from/to before special-move metadata is derived.
  * In that common case, matching the destination against generated candidates is
  * enough; detailed requests still require an exact semantic match. */
@@ -123,7 +113,7 @@ int validateMove(const GameState *state, Move move) {
 
         if (generated_move_matches_request(move, *candidate)) {
             ++simpleMatchCount;
-            if (!is_promotion_move(candidate->specialType)) {
+            if (!isPromotionSpecialMove(candidate->specialType)) {
                 allSimpleMatchesArePromotions = 0;
             }
             if (candidate->specialType == PROMOTION_QUEEN) {

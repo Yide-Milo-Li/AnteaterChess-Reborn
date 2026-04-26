@@ -43,6 +43,8 @@ struct Gui {
     GtkWidget *submit_button;
     GtkWidget *undo_button;
     GtkWidget *hint_button;
+    GtkWidget *leave_game_button;
+    GtkWidget *endgame_dialog;
     GtkWidget *setup_timer_toggle;
     GtkWidget *setup_hours_spin;
     GtkWidget *setup_minutes_spin;
@@ -90,6 +92,7 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
                              const char *title,
                              const char *message);
 void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog);
+void gui_destroy_endgame_dialog(Gui *gui);
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
 void gui_attach_move_provider(Gui *gui);

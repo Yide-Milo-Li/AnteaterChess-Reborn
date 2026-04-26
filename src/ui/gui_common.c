@@ -28,6 +28,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->submit_button = NULL;
     gui->undo_button = NULL;
     gui->hint_button = NULL;
+    gui->leave_game_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;
     gui->setup_minutes_spin = NULL;
@@ -136,6 +137,20 @@ void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog) {
     gtk_window_set_modal(window, TRUE);
     gtk_window_set_keep_above(window, TRUE);
     gtk_window_set_position(window, GTK_WIN_POS_CENTER_ON_PARENT);
+}
+
+void gui_destroy_endgame_dialog(Gui *gui) {
+    GtkWidget *dialog;
+
+    if (gui == NULL || gui->endgame_dialog == NULL) {
+        return;
+    }
+
+    dialog = gui->endgame_dialog;
+    gui->endgame_dialog = NULL;
+    if (GTK_IS_WIDGET(dialog)) {
+        gtk_widget_destroy(dialog);
+    }
 }
 
 int gui_confirm(Gui *gui, const char *title, const char *message) {

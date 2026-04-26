@@ -213,6 +213,7 @@ void gui_on_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -257,6 +258,7 @@ void gui_on_back_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -491,6 +493,7 @@ void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -504,6 +507,7 @@ void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -517,6 +521,7 @@ void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);

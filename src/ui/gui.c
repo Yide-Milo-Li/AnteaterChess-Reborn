@@ -1,6 +1,7 @@
 #include "gui_internal.h"
 
 #include <gdk/gdkkeysyms.h>
+#include <stdio.h>
 
 #include "error/error.h"
 
@@ -55,6 +56,22 @@ static gboolean gui_on_window_state_event(GtkWidget *widget,
         gui->fullscreen_transition_pending = 0;
     }
     return FALSE;
+}
+
+static void gui_update_endgame_turn_display(Gui *gui, const GameState *state) {
+    char text[96];
+
+    if (gui == NULL || state == NULL
+        || !GTK_IS_WIDGET(gui->turn_label)
+        || !GTK_IS_LABEL(gui->turn_label)) {
+        return;
+    }
+
+    snprintf(text,
+        sizeof(text),
+        "Game Over - %s",
+        gui_game_result_text(state->result));
+    gtk_label_set_text(GTK_LABEL(gui->turn_label), text);
 }
 
 Gui *gui_create(int *argc, char ***argv) {
@@ -150,6 +167,7 @@ void gui_destroy(Gui *gui) {
     }
 
     gui->should_quit = 1;
+    gui_destroy_endgame_dialog(gui);
     if (gui->sync_source_id != 0) {
         g_source_remove(gui->sync_source_id);
         gui->sync_source_id = 0;
@@ -249,7 +267,7 @@ void gui_sync_from_controller(Gui *gui) {
         gui->has_rendered_state = 1;
     }
 
-    if (state->systemState == GAMEPLAY_STATE) {
+    if (state->systemState == GAMEPLAY_STATE || state->systemState == END_GAME_MENU_STATE) {
         if (previousTimerEnabled
             && previousSystemState == GAMEPLAY_STATE
             && previousMoveCount == state->moveHistory.count
@@ -263,10 +281,18 @@ void gui_sync_from_controller(Gui *gui) {
         }
         gui_update_clock(gui);
         gui_update_timers(gui, state);
-        gui_update_turn_display(gui, state->currentTurn);
+        if (state->systemState == END_GAME_MENU_STATE) {
+            gui_update_endgame_turn_display(gui, state);
+        } else {
+            gui_update_turn_display(gui, state->currentTurn);
+        }
         gui_update_gameplay_controls(gui, state);
-        gui_refresh_move_highlights(gui);
-        gui_maybe_start_ai_job(gui, state);
+        if (state->systemState == GAMEPLAY_STATE) {
+            gui_refresh_move_highlights(gui);
+            gui_maybe_start_ai_job(gui, state);
+        } else {
+            gui_clear_move_highlights(gui);
+        }
     }
 
     gui->last_turn = state->currentTurn;
@@ -338,6 +364,7 @@ void gui_on_window_destroy(GtkWidget *widget, gpointer user_data) {
         gui->sync_source_id = 0;
     }
     gui->window = NULL;
+    gui->endgame_dialog = NULL;
     gui_clear_view_refs(gui);
     gtk_main_quit();
 }

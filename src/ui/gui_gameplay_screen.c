@@ -384,6 +384,7 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     build_gameplay_board(gui, rightBox, state);
 
     leaveButton = gtk_button_new_with_label("Leave Game");
+    gui->leave_game_button = leaveButton;
     gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
     gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
     gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
@@ -717,5 +718,8 @@ void gui_update_gameplay_controls(Gui *gui, const GameState *state) {
     if (GTK_IS_WIDGET(gui->hint_button)) {
         gtk_widget_set_sensitive(gui->hint_button,
             canUseHumanControls && gui->hint_job == NULL);
+    }
+    if (GTK_IS_WIDGET(gui->leave_game_button)) {
+        gtk_widget_set_sensitive(gui->leave_game_button, gameplayState);
     }
 }

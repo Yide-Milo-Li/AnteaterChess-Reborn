@@ -5,6 +5,8 @@
 #include "time/clock.h"
 #include "turn/turn_timer.h"
 
+#define GUI_PIECE_IMAGE_SIZE 56
+
 static const char *gui_special_move_text(SpecialMove type) {
     switch (type) {
         case CASTLING_KINGSIDE:
@@ -92,19 +94,23 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(moveBox), submitButton, FALSE, FALSE, 0);
     g_signal_connect(submitButton, "clicked", G_CALLBACK(gui_on_submit_move_clicked), gui);
 
-    undoButton = gtk_button_new();
+    undoButton = gtk_button_new_with_label("Undo");
     gui->undo_button = undoButton;
     gtk_button_set_image(GTK_BUTTON(undoButton),
         gtk_image_new_from_icon_name("gtk-undo", GTK_ICON_SIZE_BUTTON));
-    gtk_widget_set_size_request(undoButton, 60, 60);
+    gtk_button_set_image_position(GTK_BUTTON(undoButton), GTK_POS_LEFT);
+    gtk_button_set_always_show_image(GTK_BUTTON(undoButton), TRUE);
+    gtk_widget_set_size_request(undoButton, 92, 44);
     gtk_widget_set_tooltip_text(undoButton, "Undo the previous move.");
     g_signal_connect(undoButton, "clicked", G_CALLBACK(gui_on_undo_clicked), gui);
 
-    hintButton = gtk_button_new();
+    hintButton = gtk_button_new_with_label("Hint");
     gui->hint_button = hintButton;
     gtk_button_set_image(GTK_BUTTON(hintButton),
         gtk_image_new_from_icon_name("gtk-info", GTK_ICON_SIZE_BUTTON));
-    gtk_widget_set_size_request(hintButton, 60, 60);
+    gtk_button_set_image_position(GTK_BUTTON(hintButton), GTK_POS_LEFT);
+    gtk_button_set_always_show_image(GTK_BUTTON(hintButton), TRUE);
+    gtk_widget_set_size_request(hintButton, 92, 44);
     gtk_widget_set_tooltip_text(hintButton, "Show a suggested move.");
     g_signal_connect(hintButton, "clicked", G_CALLBACK(gui_on_hint_clicked), gui);
 
@@ -122,6 +128,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     int row;
     int col;
 
+    (void)state;
     gui->black_timer_label = gtk_label_new("Black --:--:--");
     gtk_widget_set_halign(gui->black_timer_label, GTK_ALIGN_END);
     gtk_box_pack_start(GTK_BOX(parent), gui->black_timer_label, FALSE, FALSE, 0);
@@ -149,19 +156,26 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
             GtkWidget *image = gtk_image_new();
+            GtkWidget *pieceLabel = gtk_label_new("");
+            GtkWidget *pieceBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
             GtkWidget *eventBox = gtk_event_box_new();
-            const char *icon = gui_get_piece_icon(state->board.cells[row][col]);
 
-            if (icon != NULL) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(image), icon, GTK_ICON_SIZE_BUTTON);
-            }
+            gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+            gtk_widget_set_halign(pieceLabel, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(pieceLabel, GTK_ALIGN_CENTER);
+            gtk_style_context_add_class(gtk_widget_get_style_context(pieceLabel),
+                "piece-fallback");
+            gtk_box_pack_start(GTK_BOX(pieceBox), image, TRUE, TRUE, 0);
+            gtk_box_pack_start(GTK_BOX(pieceBox), pieceLabel, TRUE, TRUE, 0);
 
             gui->board_images[row][col] = image;
+            gui->board_piece_labels[row][col] = pieceLabel;
             gui->board_cells[row][col] = eventBox;
             g_object_set_data(G_OBJECT(eventBox), "board-row", GINT_TO_POINTER(row));
             g_object_set_data(G_OBJECT(eventBox), "board-col", GINT_TO_POINTER(col));
             gtk_widget_add_events(eventBox, GDK_BUTTON_PRESS_MASK);
-            gtk_container_add(GTK_CONTAINER(eventBox), image);
+            gtk_container_add(GTK_CONTAINER(eventBox), pieceBox);
             gtk_style_context_add_class(gtk_widget_get_style_context(eventBox),
                 ((row + col) % 2) == 0 ? "light-square" : "dark-square");
             g_signal_connect(eventBox, "button-press-event",
@@ -237,6 +251,9 @@ void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf) {
     }
 
     gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
+    if (GTK_IS_WIDGET(gui->board_piece_labels[row][col])) {
+        gtk_widget_hide(gui->board_piece_labels[row][col]);
+    }
 }
 
 void gui_update_board(Gui *gui, const GameState *state) {
@@ -249,19 +266,35 @@ void gui_update_board(Gui *gui, const GameState *state) {
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
-            const char *icon;
+            Piece piece;
+            GdkPixbuf *pixbuf;
+            char fallbackText[4];
 
-            if (!GTK_IS_IMAGE(gui->board_images[row][col])) {
+            if (!GTK_IS_IMAGE(gui->board_images[row][col])
+                || !GTK_IS_LABEL(gui->board_piece_labels[row][col])) {
                 continue;
             }
 
-            icon = gui_get_piece_icon(state->board.cells[row][col]);
-            if (icon != NULL) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]),
-                    icon,
-                    GTK_ICON_SIZE_BUTTON);
-            } else {
+            piece = state->board.cells[row][col];
+            if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) {
                 gtk_image_clear(GTK_IMAGE(gui->board_images[row][col]));
+                gtk_label_set_text(GTK_LABEL(gui->board_piece_labels[row][col]), "");
+                gtk_widget_hide(gui->board_images[row][col]);
+                gtk_widget_hide(gui->board_piece_labels[row][col]);
+                continue;
+            }
+
+            pixbuf = gui_get_piece_pixbuf(piece, GUI_PIECE_IMAGE_SIZE);
+            if (pixbuf != NULL) {
+                gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
+                gtk_widget_show(gui->board_images[row][col]);
+                gtk_widget_hide(gui->board_piece_labels[row][col]);
+            } else {
+                gui_format_piece_fallback_text(piece, fallbackText);
+                gtk_image_clear(GTK_IMAGE(gui->board_images[row][col]));
+                gtk_label_set_text(GTK_LABEL(gui->board_piece_labels[row][col]), fallbackText);
+                gtk_widget_hide(gui->board_images[row][col]);
+                gtk_widget_show(gui->board_piece_labels[row][col]);
             }
         }
     }

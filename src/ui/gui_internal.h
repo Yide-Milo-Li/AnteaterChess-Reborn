@@ -17,6 +17,7 @@ struct Gui {
     GtkWidget *quit_game_button;
     GtkWidget *board_cells[8][10];
     GtkWidget *board_images[8][10];
+    GtkWidget *board_piece_labels[8][10];
     GtkWidget *turn_label;
     GtkWidget *time_display;
     GtkWidget *history_view;
@@ -78,7 +79,9 @@ void gui_format_elapsed_text(char buffer[32], int64_t elapsedSeconds);
 void gui_format_timer_text(char buffer[32], const char *prefix, int seconds);
 void gui_format_position_text(Position pos, char buffer[8]);
 void gui_format_hint_text(Move move, char buffer[64]);
-const char *gui_get_piece_icon(Piece piece);
+const char *gui_get_piece_asset_path(Piece piece);
+GdkPixbuf *gui_get_piece_pixbuf(Piece piece, int size);
+void gui_format_piece_fallback_text(Piece piece, char buffer[4]);
 
 void gui_build_main_menu(Gui *gui);
 void gui_build_mode_menu(Gui *gui);

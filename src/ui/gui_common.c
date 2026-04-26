@@ -38,6 +38,7 @@ void gui_clear_view_refs(Gui *gui) {
         for (col = 0; col < 10; ++col) {
             gui->board_cells[row][col] = NULL;
             gui->board_images[row][col] = NULL;
+            gui->board_piece_labels[row][col] = NULL;
             gui->highlight_destinations[row][col] = 0;
         }
     }
@@ -162,6 +163,7 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 GtkWidget *gui_create_centered_button(const char *label) {
     GtkWidget *button = gtk_button_new_with_label(label);
 
+    gtk_widget_set_size_request(button, 180, 44);
     gtk_widget_set_hexpand(button, TRUE);
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
     return button;

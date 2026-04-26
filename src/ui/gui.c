@@ -19,8 +19,13 @@ Gui *gui_create(int *argc, char ***argv) {
     provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
         "GtkWindow { background-color: #2c3e50; } "
+        "label { color: #f8fafc; } "
+        "button { color: #111827; background-image: none; background-color: #f8fafc; } "
+        "button label { color: #111827; } "
+        "entry { color: #111827; background-color: #ffffff; } "
         ".light-square { background-color: #f0d9b5; } "
         ".dark-square { background-color: #b58863; } "
+        ".piece-fallback { color: #111827; font-size: 28px; font-weight: bold; } "
         ".highlight-from { background-color: #4f83cc; } "
         ".highlight-destination { background-color: #6abf69; } "
         ".highlight-selected { background-color: #f4d35e; } "

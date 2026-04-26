@@ -1,5 +1,6 @@
 #include "gui_internal.h"
 
+#include <ctype.h>
 #include <stdio.h>
 
 int gui_current_turn_is_ai(const GameState *state) {
@@ -132,35 +133,152 @@ void gui_format_hint_text(Move move, char buffer[64]) {
     snprintf(buffer, 64, "Hint: %s -> %s", fromText, toText);
 }
 
-const char *gui_get_piece_icon(Piece piece) {
-    static const char *whiteIcons[] = {
-        "gtk-dialog-info",
-        "gtk-dialog-warning",
-        "gtk-dialog-question",
-        "gtk-dialog-error",
-        "gtk-dialog-authentication",
-        "gtk-dialog-password",
-        "gtk-dialog-info"
+static int gui_piece_asset_index(Piece piece, int *colorIndex, int *typeIndex) {
+    if (colorIndex == NULL || typeIndex == NULL
+        || !isValidPiece(piece) || piece.type == EMPTY_PIECE) {
+        return 0;
+    }
+
+    if (piece.color == WHITE) {
+        *colorIndex = 0;
+    } else if (piece.color == BLACK) {
+        *colorIndex = 1;
+    } else {
+        return 0;
+    }
+
+    *typeIndex = piece.type - ANT;
+    return *typeIndex >= 0 && *typeIndex < 7;
+}
+
+static const char *gui_get_piece_asset_filename(Piece piece) {
+    static const char *whiteAssets[] = {
+        "WhiteAntsvg.svg",
+        "WhiteRook.svg",
+        "WhiteKnight.svg",
+        "WhiteBishop.svg",
+        "WhiteQueen.svg",
+        "WhiteKing.svg",
+        "WhiteAnteater.svg"
     };
-    static const char *blackIcons[] = {
-        "gtk-dialog-warning",
-        "gtk-dialog-question",
-        "gtk-dialog-error",
-        "gtk-dialog-authentication",
-        "gtk-dialog-password",
-        "gtk-dialog-info",
-        "gtk-dialog-warning"
+    static const char *blackAssets[] = {
+        "BlackAnt.svg",
+        "BlackRook.svg",
+        "BlackKnight.svg",
+        "BlackBishop.svg",
+        "BlackQueen.svg",
+        "BlackKing.svg",
+        "BlackAnteater.svg"
     };
+    int colorIndex;
+    int typeIndex;
+
+    if (!gui_piece_asset_index(piece, &colorIndex, &typeIndex)) {
+        return NULL;
+    }
+
+    return colorIndex == 0 ? whiteAssets[typeIndex] : blackAssets[typeIndex];
+}
+
+const char *gui_get_piece_asset_path(Piece piece) {
+    static char paths[2][7][64];
+    const char *filename;
+    int colorIndex;
+    int typeIndex;
+
+    filename = gui_get_piece_asset_filename(piece);
+    if (filename == NULL || !gui_piece_asset_index(piece, &colorIndex, &typeIndex)) {
+        return NULL;
+    }
+
+    snprintf(paths[colorIndex][typeIndex],
+        sizeof(paths[colorIndex][typeIndex]),
+        "assets/%s",
+        filename);
+    return paths[colorIndex][typeIndex];
+}
+
+static GdkPixbuf *gui_load_piece_pixbuf(const char *assetPath, int size) {
+    static const char *prefixes[] = {"", "../", "../../"};
+    GdkPixbuf *pixbuf;
+    GError *error;
     int index;
 
+    if (assetPath == NULL || size <= 0) {
+        return NULL;
+    }
+
+    for (index = 0; index < (int)(sizeof(prefixes) / sizeof(prefixes[0])); ++index) {
+        char *path = g_strdup_printf("%s%s", prefixes[index], assetPath);
+
+        if (path == NULL) {
+            continue;
+        }
+
+        error = NULL;
+        pixbuf = gdk_pixbuf_new_from_file_at_scale(path, size, size, TRUE, &error);
+        g_free(path);
+        if (pixbuf != NULL) {
+            return pixbuf;
+        }
+        if (error != NULL) {
+            g_error_free(error);
+        }
+    }
+
+    return NULL;
+}
+
+GdkPixbuf *gui_get_piece_pixbuf(Piece piece, int size) {
+    static GdkPixbuf *cache[2][7];
+    static int cachedSize = 0;
+    const char *assetPath;
+    int colorIndex;
+    int typeIndex;
+    int row;
+    int col;
+
+    if (!gui_piece_asset_index(piece, &colorIndex, &typeIndex) || size <= 0) {
+        return NULL;
+    }
+
+    if (cachedSize != size) {
+        for (row = 0; row < 2; ++row) {
+            for (col = 0; col < 7; ++col) {
+                if (cache[row][col] != NULL) {
+                    g_object_unref(cache[row][col]);
+                    cache[row][col] = NULL;
+                }
+            }
+        }
+        cachedSize = size;
+    }
+
+    if (cache[colorIndex][typeIndex] == NULL) {
+        assetPath = gui_get_piece_asset_path(piece);
+        cache[colorIndex][typeIndex] = gui_load_piece_pixbuf(assetPath, size);
+    }
+
+    return cache[colorIndex][typeIndex];
+}
+
+void gui_format_piece_fallback_text(Piece piece, char buffer[4]) {
+    char symbol;
+
+    if (buffer == NULL) {
+        return;
+    }
+
     if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) {
-        return NULL;
+        buffer[0] = '\0';
+        return;
     }
 
-    index = piece.type - ANT;
-    if (index < 0 || index >= 7) {
-        return NULL;
+    symbol = getPieceSymbol(piece);
+    if (piece.color == BLACK) {
+        symbol = (char)tolower((unsigned char)symbol);
     }
 
-    return piece.color == WHITE ? whiteIcons[index] : blackIcons[index];
+    buffer[0] = symbol;
+    buffer[1] = '\0';
 }

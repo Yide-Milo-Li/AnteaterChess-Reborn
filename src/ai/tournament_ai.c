@@ -26,6 +26,10 @@ static int abs_int(int value) {
     return value < 0 ? -value : value;
 }
 
+static int max_int_local(int left, int right) {
+    return left > right ? left : right;
+}
+
 static int local_piece_value(PieceType type) {
     switch (type) {
         case ANT:
@@ -223,6 +227,16 @@ static int attacks_square(const Board *board, Position from, Piece piece, Positi
     }
 }
 
+static int local_knight_attacks_square(Position from, Position target) {
+    int rowDistance;
+    int colDistance;
+
+    rowDistance = abs_int(target.row - from.row);
+    colDistance = abs_int(target.col - from.col);
+    return (rowDistance == 2 && colDistance == 1)
+        || (rowDistance == 1 && colDistance == 2);
+}
+
 static int square_attacked_by(const Board *board, Position target, Color attackingColor) {
     int row;
     int col;
@@ -327,6 +341,81 @@ static int king_zone_pressure(const Board *board, Color color) {
     return pressure;
 }
 
+static int knight_check_jump_pressure_for(const Board *board, Color color) {
+    static const int rowOffsets[] = {-2, -2, -1, -1, 1, 1, 2, 2};
+    static const int colOffsets[] = {-1, 1, -2, 2, -2, 2, -1, 1};
+    Position kingPos;
+    Color enemy;
+    int pressure;
+    int homeRow;
+    int row;
+    int col;
+
+    if (board == NULL) {
+        return 0;
+    }
+
+    kingPos = find_king_position(board, color);
+    if (!isValidPosition(kingPos)) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    homeRow = (color == WHITE) ? 7 : 0;
+    pressure = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position from = createPosition(row, col);
+            Piece piece = getPiece(board, from);
+            int index;
+
+            if (piece.type != KNIGHT || piece.color != enemy) {
+                continue;
+            }
+
+            if (local_knight_attacks_square(from, kingPos)) {
+                pressure += 360;
+            }
+
+            for (index = 0; index < 8; ++index) {
+                Position target = createPosition(from.row + rowOffsets[index],
+                                                 from.col + colOffsets[index]);
+                Piece occupant;
+                int kingDistance;
+
+                if (!isValidPosition(target)) {
+                    continue;
+                }
+
+                occupant = getPiece(board, target);
+                if (occupant.color == enemy
+                    || !local_knight_attacks_square(target, kingPos)) {
+                    continue;
+                }
+
+                kingDistance = max_int_local(abs_int(target.row - kingPos.row),
+                                             abs_int(target.col - kingPos.col));
+                pressure += (occupant.color == color) ? 260 : 190;
+                if (kingDistance <= 1) {
+                    pressure += 80;
+                } else if (kingDistance <= 2) {
+                    pressure += 45;
+                }
+                if (abs_int(target.row - homeRow) <= 1) {
+                    pressure += 55;
+                }
+                if (abs_int(kingPos.row - homeRow) <= 1) {
+                    pressure += 65;
+                }
+                if (occupant.color == color) {
+                    pressure += clamp_int_local(local_piece_value(occupant.type) / 8, 12, 120);
+                }
+            }
+        }
+    }
+    return pressure;
+}
+
 static int enemy_major_count(const Board *board, Color color) {
     Color enemy;
     int count;
@@ -419,6 +508,7 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
 
     score -= king_ring_pressure(&state->board, color) * ((phase >= 12) ? 12 : 7);
     score -= king_zone_pressure(&state->board, color) * ((phase >= 12) ? 2 : 3);
+    score -= knight_check_jump_pressure_for(&state->board, color);
     return score;
 }
 
@@ -547,6 +637,7 @@ static int king_crisis_score_for(const GameState *state, Color color) {
 
     score = king_ring_pressure(&state->board, color) * 32;
     score += king_zone_pressure(&state->board, color) * 4;
+    score += knight_check_jump_pressure_for(&state->board, color);
     score -= back_rank_invasion_pressure_for(state, color);
     if (isInCheck(state, color)) {
         score += 220;

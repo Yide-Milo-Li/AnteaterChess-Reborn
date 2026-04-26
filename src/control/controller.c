@@ -644,6 +644,44 @@ int controllerSubmitAIMoveDetailed(Controller *controller,
     return 0;
 }
 
+int controllerDeclareTimeForfeit(Controller *controller,
+                                 Color losingColor,
+                                 ErrorCode *errorCode) {
+    GameResult result;
+
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        set_controller_error(errorCode, ERR_ACTION_UNAVAILABLE);
+        return 1;
+    }
+
+    if (losingColor == WHITE) {
+        result = RESULT_BLACK_WIN;
+    } else if (losingColor == BLACK) {
+        result = RESULT_WHITE_WIN;
+    } else {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    setGameResult(&controller->state, result);
+    if (transitionState(&controller->state, GAME_TERMINATION_STATE) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controllerRunUntilIdle(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    return 0;
+}
+
 /* Request one undo and drain controller-owned follow-up work before the GUI
  * reads back state again. */
 int controllerRequestUndo(Controller *controller) {

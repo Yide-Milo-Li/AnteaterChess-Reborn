@@ -194,11 +194,14 @@ static void test_tournament_time_manager_rolls_saved_time_forward(void) {
     int cappedBudget;
 
     initAITimeManager(&manager);
+    assert(manager.remainingMs[WHITE] == 600999);
+    assert(isAITournamentTimeExpired(&manager, WHITE) == 0);
+
     firstBudget = getAITournamentBudgetMs(&manager, WHITE);
     assert(firstBudget == 7000);
 
     updateAITournamentTime(&manager, WHITE, firstBudget, 100);
-    assert(manager.remainingMs[WHITE] == 599900);
+    assert(manager.remainingMs[WHITE] == 600899);
     assert(manager.poolMs[WHITE] == 6900);
 
     secondBudget = getAITournamentBudgetMs(&manager, WHITE);
@@ -216,6 +219,9 @@ static void test_tournament_time_manager_rolls_saved_time_forward(void) {
 
     manager.remainingMs[WHITE] = 100;
     assert(getAITournamentBudgetMs(&manager, WHITE) == 300);
+    updateAITournamentTime(&manager, WHITE, 300, 301);
+    assert(manager.remainingMs[WHITE] == 0);
+    assert(isAITournamentTimeExpired(&manager, WHITE) == 1);
 }
 
 /* Terminal positions with no legal moves should report failure instead of

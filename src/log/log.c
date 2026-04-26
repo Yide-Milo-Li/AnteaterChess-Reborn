@@ -101,6 +101,24 @@ static const char *difficulty_to_string(AIDifficulty difficulty) {
     }
 }
 
+static void write_ai_budget_for_color(Color color, AIDifficulty difficulty) {
+    const char *colorText = (color == WHITE) ? "White" : "Black";
+
+    if (difficulty == DIFFICULTY_TOURNAMENT) {
+        fprintf(logFile,
+            "%s Tournament 10:00.999 pool, max %dms",
+            colorText,
+            getDefaultAITimeBudgetMs(DIFFICULTY_TOURNAMENT));
+        return;
+    }
+
+    fprintf(logFile,
+        "%s %s %dms",
+        colorText,
+        difficulty_to_string(difficulty),
+        getDefaultAITimeBudgetMs(difficulty));
+}
+
 static int write_ai_budget_section(const GameConfig *config) {
     if (logFile == NULL || config == NULL) {
         return 1;
@@ -114,23 +132,23 @@ static int write_ai_budget_section(const GameConfig *config) {
     switch (config->mode) {
         case MODE_HUMAN_VS_COMPUTER:
             if (config->aiDifficultyWhite != DIFFICULTY_NONE) {
-                fprintf(logFile, "AI Budget: White %s %dms\n",
-                    difficulty_to_string(config->aiDifficultyWhite),
-                    getDefaultAITimeBudgetMs(config->aiDifficultyWhite));
+                fprintf(logFile, "AI Budget: ");
+                write_ai_budget_for_color(WHITE, config->aiDifficultyWhite);
+                fprintf(logFile, "\n");
             } else if (config->aiDifficultyBlack != DIFFICULTY_NONE) {
-                fprintf(logFile, "AI Budget: Black %s %dms\n",
-                    difficulty_to_string(config->aiDifficultyBlack),
-                    getDefaultAITimeBudgetMs(config->aiDifficultyBlack));
+                fprintf(logFile, "AI Budget: ");
+                write_ai_budget_for_color(BLACK, config->aiDifficultyBlack);
+                fprintf(logFile, "\n");
             } else {
                 fprintf(logFile, "AI Budget: None\n");
             }
             return 0;
         case MODE_COMPUTER_VS_COMPUTER:
-            fprintf(logFile, "AI Budget: White %s %dms, Black %s %dms\n",
-                difficulty_to_string(config->aiDifficultyWhite),
-                getDefaultAITimeBudgetMs(config->aiDifficultyWhite),
-                difficulty_to_string(config->aiDifficultyBlack),
-                getDefaultAITimeBudgetMs(config->aiDifficultyBlack));
+            fprintf(logFile, "AI Budget: ");
+            write_ai_budget_for_color(WHITE, config->aiDifficultyWhite);
+            fprintf(logFile, ", ");
+            write_ai_budget_for_color(BLACK, config->aiDifficultyBlack);
+            fprintf(logFile, "\n");
             return 0;
         case MODE_HUMAN_VS_HUMAN:
         default:

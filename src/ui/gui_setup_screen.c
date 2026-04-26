@@ -94,7 +94,7 @@ static void build_ai_budget_summary(GtkWidget *parent) {
     char text[128];
 
     snprintf(text, sizeof(text),
-        "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10 min pool, max %dms",
+        "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10:00.999 pool, max %dms",
         getDefaultAITimeBudgetMs(DIFFICULTY_EASY),
         getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM),
         getDefaultAITimeBudgetMs(DIFFICULTY_HARD),

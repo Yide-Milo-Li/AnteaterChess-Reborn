@@ -38,7 +38,7 @@
 #define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
-#define AI_TOURNAMENT_TOTAL_MS 600000
+#define AI_TOURNAMENT_TOTAL_MS 600999
 #define AI_TOURNAMENT_RESERVE_MS 30000
 #define AI_TOURNAMENT_BASE_MS 7000
 #define AI_TOURNAMENT_MAX_MS 10000
@@ -1468,6 +1468,17 @@ int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
         budgetMs = clamp_int(availableMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
     }
     return budgetMs;
+}
+
+int isAITournamentTimeExpired(const AITimeManager *manager, Color color) {
+    int index;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return 0;
+    }
+
+    index = color_time_index(color);
+    return manager->remainingMs[index] <= 0;
 }
 
 void updateAITournamentTime(AITimeManager *manager,

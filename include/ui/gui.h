@@ -8,6 +8,10 @@
 
 typedef struct Gui Gui;
 
+#define GUI_MOVE_PROVIDER_OK 0
+#define GUI_MOVE_PROVIDER_UNAVAILABLE 1
+#define GUI_MOVE_PROVIDER_TIME_FORFEIT 2
+
 typedef int (*GuiMoveProvider)(const GameState *state, Move *move, void *context);
 typedef int (*GuiHintProvider)(const GameState *state, Move *move, void *context);
 typedef void (*GuiMoveProviderReset)(void *context, const GameConfig *config);

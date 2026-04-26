@@ -12,6 +12,7 @@ typedef struct {
 
 void initAITimeManager(AITimeManager *manager);
 int getAITournamentBudgetMs(AITimeManager *manager, Color color);
+int isAITournamentTimeExpired(const AITimeManager *manager, Color color);
 void updateAITournamentTime(AITimeManager *manager,
                             Color color,
                             int budgetMs,

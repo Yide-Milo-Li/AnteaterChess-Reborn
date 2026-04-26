@@ -41,6 +41,9 @@ static int main_generate_ai_move(const GameState *state, Move *move, void *conte
     int64_t endMs;
 
     if (state != NULL && main_current_ai_difficulty(state) == DIFFICULTY_TOURNAMENT) {
+        int colorIndex;
+        int remainingBeforeMs;
+
         if (aiContext == NULL) {
             return 1;
         }
@@ -48,7 +51,12 @@ static int main_generate_ai_move(const GameState *state, Move *move, void *conte
             initAITimeManager(&aiContext->timeManager);
             aiContext->initialized = 1;
         }
+        if (isAITournamentTimeExpired(&aiContext->timeManager, state->currentTurn)) {
+            return GUI_MOVE_PROVIDER_TIME_FORFEIT;
+        }
 
+        colorIndex = (state->currentTurn == BLACK) ? BLACK : WHITE;
+        remainingBeforeMs = aiContext->timeManager.remainingMs[colorIndex];
         budgetMs = getAITournamentBudgetMs(&aiContext->timeManager, state->currentTurn);
         startMs = 0;
         endMs = 0;
@@ -62,6 +70,9 @@ static int main_generate_ai_move(const GameState *state, Move *move, void *conte
             elapsedMs = budgetMs;
         }
         updateAITournamentTime(&aiContext->timeManager, state->currentTurn, budgetMs, elapsedMs);
+        if (elapsedMs > remainingBeforeMs) {
+            return GUI_MOVE_PROVIDER_TIME_FORFEIT;
+        }
         return result;
     }
 

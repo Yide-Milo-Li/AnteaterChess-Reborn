@@ -156,6 +156,21 @@ static void complete_ai_job(GuiAsyncJob *job) {
         return;
     }
 
+    if (job->result == GUI_MOVE_PROVIDER_TIME_FORFEIT) {
+        if (controllerDeclareTimeForfeit(&gui->controller,
+                job->snapshot.currentTurn,
+                &errorCode) != 0) {
+            gui_set_error(gui, errorCode);
+            gui_update_gameplay_controls(gui, controllerGetState(&gui->controller));
+            return;
+        }
+
+        gui->ai_failure_active = 0;
+        gui_set_error(gui, ERR_TIME_UP);
+        gui_sync_from_controller(gui);
+        return;
+    }
+
     if (job->result != 0) {
         mark_ai_failure(gui);
         gui_set_error(gui, ERR_AI_UNAVAILABLE);

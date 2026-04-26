@@ -19,10 +19,12 @@ static void build_difficulty_group(GtkWidget *parent, const char *labelText,
     buttons[1] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Medium");
     buttons[2] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Hard");
     buttons[3] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Tournament");
+    buttons[4] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Experimental");
     gtk_box_pack_start(GTK_BOX(box), buttons[0], FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), buttons[1], FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), buttons[2], FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), buttons[3], FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), buttons[4], FALSE, FALSE, 0);
 }
 
 static void build_timer_controls(Gui *gui, GtkWidget *parent) {
@@ -91,14 +93,15 @@ static AIDifficulty selected_difficulty(GtkWidget *buttons[GUI_AI_DIFFICULTY_COU
 
 static void build_ai_budget_summary(GtkWidget *parent) {
     GtkWidget *label;
-    char text[128];
+    char text[192];
 
     snprintf(text, sizeof(text),
-        "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10:00.000 pool, max %dms",
+        "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10:00.000 pool, max %dms / Experimental %dms (alien plugin)",
         getDefaultAITimeBudgetMs(DIFFICULTY_EASY),
         getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM),
         getDefaultAITimeBudgetMs(DIFFICULTY_HARD),
-        getDefaultAITimeBudgetMs(DIFFICULTY_TOURNAMENT));
+        getDefaultAITimeBudgetMs(DIFFICULTY_TOURNAMENT),
+        getDefaultAITimeBudgetMs(DIFFICULTY_EXPERIMENTAL));
     label = gtk_label_new(text);
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);

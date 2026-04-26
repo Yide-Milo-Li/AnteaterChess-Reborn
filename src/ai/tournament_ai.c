@@ -316,11 +316,11 @@ static int king_zone_pressure(const Board *board, Color color) {
                 continue;
             }
             distance = abs_int(from.row - kingPos.row) + abs_int(from.col - kingPos.col);
-            if (distance <= 4) {
-                pressure += local_attacker_weight(piece.type) * (5 - distance);
+            if (distance <= 5) {
+                pressure += local_attacker_weight(piece.type) * (6 - distance);
             }
             if (attacks_square(board, from, piece, kingPos)) {
-                pressure += local_attacker_weight(piece.type) * 4;
+                pressure += local_attacker_weight(piece.type) * 8;
             }
         }
     }
@@ -375,6 +375,8 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
     int homeRow;
     int homeDistance;
     int shieldRow;
+    int edgeDistance;
+    int enemyMajors;
     int score;
     int colOffset;
 
@@ -385,12 +387,20 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
 
     homeRow = (color == WHITE) ? 7 : 0;
     homeDistance = (color == WHITE) ? (homeRow - kingPos.row) : (kingPos.row - homeRow);
+    edgeDistance = kingPos.col;
+    if ((COLS - 1 - kingPos.col) < edgeDistance) {
+        edgeDistance = COLS - 1 - kingPos.col;
+    }
+    enemyMajors = enemy_major_count(&state->board, color);
     score = 0;
     if (phase >= 12 && homeDistance > 1) {
         score -= 18 * homeDistance;
     }
     if (homeDistance > 2) {
-        score -= enemy_major_count(&state->board, color) * 18 * (homeDistance - 2);
+        score -= enemyMajors * 18 * (homeDistance - 2);
+    }
+    if (enemyMajors > 0 && edgeDistance <= 2) {
+        score -= enemyMajors * (edgeDistance <= 1 ? 34 : 18);
     }
 
     shieldRow = kingPos.row + ((color == WHITE) ? -1 : 1);
@@ -465,12 +475,14 @@ static int back_rank_invasion_pressure_for(const GameState *state, Color color) 
     int row;
     int col;
     int homeRow;
+    Position kingPos;
 
     if (state == NULL) {
         return 0;
     }
 
     homeRow = (color == WHITE) ? 7 : 0;
+    kingPos = find_king_position(&state->board, color);
     score = 0;
     for (row = 0; row < ROWS; ++row) {
         for (col = 0; col < COLS; ++col) {
@@ -478,6 +490,7 @@ static int back_rank_invasion_pressure_for(const GameState *state, Color color) 
             Piece piece = getPiece(&state->board, pos);
             int rowDistance;
             int campDepth;
+            int kingDistance;
 
             if (piece.type == EMPTY_PIECE || piece.color == color) {
                 continue;
@@ -491,29 +504,58 @@ static int back_rank_invasion_pressure_for(const GameState *state, Color color) 
             campDepth = 3 - rowDistance;
             switch (piece.type) {
                 case QUEEN:
-                    score -= 75 * campDepth;
+                    score -= 110 * campDepth;
                     break;
                 case ROOK:
-                    score -= 48 * campDepth;
+                    score -= 78 * campDepth;
                     break;
                 case BISHOP:
                 case KNIGHT:
-                    score -= 32 * campDepth;
+                    score -= 50 * campDepth;
                     break;
                 case ANTEATER:
-                    score -= 22 * campDepth;
+                    score -= 32 * campDepth;
                     break;
                 case ANT:
-                    score -= 18 * campDepth;
+                    score -= 26 * campDepth;
                     break;
                 case KING:
                 case EMPTY_PIECE:
                 default:
                     break;
             }
+            if (isValidPosition(kingPos)) {
+                kingDistance = abs_int(pos.row - kingPos.row) + abs_int(pos.col - kingPos.col);
+                if (kingDistance <= 4) {
+                    score -= local_attacker_weight(piece.type) * (5 - kingDistance) * 10;
+                }
+                if (attacks_square(&state->board, pos, piece, kingPos)) {
+                    score -= local_attacker_weight(piece.type) * 32;
+                }
+            }
         }
     }
     return score;
+}
+
+static int king_crisis_score_for(const GameState *state, Color color) {
+    int score;
+
+    if (state == NULL) {
+        return 0;
+    }
+
+    score = king_ring_pressure(&state->board, color) * 32;
+    score += king_zone_pressure(&state->board, color) * 4;
+    score -= back_rank_invasion_pressure_for(state, color);
+    if (isInCheck(state, color)) {
+        score += 220;
+    }
+    return score;
+}
+
+static int side_has_king_crisis(const GameState *state, Color color) {
+    return king_crisis_score_for(state, color) >= 260;
 }
 
 static int side_has_urgent_promotion_threat(const GameState *state, Color color) {
@@ -590,6 +632,9 @@ static int tournament_soft_limit_ms(const GameState *state,
     if (king_ring_pressure(&state->board, state->currentTurn) >= 3) {
         percent += 18;
     }
+    if (side_has_king_crisis(state, state->currentTurn)) {
+        percent += 24;
+    }
     if (side_has_urgent_promotion_threat(state, state->currentTurn)) {
         percent += 25;
     }
@@ -605,6 +650,7 @@ static int tournament_allow_null_move(const GameState *state, int depth) {
         return 1;
     }
     return king_ring_pressure(&state->board, state->currentTurn) < 3
+        && !side_has_king_crisis(state, state->currentTurn)
         && !side_has_urgent_promotion_threat(state, state->currentTurn);
 }
 
@@ -629,6 +675,7 @@ static int tournament_extend_move(const GameState *stateAfterMove,
     }
     if (stateAfterMove != NULL
         && (king_ring_pressure(&stateAfterMove->board, stateAfterMove->currentTurn) >= 4
+            || side_has_king_crisis(stateAfterMove, stateAfterMove->currentTurn)
             || side_has_urgent_promotion_threat(stateAfterMove, stateAfterMove->currentTurn))) {
         return 1;
     }

@@ -69,6 +69,7 @@ struct Gui {
     int has_highlight_from;
     int endgame_dialog_shown;
     int is_fullscreen;
+    int fullscreen_transition_pending;
     int should_quit;
 };
 

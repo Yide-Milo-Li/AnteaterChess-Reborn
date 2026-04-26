@@ -13,6 +13,11 @@ static gboolean gui_on_window_key_press(GtkWidget *widget, GdkEventKey *event, g
     }
 
     if (event->keyval == GDK_KEY_F11) {
+        if (gui->fullscreen_transition_pending) {
+            return TRUE;
+        }
+
+        gui->fullscreen_transition_pending = 1;
         if (gui->is_fullscreen) {
             gtk_window_unfullscreen(GTK_WINDOW(gui->window));
         } else {
@@ -22,6 +27,11 @@ static gboolean gui_on_window_key_press(GtkWidget *widget, GdkEventKey *event, g
     }
 
     if (event->keyval == GDK_KEY_Escape && gui->is_fullscreen) {
+        if (gui->fullscreen_transition_pending) {
+            return TRUE;
+        }
+
+        gui->fullscreen_transition_pending = 1;
         gtk_window_unfullscreen(GTK_WINDOW(gui->window));
         return TRUE;
     }
@@ -39,8 +49,11 @@ static gboolean gui_on_window_state_event(GtkWidget *widget,
         return FALSE;
     }
 
-    gui->is_fullscreen =
-        (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) ? 1 : 0;
+    if ((event->changed_mask & GDK_WINDOW_STATE_FULLSCREEN) != 0) {
+        gui->is_fullscreen =
+            (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) ? 1 : 0;
+        gui->fullscreen_transition_pending = 0;
+    }
     return FALSE;
 }
 
@@ -54,7 +67,7 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(gui->window), "Anteater Chess");
     gtk_window_set_default_size(GTK_WINDOW(gui->window), 1200, 840);
-    gtk_window_set_resizable(GTK_WINDOW(gui->window), FALSE);
+    gtk_window_set_resizable(GTK_WINDOW(gui->window), TRUE);
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
     gtk_widget_add_events(gui->window, GDK_KEY_PRESS_MASK | GDK_STRUCTURE_MASK);
@@ -121,6 +134,7 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->endgame_dialog_shown = 0;
     gui->sync_source_id = 0;
     gui->is_fullscreen = 0;
+    gui->fullscreen_transition_pending = 0;
     gui->should_quit = 0;
 
     g_signal_connect(gui->window, "destroy", G_CALLBACK(gui_on_window_destroy), gui);

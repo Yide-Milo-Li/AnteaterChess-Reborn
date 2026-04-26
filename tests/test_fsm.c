@@ -48,8 +48,9 @@ static void test_transition_validation(void) {
     assert(state.systemState == MAIN_MENU_STATE);
 }
 
-/* Check that timer expiry and fatal errors force the documented terminal paths. */
-static void test_terminal_event_paths(void) {
+/* Check that timer expiry skips the active turn while fatal errors still force
+ * terminal exit. */
+static void test_timer_expiry_and_fatal_error_paths(void) {
     GameState state = fresh_state();
 
     assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
@@ -60,10 +61,10 @@ static void test_terminal_event_paths(void) {
 
     state.currentTurn = WHITE;
     assert(processEvent(&state, createSystemEvent(EVENT_TIMER_EXPIRED)) == 0);
-    assert(state.systemState == GAME_TERMINATION_STATE);
-    assert(state.result == RESULT_BLACK_WIN);
-    assert(processEvent(&state, createSystemEvent(EVENT_NONE)) == 0);
-    assert(state.systemState == END_GAME_MENU_STATE);
+    assert(state.systemState == GAMEPLAY_STATE);
+    assert(state.currentTurn == BLACK);
+    assert(state.result == RESULT_NONE);
+    assert(state.gameOver == 0);
 
     state = fresh_state();
     assert(processEvent(&state, createFatalErrorEvent(ERR_FATAL)) == 0);
@@ -74,6 +75,6 @@ static void test_terminal_event_paths(void) {
 int main(void) {
     test_forward_state_progression();
     test_transition_validation();
-    test_terminal_event_paths();
+    test_timer_expiry_and_fatal_error_paths();
     return 0;
 }

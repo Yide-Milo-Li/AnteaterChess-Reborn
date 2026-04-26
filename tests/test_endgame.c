@@ -108,6 +108,40 @@ void test_insufficient_material_detects_simple_draws(void) {
     assert(isInsufficientMaterial(&state) == 0);
 }
 
+/* Check additional low-material combinations near the detector boundaries. */
+void test_insufficient_material_detects_boundary_combinations(void) {
+    GameState state;
+
+    initGameState(&state, NULL);
+    clearBoardForEndgameTest(&state.board);
+
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(4, 4), createPiece(KNIGHT, WHITE));
+    assert(isInsufficientMaterial(&state) == 1);
+
+    clearBoardForEndgameTest(&state.board);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(4, 4), createPiece(KNIGHT, WHITE));
+    setPiece(&state.board, createPosition(4, 6), createPiece(KNIGHT, BLACK));
+    assert(isInsufficientMaterial(&state) == 1);
+
+    clearBoardForEndgameTest(&state.board);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(3, 3), createPiece(BISHOP, WHITE));
+    setPiece(&state.board, createPosition(5, 5), createPiece(BISHOP, BLACK));
+    assert(isInsufficientMaterial(&state) == 1);
+
+    clearBoardForEndgameTest(&state.board);
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(3, 3), createPiece(BISHOP, WHITE));
+    setPiece(&state.board, createPosition(5, 4), createPiece(BISHOP, BLACK));
+    assert(isInsufficientMaterial(&state) == 0);
+}
+
 /* Check that detectGameResult writes the expected terminal result into state. */
 void test_detect_game_result_updates_game_state(void) {
     GameState state;
@@ -166,6 +200,7 @@ int main(void) {
     test_checkmate_ignores_capture_king_pseudomove();
     test_stalemate_detection_finds_no_legal_move_position();
     test_insufficient_material_detects_simple_draws();
+    test_insufficient_material_detects_boundary_combinations();
     test_detect_game_result_updates_game_state();
     test_endgame_detection_ignores_history_capacity_limit();
     return 0;

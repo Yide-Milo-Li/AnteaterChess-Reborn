@@ -15,6 +15,14 @@ void clearBoardForUndoTest(Board *board) {
     }
 }
 
+void test_undo_move_rejects_unavailable_history(void) {
+    GameState state;
+
+    initGameState(&state, NULL);
+    assert(undoMove(NULL) != 0);
+    assert(undoMove(&state) != 0);
+}
+
 void test_undo_move_restores_simple_move(void) {
     GameState state;
     Move move;
@@ -107,6 +115,49 @@ void test_undo_move_reverts_castling(void) {
     assert(getPiece(&state.board, createPosition(7, 6)).type == EMPTY_PIECE);
 }
 
+void test_undo_move_reverts_queenside_castling(void) {
+    GameState state;
+    Move move;
+
+    initGameState(&state, NULL);
+    clearBoardForUndoTest(&state.board);
+    state.currentTurn = BLACK;
+
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(0, 0), createPiece(ROOK, BLACK));
+    move = createMove(createPosition(0, 5), createPosition(0, 3), createPiece(KING, BLACK));
+    setSpecialMove(&move, CASTLING_QUEENSIDE);
+
+    assert(applyMove(&state, move) == 0);
+    assert(undoMove(&state) == 0);
+    assert(getPiece(&state.board, createPosition(0, 5)).type == KING);
+    assert(getPiece(&state.board, createPosition(0, 0)).type == ROOK);
+    assert(getPiece(&state.board, createPosition(0, 3)).type == EMPTY_PIECE);
+    assert(getPiece(&state.board, createPosition(0, 4)).type == EMPTY_PIECE);
+}
+
+void test_undo_move_reverts_black_capture_promotion(void) {
+    GameState state;
+    Move move;
+
+    initGameState(&state, NULL);
+    clearBoardForUndoTest(&state.board);
+    state.currentTurn = BLACK;
+
+    setPiece(&state.board, createPosition(6, 4), createPiece(ANT, BLACK));
+    setPiece(&state.board, createPosition(7, 5), createPiece(ROOK, WHITE));
+    move = createMove(createPosition(6, 4), createPosition(7, 5), createPiece(ANT, BLACK));
+    addCapture(&move, createPosition(7, 5), createPiece(ROOK, WHITE));
+    setSpecialMove(&move, PROMOTION_BISHOP);
+
+    assert(applyMove(&state, move) == 0);
+    assert(undoMove(&state) == 0);
+    assert(getPiece(&state.board, createPosition(6, 4)).type == ANT);
+    assert(getPiece(&state.board, createPosition(6, 4)).color == BLACK);
+    assert(getPiece(&state.board, createPosition(7, 5)).type == ROOK);
+    assert(getPiece(&state.board, createPosition(7, 5)).color == WHITE);
+}
+
 void test_undo_move_reverts_en_passant(void) {
     GameState state;
     Move move;
@@ -131,10 +182,13 @@ void test_undo_move_reverts_en_passant(void) {
 }
 
 int main(void) {
+    test_undo_move_rejects_unavailable_history();
     test_undo_move_restores_simple_move();
     test_undo_move_restores_chain_captures();
     test_undo_move_reverts_promotion_to_original_piece();
     test_undo_move_reverts_castling();
+    test_undo_move_reverts_queenside_castling();
+    test_undo_move_reverts_black_capture_promotion();
     test_undo_move_reverts_en_passant();
     return 0;
 }

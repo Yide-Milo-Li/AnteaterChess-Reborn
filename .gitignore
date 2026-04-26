@@ -59,7 +59,6 @@ coverage/
 # =========================
 .vscode/
 .idea/
+.cache/
 .codex
 compile_commands.json
-.cache/
-

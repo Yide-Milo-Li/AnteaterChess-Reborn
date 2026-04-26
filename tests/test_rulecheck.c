@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 
 #include "core/board.h"
 #include "core/gameconfig.h"
@@ -127,6 +128,27 @@ static void test_validate_move_checks_explicit_capture_metadata(void) {
     assert(validateMove(&state, wrongCaptureRequest) == 0);
 }
 
+/* Verify legal filtering rejects moves that would expose the moving side's
+ * king or move the king onto an attacked square. */
+static void test_validate_move_rejects_self_check_positions(void) {
+    GameState pinnedState = create_test_state(WHITE);
+    GameState kingStepState = create_test_state(WHITE);
+    Move move;
+
+    setPiece(&pinnedState.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&pinnedState.board, createPosition(7, 4), createPiece(ROOK, WHITE));
+    setPiece(&pinnedState.board, createPosition(7, 0), createPiece(ROOK, BLACK));
+    setPiece(&pinnedState.board, createPosition(0, 5), createPiece(KING, BLACK));
+    move = createMove(createPosition(7, 4), createPosition(6, 4), createPiece(ROOK, WHITE));
+    assert(validateMove(&pinnedState, move) == 0);
+
+    setPiece(&kingStepState.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&kingStepState.board, createPosition(0, 0), createPiece(KING, BLACK));
+    setPiece(&kingStepState.board, createPosition(5, 4), createPiece(ROOK, BLACK));
+    move = createMove(createPosition(7, 5), createPosition(6, 4), createPiece(KING, WHITE));
+    assert(validateMove(&kingStepState, move) == 0);
+}
+
 /* Verify special move validation accepts castling, en passant, and both
  * explicit and implicit promotion requests. */
 static void test_validate_move_accepts_supported_special_moves(void) {
@@ -188,6 +210,7 @@ int main(void) {
     test_validate_move_rejects_invalid_origin_and_target_inputs();
     test_validate_move_rejects_blocked_rook_path();
     test_validate_move_checks_explicit_capture_metadata();
+    test_validate_move_rejects_self_check_positions();
     test_validate_move_accepts_supported_special_moves();
     test_validate_move_rejects_illegal_special_moves();
     return 0;

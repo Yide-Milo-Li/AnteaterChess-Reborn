@@ -116,6 +116,24 @@ static void test_cli_app_human_vs_computer_white_session(void) {
     assert(count_occurrences(buffer, "WHITE TO MOVE") >= 2);
 }
 
+/* Check that human-vs-computer undo rewinds to the previous human turn
+ * without letting the AI immediately play another reply. */
+static void test_cli_app_human_vs_computer_undo_returns_to_human_turn(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        "1\n2\n1\n1\n1\n2\n1\nE2 E4\n2\n3\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Selected mode: Human vs Computer") != NULL);
+    assert(strstr(buffer, "Human Side: White") != NULL);
+    assert(count_occurrences(buffer, "[AI Move]") == 1);
+    assert(count_occurrences(buffer, "WHITE TO MOVE") >= 2);
+    assert(count_occurrences(buffer, "Actions") >= 2);
+}
+
 /* Check that black-side human games auto-play White's first AI move. */
 static void test_cli_app_human_vs_computer_black_session(void) {
     char buffer[32768];
@@ -135,10 +153,29 @@ static void test_cli_app_human_vs_computer_black_session(void) {
     assert(strstr(buffer, "Actions") != NULL);
 }
 
+/* Check that Black cannot undo White's opening AI move before Black has taken
+ * a turn. */
+static void test_cli_app_human_vs_computer_black_opening_undo_unavailable(void) {
+    char buffer[32768];
+    int result = run_and_capture_cli_app(
+        "1\n2\n2\n1\n1\n2\n2\n3\n3\n",
+        buffer,
+        sizeof(buffer)
+    );
+
+    assert(result == 0);
+    assert(strstr(buffer, "Human Side: Black") != NULL);
+    assert(strstr(buffer, "Undo unavailable.") != NULL);
+    assert(count_occurrences(buffer, "[AI Move]") == 1);
+    assert(count_occurrences(buffer, "BLACK TO MOVE") >= 2);
+}
+
 /* Run the standalone CLI app regression suite. */
 int main(void) {
     test_cli_app_full_session();
     test_cli_app_human_vs_computer_white_session();
+    test_cli_app_human_vs_computer_undo_returns_to_human_turn();
     test_cli_app_human_vs_computer_black_session();
+    test_cli_app_human_vs_computer_black_opening_undo_unavailable();
     return 0;
 }

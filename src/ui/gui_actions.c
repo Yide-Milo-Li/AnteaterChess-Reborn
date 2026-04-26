@@ -284,6 +284,9 @@ void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
     }
 
     gui_attach_move_provider(gui);
+    if (gui->move_provider_reset != NULL) {
+        gui->move_provider_reset(gui->move_provider_reset_context, &config);
+    }
     gui->pendingConfig = config;
     gui_sync_from_controller(gui);
 }

@@ -48,7 +48,7 @@ void gui_clear_view_refs(Gui *gui) {
         gui->setup_timer_widgets[index] = NULL;
     }
 
-    for (index = 0; index < 3; ++index) {
+    for (index = 0; index < GUI_AI_DIFFICULTY_COUNT; ++index) {
         gui->setup_ai_diff_buttons[index] = NULL;
         gui->setup_white_diff_buttons[index] = NULL;
         gui->setup_black_diff_buttons[index] = NULL;

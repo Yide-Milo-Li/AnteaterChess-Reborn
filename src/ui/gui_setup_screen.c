@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 static void build_difficulty_group(GtkWidget *parent, const char *labelText,
-                                   GtkWidget *buttons[3]) {
+                                   GtkWidget *buttons[GUI_AI_DIFFICULTY_COUNT]) {
     GtkWidget *label;
     GtkWidget *box;
 
@@ -18,9 +18,11 @@ static void build_difficulty_group(GtkWidget *parent, const char *labelText,
     buttons[0] = gtk_radio_button_new_with_label(NULL, "Easy");
     buttons[1] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Medium");
     buttons[2] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Hard");
+    buttons[3] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Tournament");
     gtk_box_pack_start(GTK_BOX(box), buttons[0], FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), buttons[1], FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), buttons[2], FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), buttons[3], FALSE, FALSE, 0);
 }
 
 static void build_timer_controls(Gui *gui, GtkWidget *parent) {
@@ -66,7 +68,7 @@ static void build_timer_controls(Gui *gui, GtkWidget *parent) {
     g_signal_connect(gui->setup_timer_toggle, "toggled", G_CALLBACK(gui_on_setup_timer_toggled), gui);
 }
 
-static void apply_difficulty_selection(GtkWidget *buttons[3], AIDifficulty difficulty) {
+static void apply_difficulty_selection(GtkWidget *buttons[GUI_AI_DIFFICULTY_COUNT], AIDifficulty difficulty) {
     int index = gui_difficulty_index(difficulty);
 
     if (GTK_IS_TOGGLE_BUTTON(buttons[index])) {
@@ -74,10 +76,10 @@ static void apply_difficulty_selection(GtkWidget *buttons[3], AIDifficulty diffi
     }
 }
 
-static AIDifficulty selected_difficulty(GtkWidget *buttons[3], AIDifficulty fallback) {
+static AIDifficulty selected_difficulty(GtkWidget *buttons[GUI_AI_DIFFICULTY_COUNT], AIDifficulty fallback) {
     int index;
 
-    for (index = 0; index < 3; ++index) {
+    for (index = 0; index < GUI_AI_DIFFICULTY_COUNT; ++index) {
         if (GTK_IS_TOGGLE_BUTTON(buttons[index])
             && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(buttons[index]))) {
             return gui_difficulty_from_index(index);
@@ -91,10 +93,12 @@ static void build_ai_budget_summary(GtkWidget *parent) {
     GtkWidget *label;
     char text[128];
 
-    snprintf(text, sizeof(text), "AI Budget: Easy %dms / Medium %dms / Hard %dms",
+    snprintf(text, sizeof(text),
+        "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10 min pool, max %dms",
         getDefaultAITimeBudgetMs(DIFFICULTY_EASY),
         getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM),
-        getDefaultAITimeBudgetMs(DIFFICULTY_HARD));
+        getDefaultAITimeBudgetMs(DIFFICULTY_HARD),
+        getDefaultAITimeBudgetMs(DIFFICULTY_TOURNAMENT));
     label = gtk_label_new(text);
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
@@ -205,6 +209,8 @@ int gui_collect_setup_config(Gui *gui, GameConfig *config, ErrorCode *errorCode)
             config->playerColor = EMPTY_COLOR;
             config->aiDifficultyWhite = selected_difficulty(gui->setup_white_diff_buttons, DIFFICULTY_EASY);
             config->aiDifficultyBlack = selected_difficulty(gui->setup_black_diff_buttons, DIFFICULTY_EASY);
+            config->timerEnabled = 0;
+            config->initialTimeSeconds = 0;
             break;
         default:
             if (errorCode != NULL) {
@@ -238,7 +244,7 @@ void gui_build_setup_menu(Gui *gui) {
     contentBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
     gtk_widget_set_halign(contentBox, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(contentBox, GTK_ALIGN_CENTER);
-    gtk_widget_set_size_request(contentBox, 520, -1);
+    gtk_widget_set_size_request(contentBox, 620, -1);
     gtk_style_context_add_class(gtk_widget_get_style_context(contentBox), "menu-panel");
     gtk_box_pack_start(GTK_BOX(gui->main_box), contentBox, TRUE, FALSE, 0);
 
@@ -269,7 +275,9 @@ void gui_build_setup_menu(Gui *gui) {
         build_ai_budget_summary(contentBox);
     }
 
-    build_timer_controls(gui, contentBox);
+    if (gui->pendingConfig.mode != MODE_COMPUTER_VS_COMPUTER) {
+        build_timer_controls(gui, contentBox);
+    }
 
     buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_set_halign(buttonBox, GTK_ALIGN_CENTER);
@@ -286,5 +294,7 @@ void gui_build_setup_menu(Gui *gui) {
 
     gui_apply_pending_setup_config(gui);
     gtk_widget_show_all(gui->window);
-    gui_on_setup_timer_toggled(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle), gui);
+    if (GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)) {
+        gui_on_setup_timer_toggled(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle), gui);
+    }
 }

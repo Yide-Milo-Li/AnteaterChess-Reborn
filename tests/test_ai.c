@@ -103,6 +103,9 @@ static void test_ai_rejects_null_arguments(void) {
 
     assert(generateAIMove(NULL, &move) != 0);
     assert(generateAIMove(&state, NULL) != 0);
+    assert(generateAIMoveWithBudget(NULL, &move, 300) != 0);
+    assert(generateAIMoveWithBudget(&state, NULL, 300) != 0);
+    assert(generateAIMoveWithBudget(&state, &move, 0) != 0);
     assert(generateHintMove(NULL, &move) != 0);
     assert(generateHintMove(&state, NULL) != 0);
 }
@@ -167,6 +170,52 @@ static void test_ai_respects_wall_clock_time_limit(void) {
     assert(endMs >= startMs);
     assert(endMs - startMs <= 2500);
     assert_move_is_playable_and_safe(&state, move);
+}
+
+static void test_ai_generates_move_with_explicit_budget(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    state.config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state.config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state.config.aiTimeLimit = 0;
+    before = state;
+
+    assert(generateAIMoveWithBudget(&state, &move, 300) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+}
+
+static void test_tournament_time_manager_rolls_saved_time_forward(void) {
+    AITimeManager manager;
+    int firstBudget;
+    int secondBudget;
+    int cappedBudget;
+
+    initAITimeManager(&manager);
+    firstBudget = getAITournamentBudgetMs(&manager, WHITE);
+    assert(firstBudget == 7000);
+
+    updateAITournamentTime(&manager, WHITE, firstBudget, 100);
+    assert(manager.remainingMs[WHITE] == 599900);
+    assert(manager.poolMs[WHITE] == 6900);
+
+    secondBudget = getAITournamentBudgetMs(&manager, WHITE);
+    assert(secondBudget == 8725);
+
+    updateAITournamentTime(&manager, WHITE, secondBudget, 11000);
+    assert(manager.poolMs[WHITE] == 4625);
+
+    updateAITournamentTime(&manager, WHITE, 7000, 0);
+    updateAITournamentTime(&manager, WHITE, 7000, 0);
+    updateAITournamentTime(&manager, WHITE, 7000, 0);
+    cappedBudget = getAITournamentBudgetMs(&manager, WHITE);
+    assert(cappedBudget <= 10000);
+    assert(cappedBudget >= 7000);
+
+    manager.remainingMs[WHITE] = 100;
+    assert(getAITournamentBudgetMs(&manager, WHITE) == 300);
 }
 
 /* Terminal positions with no legal moves should report failure instead of
@@ -238,6 +287,8 @@ int main(void) {
     test_ai_resolves_check_with_safe_move();
     test_hint_returns_legal_move_without_mutating_state();
     test_ai_respects_wall_clock_time_limit();
+    test_ai_generates_move_with_explicit_budget();
+    test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();
     test_ai_can_choose_en_passant();

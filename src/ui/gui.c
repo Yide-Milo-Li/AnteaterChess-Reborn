@@ -172,6 +172,17 @@ void gui_set_move_provider(Gui *gui, GuiMoveProvider provider, void *context) {
     gui->move_provider_context = context;
 }
 
+void gui_set_move_provider_reset(Gui *gui,
+                                 GuiMoveProviderReset reset,
+                                 void *context) {
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->move_provider_reset = reset;
+    gui->move_provider_reset_context = context;
+}
+
 void gui_set_hint_provider(Gui *gui, GuiHintProvider provider, void *context) {
     if (gui == NULL) {
         return;

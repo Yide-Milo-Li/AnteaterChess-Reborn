@@ -105,6 +105,10 @@ static const char *difficulty_label(AIDifficulty difficulty) {
             return "Medium";
         case DIFFICULTY_HARD:
             return "Hard";
+        case DIFFICULTY_TOURNAMENT:
+            return "Tournament";
+        case DIFFICULTY_EXPERIMENTAL:
+            return "Experimental";
         case DIFFICULTY_NONE:
         default:
             return "None";

@@ -19,7 +19,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "core/board.h"
 #include "core/hash.h"
@@ -28,6 +27,7 @@
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
 #include "gameplay/movegen.h"
+#include "time/clock.h"
 
 // AI Constants
 #define AI_INF 100000000       // Infinity
@@ -38,6 +38,13 @@
 #define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
+#define AI_TOURNAMENT_TOTAL_MS 600000
+#define AI_TOURNAMENT_RESERVE_MS 30000
+#define AI_TOURNAMENT_BASE_MS 7000
+#define AI_TOURNAMENT_MAX_MS 10000
+#define AI_TOURNAMENT_MAX_EXTRA_MS 3000
+#define AI_TOURNAMENT_POOL_CAP_MS 180000
+#define AI_MIN_MOVE_BUDGET_MS 300
 
 enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
 typedef struct {
@@ -52,7 +59,7 @@ typedef struct {
 } TTEntry;
 
 typedef struct {
-    clock_t searchStart;
+    int64_t searchStartMs;
     int timeLimitMs;
     int softTimeLimitMs;
     int stopSearch;
@@ -1379,11 +1386,33 @@ static int evaluate_relative(const GameState *state) {
     return -absoluteScore + 1;
 }
 
-static int elapsed_ms(const SearchContext *ctx) {
-    clock_t now;
+static int clamp_int(int value, int minValue, int maxValue) {
+    if (value < minValue) {
+        return minValue;
+    }
+    if (value > maxValue) {
+        return maxValue;
+    }
+    return value;
+}
 
-    now = clock();
-    return (int)(((now - ctx->searchStart) * 1000) / CLOCKS_PER_SEC);
+static int color_time_index(Color color) {
+    if (color == BLACK) {
+        return 1;
+    }
+    return 0;
+}
+
+static int elapsed_ms(const SearchContext *ctx) {
+    int64_t now;
+
+    if (ctx == NULL || getMonotonicMilliseconds(&now) != 0 || now < ctx->searchStartMs) {
+        return 0;
+    }
+    if (now - ctx->searchStartMs > INT_MAX) {
+        return INT_MAX;
+    }
+    return (int)(now - ctx->searchStartMs);
 }
 
 static int time_is_up(SearchContext *ctx) {
@@ -1391,12 +1420,88 @@ static int time_is_up(SearchContext *ctx) {
         return 0;
     }
 
-    // equal to % 2048, every 2048 nodes, check time
-    if ((ctx->nodes & 2047) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
+    if ((ctx->nodes & 1023) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
         ctx->stopSearch = 1;
     }
 
     return ctx->stopSearch;
+}
+
+void initAITimeManager(AITimeManager *manager) {
+    int index;
+
+    if (manager == NULL) {
+        return;
+    }
+
+    for (index = 0; index < 2; ++index) {
+        manager->remainingMs[index] = AI_TOURNAMENT_TOTAL_MS;
+        manager->poolMs[index] = 0;
+    }
+}
+
+int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
+    int index;
+    int remainingMs;
+    int availableMs;
+    int bonusMs;
+    int budgetMs;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return AI_TOURNAMENT_BASE_MS;
+    }
+
+    index = color_time_index(color);
+    remainingMs = manager->remainingMs[index];
+    if (remainingMs <= AI_MIN_MOVE_BUDGET_MS) {
+        return AI_MIN_MOVE_BUDGET_MS;
+    }
+    availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS
+        ? remainingMs - AI_TOURNAMENT_RESERVE_MS
+        : remainingMs;
+    bonusMs = manager->poolMs[index] / 4;
+    bonusMs = clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
+
+    budgetMs = AI_TOURNAMENT_BASE_MS + bonusMs;
+    budgetMs = clamp_int(budgetMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+    if (availableMs > 0 && budgetMs > availableMs) {
+        budgetMs = clamp_int(availableMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+    }
+    return budgetMs;
+}
+
+void updateAITournamentTime(AITimeManager *manager,
+                            Color color,
+                            int budgetMs,
+                            int elapsedMs) {
+    int index;
+    int poolMs;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return;
+    }
+
+    if (budgetMs <= 0) {
+        budgetMs = AI_TOURNAMENT_BASE_MS;
+    }
+    if (elapsedMs < 0) {
+        elapsedMs = 0;
+    }
+
+    index = color_time_index(color);
+    if (manager->remainingMs[index] > elapsedMs) {
+        manager->remainingMs[index] -= elapsedMs;
+    } else {
+        manager->remainingMs[index] = 0;
+    }
+
+    poolMs = manager->poolMs[index];
+    if (elapsedMs < budgetMs) {
+        poolMs += budgetMs - elapsedMs;
+    } else {
+        poolMs -= elapsedMs - budgetMs;
+    }
+    manager->poolMs[index] = clamp_int(poolMs, 0, AI_TOURNAMENT_POOL_CAP_MS);
 }
 
 // reset and init
@@ -1428,7 +1533,13 @@ static void age_history_scores(void) {
 }
 
 static int init_search_context(SearchContext *ctx, int timeLimitMs) {
+    int64_t now;
+
     if (ctx == NULL) {
+        return 1;
+    }
+
+    if (getMonotonicMilliseconds(&now) != 0) {
         return 1;
     }
 
@@ -1441,7 +1552,7 @@ static int init_search_context(SearchContext *ctx, int timeLimitMs) {
 
     ctx->timeLimitMs = timeLimitMs;
     ctx->softTimeLimitMs = (timeLimitMs > 0) ? (timeLimitMs * 4) / 5 : 0;
-    ctx->searchStart = clock();
+    ctx->searchStartMs = now;
     ++g_ttGeneration;
     if (g_ttGeneration == 0) {
         ++g_ttGeneration;
@@ -2269,6 +2380,8 @@ static int depth_for_difficulty(AIDifficulty difficulty) {
     case DIFFICULTY_MEDIUM:
         return 10;
     case DIFFICULTY_HARD:
+    case DIFFICULTY_EXPERIMENTAL:
+    case DIFFICULTY_TOURNAMENT:
         return 24;
     case DIFFICULTY_NONE:
     default:
@@ -2287,11 +2400,21 @@ static int time_budget_for_state(const GameState *state, AIDifficulty difficulty
     case DIFFICULTY_MEDIUM:
         return 2200;
     case DIFFICULTY_HARD:
+    case DIFFICULTY_EXPERIMENTAL:
         return 7000;
+    case DIFFICULTY_TOURNAMENT:
+        return AI_TOURNAMENT_MAX_MS;
     case DIFFICULTY_NONE:
     default:
         return 2200;
     }
+}
+
+static AIDifficulty search_difficulty_for(AIDifficulty difficulty) {
+    if (difficulty == DIFFICULTY_EXPERIMENTAL || difficulty == DIFFICULTY_TOURNAMENT) {
+        return DIFFICULTY_HARD;
+    }
+    return difficulty;
 }
 
 static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs, Move *bestMove) {
@@ -2498,15 +2621,30 @@ int generateAIMove(const GameState *state, Move *move) {
 #endif
         effective = DIFFICULTY_HARD;
     } else {
-        effective = difficulty;
+        effective = search_difficulty_for(difficulty);
     }
 
     maxDepth = depth_for_difficulty(effective);
-    maxTimeMs = time_budget_for_state(state, effective);
+    maxTimeMs = time_budget_for_state(state, difficulty);
     if (search_best_move(state, maxDepth, maxTimeMs, move) != 0) {
         return 1;
     }
     return 0;
+}
+
+int generateAIMoveWithBudget(const GameState *state, Move *move, int budgetMs) {
+    AIDifficulty difficulty;
+    AIDifficulty effective;
+    int maxDepth;
+
+    if (state == NULL || move == NULL || budgetMs <= 0) {
+        return 1;
+    }
+
+    difficulty = difficulty_for_turn(state);
+    effective = search_difficulty_for(difficulty);
+    maxDepth = depth_for_difficulty(effective);
+    return search_best_move(state, maxDepth, budgetMs, move);
 }
 
 int generateHintMove(const GameState *state, Move *move) {

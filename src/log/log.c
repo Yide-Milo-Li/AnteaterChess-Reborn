@@ -94,6 +94,8 @@ static const char *difficulty_to_string(AIDifficulty difficulty) {
             return "Hard";
         case DIFFICULTY_EXPERIMENTAL:
             return "Experimental";
+        case DIFFICULTY_TOURNAMENT:
+            return "Tournament";
         default:
             return "Unknown";
     }

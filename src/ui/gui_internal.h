@@ -18,6 +18,8 @@ typedef enum {
     GUI_STATUS_ERROR
 } GuiStatusKind;
 
+#define GUI_AI_DIFFICULTY_COUNT 4
+
 struct Gui {
     GtkWidget *window;
     GtkWidget *main_box;
@@ -44,11 +46,13 @@ struct Gui {
     GtkWidget *setup_timer_widgets[6];
     GtkWidget *setup_side_white;
     GtkWidget *setup_side_black;
-    GtkWidget *setup_ai_diff_buttons[3];
-    GtkWidget *setup_white_diff_buttons[3];
-    GtkWidget *setup_black_diff_buttons[3];
+    GtkWidget *setup_ai_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
+    GtkWidget *setup_white_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
+    GtkWidget *setup_black_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
     GuiMoveProvider move_provider;
     void *move_provider_context;
+    GuiMoveProviderReset move_provider_reset;
+    void *move_provider_reset_context;
     GuiHintProvider hint_provider;
     void *hint_provider_context;
     GuiAsyncJob *ai_job;

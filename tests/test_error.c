@@ -22,6 +22,7 @@ static void test_known_error_messages(void) {
     assert(strcmp(getErrorMessage(ERR_HINT_UNAVAILABLE), "Hint unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_NOT_YOUR_TURN), "Not your turn.") == 0);
     assert(strcmp(getErrorMessage(ERR_TIME_UP), "Time is up.") == 0);
+    assert(strcmp(getErrorMessage(ERR_ACTION_UNAVAILABLE), "Action unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_FATAL), "Fatal error.") == 0);
 }
 

@@ -36,6 +36,8 @@ const char *getErrorMessage(ErrorCode code) {
             return "Not your turn.";
         case ERR_TIME_UP:
             return "Time is up.";
+        case ERR_ACTION_UNAVAILABLE:
+            return "Action unavailable.";
         case ERR_FATAL:
             return "Fatal error.";
         default:

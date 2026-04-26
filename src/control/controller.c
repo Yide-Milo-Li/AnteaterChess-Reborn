@@ -4,6 +4,7 @@
 
 #include "ai/ai.h"
 #include "gameplay/move_resolver.h"
+#include "gameplay/validation.h"
 #include "input/move_request.h"
 #include "system/fsm.h"
 #include "turn/turn_timer.h"
@@ -45,6 +46,12 @@ static int all_queues_empty(const EventQueue *queue) {
     return isControlQueueEmpty(queue)
         && isSystemQueueEmpty(queue)
         && isGameplayQueueEmpty(queue);
+}
+
+static void set_controller_error(ErrorCode *errorCode, ErrorCode value) {
+    if (errorCode != NULL) {
+        *errorCode = value;
+    }
 }
 
 /* Remove the highest-priority available event from the controller queue. */
@@ -482,16 +489,20 @@ int controllerRequestExit(Controller *controller) {
     return apply_external_request(controller, createSystemEvent(EVENT_EXIT_PROGRAM));
 }
 
-/* Submit one already parsed move request and drain controller-owned follow-up
- * work such as AI replies, timers, or termination transitions. */
-int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
+/* Report whether a currently legal move request would resolve to a promotion
+ * move. This keeps GUI promotion prompts behind the controller boundary. */
+int controllerMoveRequestNeedsPromotion(const Controller *controller,
+                                        MoveRequest request,
+                                        int *needsPromotion) {
     Move resolvedMove;
 
-    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
+    if (needsPromotion == NULL) {
         return 1;
     }
 
-    if (controller->state.systemState != GAMEPLAY_STATE) {
+    *needsPromotion = 0;
+    if (controller == NULL || controller->state.systemState != GAMEPLAY_STATE
+        || current_turn_is_ai(&controller->state)) {
         return 1;
     }
 
@@ -499,11 +510,83 @@ int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
         return 1;
     }
 
-    if (controllerEnqueueEvent(controller, createPlayerMoveEvent(resolvedMove)) != 0) {
+    *needsPromotion = isPromotionSpecialMove(resolvedMove.specialType);
+    return 0;
+}
+
+/* Submit one already parsed move request and drain controller-owned follow-up
+ * work such as AI replies, timers, or termination transitions. The detailed
+ * variant lets GUI code show a stable user-facing error without resolving
+ * gameplay rules itself. */
+int controllerSubmitMoveRequestDetailed(Controller *controller,
+                                        MoveRequest request,
+                                        ErrorCode *errorCode) {
+    Move resolvedMove;
+    SelectionResult selectionResult;
+
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
         return 1;
     }
 
-    return controllerRunUntilIdle(controller);
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        set_controller_error(errorCode, ERR_ACTION_UNAVAILABLE);
+        return 1;
+    }
+
+    if (current_turn_is_ai(&controller->state)) {
+        set_controller_error(errorCode, ERR_NOT_YOUR_TURN);
+        return 1;
+    }
+
+    if (!isValidPosition(request.from) || !isValidPosition(request.to)) {
+        set_controller_error(errorCode, ERR_POSITION_OUT_OF_BOUNDS);
+        return 1;
+    }
+
+    if (!isValidPromotionChoice(request.promotion)) {
+        set_controller_error(errorCode, ERR_INVALID_INPUT);
+        return 1;
+    }
+
+    selectionResult = validateSelection(&controller->state, request.from);
+    switch (selectionResult) {
+        case SELECT_EMPTY:
+            set_controller_error(errorCode, ERR_EMPTY_SELECTION);
+            return 1;
+        case SELECT_OPPONENT_PIECE:
+            set_controller_error(errorCode, ERR_OPPONENT_PIECE);
+            return 1;
+        case SELECT_OUT_OF_BOUNDS:
+            set_controller_error(errorCode, ERR_POSITION_OUT_OF_BOUNDS);
+            return 1;
+        case SELECT_VALID:
+        default:
+            break;
+    }
+
+    if (resolveMoveRequest(&controller->state, request, &resolvedMove) != 0) {
+        set_controller_error(errorCode, ERR_ILLEGAL_MOVE);
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createPlayerMoveEvent(resolvedMove)) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controllerRunUntilIdle(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Submit one already parsed move request and drain controller-owned follow-up
+ * work such as AI replies, timers, or termination transitions. */
+int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
+    return controllerSubmitMoveRequestDetailed(controller, request, NULL);
 }
 
 /* Submit one legacy move command by converting it to the richer frontend move

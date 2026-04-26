@@ -225,6 +225,69 @@ static void test_controller_submit_move_applies_valid_move(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
+/* Check that detailed move submission reports one stable user-facing error for
+ * an illegal destination instead of requiring callers to run the resolver. */
+static void test_controller_submit_move_request_detailed_reports_illegal_move(void) {
+    Controller controller;
+    GameConfig config;
+    MoveRequest request;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    seed_simple_ant_position(&controller.state);
+    assert(createMoveRequest(&request, createPosition(6, 0),
+        createPosition(5, 1), PROMOTION_CHOICE_NONE) == 0);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitMoveRequestDetailed(&controller, request, &errorCode) != 0);
+    assert(errorCode == ERR_ILLEGAL_MOVE);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
+}
+
+/* Check that detailed move submission reports unavailable actions when gameplay
+ * has not started yet. */
+static void test_controller_submit_move_request_detailed_reports_non_gameplay(void) {
+    Controller controller = fresh_controller();
+    MoveRequest request;
+    ErrorCode errorCode;
+
+    assert(createMoveRequest(&request, createPosition(6, 0),
+        createPosition(5, 0), PROMOTION_CHOICE_NONE) == 0);
+    assert(controllerRunUntilIdle(&controller) == 0);
+    assert(controller.state.systemState == MAIN_MENU_STATE);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitMoveRequestDetailed(&controller, request, &errorCode) != 0);
+    assert(errorCode == ERR_ACTION_UNAVAILABLE);
+}
+
+/* Check that human-facing submit helpers do not let frontends play an AI turn. */
+static void test_controller_submit_move_request_detailed_rejects_ai_turn(void) {
+    Controller controller;
+    GameConfig config;
+    MoveRequest request;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.players[WHITE].type == AI);
+    assert(createMoveRequest(&request, createPosition(7, 1),
+        createPosition(5, 2), PROMOTION_CHOICE_NONE) == 0);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitMoveRequestDetailed(&controller, request, &errorCode) != 0);
+    assert(errorCode == ERR_NOT_YOUR_TURN);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
+}
+
 /* Check that a legal submitted move at history capacity becomes a draw through
  * the public controller path. */
 static void test_controller_submit_move_draws_at_history_capacity(void) {
@@ -254,6 +317,8 @@ static void test_controller_submit_move_request_applies_promotion_choice(void) {
     Controller controller;
     GameConfig config;
     MoveRequest request;
+    ErrorCode errorCode;
+    int needsPromotion;
 
     initDefaultGameConfig(&config);
     assert(controllerStartConfiguredGame(&controller, &config) == 0);
@@ -264,7 +329,12 @@ static void test_controller_submit_move_request_applies_promotion_choice(void) {
 
     assert(createMoveRequest(&request, createPosition(1, 2),
         createPosition(0, 2), PROMOTION_CHOICE_ROOK) == 0);
-    assert(controllerSubmitMoveRequest(&controller, request) == 0);
+    needsPromotion = 0;
+    assert(controllerMoveRequestNeedsPromotion(&controller, request, &needsPromotion) == 0);
+    assert(needsPromotion == 1);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitMoveRequestDetailed(&controller, request, &errorCode) == 0);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).type == ROOK);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
 }
@@ -405,6 +475,9 @@ int main(void) {
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();
     test_controller_submit_move_applies_valid_move();
+    test_controller_submit_move_request_detailed_reports_illegal_move();
+    test_controller_submit_move_request_detailed_reports_non_gameplay();
+    test_controller_submit_move_request_detailed_rejects_ai_turn();
     test_controller_submit_move_draws_at_history_capacity();
     test_controller_submit_move_request_applies_promotion_choice();
     test_controller_submit_move_legacy_promotion_defaults_to_queen();

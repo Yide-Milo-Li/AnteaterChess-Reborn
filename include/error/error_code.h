@@ -23,6 +23,7 @@ typedef enum {
     ERR_HINT_UNAVAILABLE,
     ERR_NOT_YOUR_TURN,
     ERR_TIME_UP,
+    ERR_ACTION_UNAVAILABLE,
     ERR_FATAL
 } ErrorCode;
 

@@ -1,7 +1,5 @@
 #include "gui_internal.h"
 
-#include "error/error.h"
-#include "gameplay/move_resolver.h"
 #include "input/command_parser.h"
 #include "input/move_request.h"
 
@@ -147,27 +145,16 @@ void gui_on_setup_timer_toggled(GtkToggleButton *button, gpointer user_data) {
 
 void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
-    const GameState *state;
     const char *fromText;
     const char *toText;
     Command command;
     MoveRequest request;
-    Move resolvedMove;
+    ErrorCode errorCode;
+    int needsPromotion;
 
     (void)button;
     if (gui == NULL || !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
         gui_set_error(gui, ERR_FATAL);
-        return;
-    }
-
-    state = controllerGetState(&gui->controller);
-    if (state == NULL || state->systemState != GAMEPLAY_STATE) {
-        gui_set_error(gui, ERR_FATAL);
-        return;
-    }
-
-    if (gui_current_turn_is_ai(state)) {
-        gui_set_error(gui, ERR_NOT_YOUR_TURN);
         return;
     }
 
@@ -178,13 +165,14 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
-    if (createMoveRequestFromCommand(&request, command) != 0
-        || resolveMoveRequest(state, request, &resolvedMove) != 0) {
-        gui_set_error(gui, ERR_ILLEGAL_MOVE);
+    if (createMoveRequestFromCommand(&request, command) != 0) {
+        gui_set_error(gui, ERR_INVALID_MOVE_FORMAT);
         return;
     }
 
-    if (isPromotionSpecialMove(resolvedMove.specialType)) {
+    needsPromotion = 0;
+    if (controllerMoveRequestNeedsPromotion(&gui->controller, request, &needsPromotion) == 0
+        && needsPromotion) {
         PromotionChoice promotion;
 
         if (gui_select_promotion_choice(gui, &promotion) != 0) {
@@ -193,8 +181,9 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
         request.promotion = promotion;
     }
 
-    if (controllerSubmitMoveRequest(&gui->controller, request) != 0) {
-        gui_set_error(gui, ERR_ILLEGAL_MOVE);
+    errorCode = ERR_ILLEGAL_MOVE;
+    if (controllerSubmitMoveRequestDetailed(&gui->controller, request, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
         return;
     }
 

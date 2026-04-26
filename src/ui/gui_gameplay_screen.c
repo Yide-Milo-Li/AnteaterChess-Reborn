@@ -74,7 +74,8 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *scrolledWindow;
     GtkWidget *enterBox;
     GtkWidget *moveBox;
-    GtkWidget *formatButton;
+    GtkWidget *formatHelp;
+    GtkWidget *formatIcon;
     GtkWidget *submitButton;
     GtkWidget *undoButton;
     GtkWidget *hintButton;
@@ -141,14 +142,23 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(moveBox), gui->from_entry, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(moveBox), gui->to_entry, TRUE, TRUE, 0);
 
-    formatButton = gtk_button_new_with_label("Format");
-    gui_set_button_icon(formatButton, "info-icon-svgrepo-com.svg", GUI_UI_ICON_SIZE);
-    gtk_widget_set_tooltip_text(formatButton,
-        "Enter moves by square, for example E2 to E4. Promotion is selected after submit.");
-    gtk_box_pack_start(GTK_BOX(moveBox), formatButton, FALSE, FALSE, 0);
+    formatHelp = gtk_event_box_new();
+    gtk_event_box_set_visible_window(GTK_EVENT_BOX(formatHelp), TRUE);
+    gtk_widget_set_size_request(formatHelp, 28, 28);
+    gtk_widget_set_tooltip_text(formatHelp,
+        "Move format: E2 to E4. Castling uses king start/end squares. Promotion is selected after submit.");
+    gtk_style_context_add_class(gtk_widget_get_style_context(formatHelp), "format-help");
+    formatIcon = gui_create_ui_icon("info-icon-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    if (formatIcon == NULL) {
+        formatIcon = gtk_label_new("i");
+        gtk_style_context_add_class(gtk_widget_get_style_context(formatIcon), "info-icon");
+    }
+    gtk_container_add(GTK_CONTAINER(formatHelp), formatIcon);
+    gtk_box_pack_start(GTK_BOX(moveBox), formatHelp, FALSE, FALSE, 0);
 
     submitButton = gtk_button_new_with_label("Submit");
     gui->submit_button = submitButton;
+    gtk_style_context_add_class(gtk_widget_get_style_context(submitButton), "primary-button");
     gtk_box_pack_start(GTK_BOX(moveBox), submitButton, FALSE, FALSE, 0);
     g_signal_connect(submitButton, "clicked", G_CALLBACK(gui_on_submit_move_clicked), gui);
 
@@ -162,7 +172,6 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gui->hint_button = hintButton;
     gui_set_button_icon(hintButton, "bulb-on-svgrepo-com (1).svg", GUI_UI_ICON_SIZE);
     gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-button");
-    gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-glow");
     gtk_widget_set_size_request(hintButton, 92, 44);
     gtk_widget_set_tooltip_text(hintButton, "Show a suggested move.");
     g_signal_connect(hintButton, "clicked", G_CALLBACK(gui_on_hint_clicked), gui);

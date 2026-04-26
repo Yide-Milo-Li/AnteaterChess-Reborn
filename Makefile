@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := all
 
 CC ?= gcc
-CPPFLAGS ?= -Iinclude -D_POSIX_C_SOURCE=200809L
+CPPFLAGS ?= -Iinclude -Isrc -D_POSIX_C_SOURCE=200809L
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror
 LDFLAGS ?=
 LDLIBS ?=
@@ -90,9 +90,18 @@ CLI_SRCS := \
 
 OPTIONAL_AI_SRCS := $(wildcard src/ai/tournament_ai.c)
 
+ALIEN_SRCS := \
+	src/ai/alien/alien_ai.c \
+	src/ai/alien/alien_board.c \
+	src/ai/alien/alien_book.c \
+	src/ai/alien/alien_engine.c \
+	src/ai/alien/alien_engine_native.c \
+	src/ai/alien/alien_movegen.c
+
 AI_SRCS := \
 	src/ai/ai.c \
-	$(OPTIONAL_AI_SRCS)
+	$(OPTIONAL_AI_SRCS) \
+	$(ALIEN_SRCS)
 
 GUI_SRCS := \
 	src/ui/gui.c \

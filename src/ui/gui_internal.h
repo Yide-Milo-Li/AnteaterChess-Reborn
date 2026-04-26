@@ -18,7 +18,10 @@ typedef enum {
     GUI_STATUS_ERROR
 } GuiStatusKind;
 
-#define GUI_AI_DIFFICULTY_COUNT 4
+/* 5 difficulty radios in the setup menu:
+ * Easy / Medium / Hard / Tournament / Experimental.
+ * Experimental routes through the optional ai/alien/ plugin. */
+#define GUI_AI_DIFFICULTY_COUNT 5
 
 struct Gui {
     GtkWidget *window;

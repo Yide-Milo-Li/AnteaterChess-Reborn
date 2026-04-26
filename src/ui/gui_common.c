@@ -178,7 +178,6 @@ void gui_set_error(Gui *gui, ErrorCode code) {
             initController(&gui->controller, &gui->pendingConfig);
             gui->last_rendered_state = EXIT_STATE;
             gui->has_rendered_state = 0;
-            gui->endgame_dialog_shown = 0;
             gui_sync_from_controller(gui);
         }
         return;

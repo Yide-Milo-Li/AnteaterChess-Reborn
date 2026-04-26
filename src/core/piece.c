@@ -31,7 +31,7 @@ char getPieceSymbol(Piece piece) {
 
     switch (piece.type) {
         case ANT:
-            return 'A';
+            return 'P';
         case ROOK:
             return 'R';
         case KNIGHT:

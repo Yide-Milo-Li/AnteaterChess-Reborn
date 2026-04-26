@@ -51,3 +51,11 @@ void setSpecialMove(Move *move, SpecialMove type) {
 
     move->specialType = type;
 }
+
+int isPromotionSpecialMove(SpecialMove type) {
+    return type == PROMOTION_QUEEN
+        || type == PROMOTION_ROOK
+        || type == PROMOTION_BISHOP
+        || type == PROMOTION_KNIGHT
+        || type == PROMOTION_ANTEATER;
+}

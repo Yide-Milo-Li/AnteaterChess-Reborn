@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/hash.h"
 #include "gameplay/execution.h"
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
@@ -438,6 +439,41 @@ int isInsufficientMaterial(const GameState *state) {
     return 0;
 }
 
+/* Count the current full-position identity while walking backward through
+ * reversible history. Three occurrences is enough for the CvC auto-draw path. */
+int isThreefoldRepetition(const GameState *state) {
+    GameState cursor;
+    uint64_t currentHash;
+    int repetitions;
+
+    if (state == NULL) {
+        return 0;
+    }
+
+    currentHash = computeHash(state);
+    cursor = *state;
+    repetitions = 0;
+
+    for (;;) {
+        if (computeHash(&cursor) == currentHash) {
+            ++repetitions;
+            if (repetitions >= 3) {
+                return 1;
+            }
+        }
+
+        if (cursor.moveHistory.count <= 0) {
+            break;
+        }
+
+        if (undoMove(&cursor) != 0) {
+            break;
+        }
+    }
+
+    return 0;
+}
+
 /* Update the GameState result field when a terminal position is found.
  * The currentTurn field identifies the side that must move next, so that is
  * the side we test for checkmate or stalemate. */
@@ -475,6 +511,12 @@ int detectGameResult(GameState *state) {
 
     /* If there is not enough material left to force a win, record a draw. */
     if (isInsufficientMaterial(state) == 1) {
+        setGameResult(state, RESULT_DRAW);
+        return 1;
+    }
+
+    if (state->config.mode == MODE_COMPUTER_VS_COMPUTER
+        && isThreefoldRepetition(state) == 1) {
         setGameResult(state, RESULT_DRAW);
         return 1;
     }

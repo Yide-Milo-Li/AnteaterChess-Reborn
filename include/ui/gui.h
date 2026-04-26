@@ -2,31 +2,18 @@
 #ifndef CHESS_UI_GUI_H
 #define CHESS_UI_GUI_H
 
-#include <gtk/gtk.h>
-
-#include "core/gameconfig.h"
 #include "core/gamestate.h"
-#include "system/controller.h"
+#include "core/move.h"
 
 typedef struct Gui Gui;
+
+typedef int (*GuiMoveProvider)(const GameState *state, Move *move, void *context);
+typedef int (*GuiHintProvider)(const GameState *state, Move *move, void *context);
 
 Gui *gui_create(int *argc, char ***argv);
 void gui_destroy(Gui *gui);
 void gui_run(Gui *gui);
-
-void gui_sync_from_controller(Gui *gui);
-int gui_render_snapshot(Gui *gui, const GameState *state);
-const GameState *gui_get_state(const Gui *gui);
-Controller *gui_get_controller(Gui *gui);
-
-int gui_process_events(void);
-int gui_window_is_valid(const Gui *gui);
-void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
-
-void update_board(Gui *gui, const GameState *state);
-void update_movelist(Gui *gui, const GameState *state);
-void update_clock(Gui *gui);
-void update_timers(Gui *gui, const GameState *state);
-void gui_display_turn(Gui *gui, Color turn);
+void gui_set_move_provider(Gui *gui, GuiMoveProvider provider, void *context);
+void gui_set_hint_provider(Gui *gui, GuiHintProvider provider, void *context);
 
 #endif

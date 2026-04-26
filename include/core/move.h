@@ -15,6 +15,7 @@ typedef enum {
     PROMOTION_ROOK,
     PROMOTION_BISHOP,
     PROMOTION_KNIGHT,
+    PROMOTION_ANTEATER,
     ANTEATER_CAPTURE
 } SpecialMove;
 
@@ -38,5 +39,6 @@ Move createMove(Position from, Position to, Piece piece);
 void addCapture(Move *move, Position pos, Piece piece);
 void addPathStep(Move *move, Position pos);
 void setSpecialMove(Move *move, SpecialMove type);
+int isPromotionSpecialMove(SpecialMove type);
 
 #endif

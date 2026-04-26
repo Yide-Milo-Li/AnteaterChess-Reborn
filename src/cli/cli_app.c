@@ -7,6 +7,7 @@
 #include "cli/cli_gameplay.h"
 #include "cli/cli_menu.h"
 #include "cli/cli_renderer.h"
+#include "ai/ai.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
 #include "core/board.h"
@@ -16,6 +17,7 @@
 #include "core/position.h"
 #include "gameplay/validation.h"
 #include "system/controller.h"
+#include "system/controller_driver.h"
 #include "system/event.h"
 #include "turn/turn_timer.h"
 
@@ -57,6 +59,24 @@ static int current_turn_is_ai(const GameState *state) {
     }
 
     return state->players[state->currentTurn].type == AI;
+}
+
+static int cli_move_provider(const GameState *state, Move *move, void *context) {
+    (void)context;
+    return generateAIMove(state, move);
+}
+
+/* Start a CLI gameplay session and attach the legacy AI provider afterwards
+ * because controllerStartConfiguredGame() rebuilds controller runtime state. */
+static int start_cli_configured_game(Controller *controller,
+                                     const GameConfig *config,
+                                     ErrorCode *errorCode) {
+    if (controllerStartConfiguredGameDetailed(controller, config, errorCode) != 0) {
+        return 1;
+    }
+
+    controllerSetMoveProvider(controller, cli_move_provider, NULL);
+    return 0;
 }
 
 /* Check whether the controller currently has pending queued work. */
@@ -167,7 +187,9 @@ static int resolve_cli_move_command(const GameState *state, Command command, Mov
         return 1;
     }
 
-    if (createMoveRequestFromCommand(&request, command) != 0) {
+    if (command.type != CMD_MOVE
+        || createMoveRequest(&request, command.from, command.to,
+            PROMOTION_CHOICE_QUEEN) != 0) {
         return 1;
     }
 
@@ -272,6 +294,7 @@ static int enqueue_timer_expiry_if_needed(Controller *controller) {
 /* Collect setup fields, rebuild the controller, and continue into gameplay. */
 static int collect_setup_event(Controller *controller, GameConfig *pendingConfig) {
     GameConfig config;
+    ErrorCode errorCode = ERR_FATAL;
 
     if (pendingConfig == NULL) {
         return 1;
@@ -282,8 +305,13 @@ static int collect_setup_event(Controller *controller, GameConfig *pendingConfig
         return 1;
     }
 
+    if (start_cli_configured_game(controller, &config, &errorCode) != 0) {
+        cliShowErrorMessage(errorCode);
+        return (errorCode == ERR_INVALID_AI_TIMER_SETTING) ? 0 : 1;
+    }
+
     *pendingConfig = config;
-    return controllerStartConfiguredGame(controller, pendingConfig);
+    return 0;
 }
 
 /* Collect one gameplay action and map it to the next CLI event if any. */
@@ -318,23 +346,39 @@ static int collect_gameplay_event(Controller *controller) {
 
     switch (action) {
         case 1:
+            if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                return 1;
+            }
+            if (!controller_queue_is_empty(controller)) {
+                return 0;
+            }
             if (cliShowMoveFormatHint() != 0) {
                 return 1;
             }
             for (;;) {
                 if (cliGetMoveCommand(&command) != 0) {
                     cliShowErrorMessage(ERR_INVALID_MOVE_FORMAT);
+                    if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                        return 1;
+                    }
+                    if (!controller_queue_is_empty(controller)) {
+                        return 0;
+                    }
                     continue;
                 }
 
                 if (resolve_cli_move_command(state, command, &resolvedMove) != 0) {
                     cliShowErrorMessage(classify_move_error(state, command));
+                    if (enqueue_timer_expiry_if_needed(controller) != 0) {
+                        return 1;
+                    }
+                    if (!controller_queue_is_empty(controller)) {
+                        return 0;
+                    }
                     continue;
                 }
 
-                /* Keep move input as a low-level event so the outer CLI tick can
-                 * print the exact processed move, timeout, or error event. */
-                return controllerEnqueueEvent(controller, createMoveInputEvent(command));
+                return controllerEnqueueEvent(controller, createPlayerMoveEvent(resolvedMove));
             }
         case 2:
             if (enqueue_timer_expiry_if_needed(controller) != 0) {
@@ -470,11 +514,6 @@ static int collect_next_cli_event(Controller *controller, GameConfig *pendingCon
 
 /* Translate common FSM failures into user-visible CLI feedback. */
 static void report_processing_error(const GameState *state, Event event) {
-    if (event.type == EVENT_MOVE_INPUT) {
-        cliShowErrorMessage(classify_move_error(state, event.data.command));
-        return;
-    }
-
     if (event.type == EVENT_PLAYER_MOVE) {
         cliShowErrorMessage(ERR_ILLEGAL_MOVE);
         return;
@@ -507,6 +546,7 @@ int runCliApp(void) {
     initDefaultGameConfig(&config);
     pendingConfig = config;
     initController(&controller, &config);
+    controllerSetMoveProvider(&controller, cli_move_provider, NULL);
 
     while (controllerGetState(&controller)->systemState != EXIT_STATE) {
         Event event;

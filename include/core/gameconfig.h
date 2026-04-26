@@ -13,7 +13,8 @@ typedef enum {
     DIFFICULTY_NONE,
     DIFFICULTY_EASY,
     DIFFICULTY_MEDIUM,
-    DIFFICULTY_HARD
+    DIFFICULTY_HARD,
+    DIFFICULTY_EXPERIMENTAL
 } AIDifficulty;
 
 typedef struct {
@@ -28,5 +29,9 @@ typedef struct {
 
 void initDefaultGameConfig(GameConfig *config);
 void initGameConfigForMode(GameConfig *config, GameMode mode);
+int getDefaultAITimeBudgetMs(AIDifficulty difficulty);
+int getAITimeBudgetMs(const GameConfig *config, AIDifficulty difficulty);
+int getRequiredAITurnTimerSeconds(const GameConfig *config);
+int isAITurnTimerSettingValid(const GameConfig *config);
 
 #endif

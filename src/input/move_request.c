@@ -33,13 +33,3 @@ int createMoveRequest(MoveRequest *request, Position from, Position to,
     request->promotion = promotion;
     return 0;
 }
-
-int createMoveRequestFromCommand(MoveRequest *request, Command command) {
-    if (command.type != CMD_MOVE) {
-        mark_invalid_request(request);
-        return 1;
-    }
-
-    return createMoveRequest(request, command.from, command.to,
-        PROMOTION_CHOICE_QUEEN);
-}

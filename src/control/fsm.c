@@ -129,6 +129,11 @@ static int apply_resolved_move(GameState *state, Move move) {
         return 1;
     }
 
+    if (state->moveHistory.count >= MAX_MOVES) {
+        setGameResult(state, RESULT_DRAW);
+        return transitionState(state, GAME_TERMINATION_STATE);
+    }
+
     if (applyMove(state, move) != 0) {
         return 1;
     }
@@ -179,8 +184,6 @@ static int handle_gameplay_event(GameState *state, Event event) {
     }
 
     switch (event.type) {
-        case EVENT_MOVE_INPUT:
-            return 1;
         case EVENT_PLAYER_MOVE:
         case EVENT_AI_MOVE:
             return handle_resolved_move(state, event.data.move);

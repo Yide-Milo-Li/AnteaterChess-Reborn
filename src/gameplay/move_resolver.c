@@ -3,16 +3,10 @@
 #include <stddef.h>
 
 #include "core/board.h"
+#include "core/move.h"
 #include "core/movelist.h"
 #include "gameplay/movegen.h"
 #include "gameplay/validation.h"
-
-static int is_promotion_move(SpecialMove type) {
-    return type == PROMOTION_QUEEN
-        || type == PROMOTION_ROOK
-        || type == PROMOTION_BISHOP
-        || type == PROMOTION_KNIGHT;
-}
 
 static SpecialMove special_for_promotion_choice(PromotionChoice promotion) {
     switch (promotion) {
@@ -81,7 +75,7 @@ int resolveMoveRequest(const GameState *state, MoveRequest request,
             continue;
         }
 
-        if (is_promotion_move(candidate->specialType)) {
+        if (isPromotionSpecialMove(candidate->specialType)) {
             ++promotionCount;
             if (candidate->specialType == requestedPromotion) {
                 selectedPromotionMove = candidate;

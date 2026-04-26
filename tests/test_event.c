@@ -3,22 +3,13 @@
 
 #include "core/move.h"
 #include "error/error_code.h"
-#include "input/command.h"
 #include "system/event.h"
 #include "system/event_queue.h"
 
 /* Check that the public event constructors fill only the documented payload. */
 static void test_event_constructors(void) {
-    Command command;
     Move move;
     Event event;
-
-    assert(createMoveCommand(&command, createPosition(1, 2), createPosition(3, 4)) == 0);
-    event = createMoveInputEvent(command);
-    assert(event.type == EVENT_MOVE_INPUT);
-    assert(event.data.command.type == CMD_MOVE);
-    assert(positionEqual(event.data.command.from, createPosition(1, 2)) == 1);
-    assert(positionEqual(event.data.command.to, createPosition(3, 4)) == 1);
 
     memset(&move, 0, sizeof(move));
     move.from = createPosition(6, 0);
@@ -35,7 +26,6 @@ static void test_event_constructors(void) {
 
     assert(createSystemEvent(EVENT_BACK).type == EVENT_BACK);
     assert(createSystemEvent(EVENT_EXIT_PROGRAM).type == EVENT_EXIT_PROGRAM);
-    assert(createSystemEvent(EVENT_MOVE_INPUT).type == EVENT_NONE);
     assert(createSystemEvent(EVENT_PLAYER_MOVE).type == EVENT_NONE);
 
     event = createUndoEvent();

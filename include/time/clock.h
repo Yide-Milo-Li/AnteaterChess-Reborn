@@ -8,6 +8,8 @@
  * GameState. */
 int initClock(void);
 int updateClock(void);
+int getMonotonicMilliseconds(int64_t *outMilliseconds);
+int64_t getElapsedTimeMilliseconds(void);
 /* Header modification: elapsed seconds now use int64_t because difftime()
  * may exceed int during long-running sessions, and truncating to int risks
  * overflow in services that consume the gameplay clock. */

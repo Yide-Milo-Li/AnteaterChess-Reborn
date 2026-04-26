@@ -18,14 +18,6 @@ static Event blankEvent(EventType type) {
     return event;
 }
 
-/* Build one gameplay input event from a parsed command payload. */
-Event createMoveInputEvent(Command cmd) {
-    Event event = blankEvent(EVENT_MOVE_INPUT);
-
-    event.data.command = cmd;
-    return event;
-}
-
 /* Build one human-selected move event after controller-side request resolution. */
 Event createPlayerMoveEvent(Move move) {
     Event event = blankEvent(EVENT_PLAYER_MOVE);

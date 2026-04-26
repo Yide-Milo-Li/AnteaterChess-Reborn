@@ -1,31 +1,28 @@
-#include <stdio.h>
+#include "ai/ai.h"
+#include "ui/gui.h"
 
-#include "core/gameconfig.h"
-#include "core/gamestate.h"
-#include "system/controller.h"
+#include <stddef.h>
 
-/*
- * Alignment assumptions for future extensions:
- * - main only wires together public contracts and should not depend on
- *   controller or FSM internals.
- * - The intended public stack is main -> controller -> fsm.
- * - controller.h is the truth source for the system loop entrypoint.
- * - Initial system state comes from GameState initialization, not hidden FSM globals.
- */
+static int main_generate_ai_move(const GameState *state, Move *move, void *context) {
+    (void)context;
+    return generateAIMove(state, move);
+}
 
-/* Boot one default game state and hand control to the public controller loop,
- * which in turn drives the FSM. */
-int main(void) {
-    GameConfig config;
-    GameState state;
-    int result;
+static int main_generate_hint_move(const GameState *state, Move *move, void *context) {
+    (void)context;
+    return generateHintMove(state, move);
+}
 
-    initDefaultGameConfig(&config);
-    initGameState(&state, &config);
+int main(int argc, char **argv) {
+    Gui *gui = gui_create(&argc, &argv);
 
-    printf("[AnteaterChess] Phase E controller starting in state %d.\n", (int)state.systemState);
-    result = runGameLoop(&state);
-    printf("[AnteaterChess] Controller stopped in state %d with rc=%d.\n", (int)state.systemState, result);
+    if (gui == NULL) {
+        return 1;
+    }
 
-    return result;
+    gui_set_move_provider(gui, main_generate_ai_move, NULL);
+    gui_set_hint_provider(gui, main_generate_hint_move, NULL);
+    gui_run(gui);
+    gui_destroy(gui);
+    return 0;
 }

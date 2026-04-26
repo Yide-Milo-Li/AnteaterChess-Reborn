@@ -7,6 +7,7 @@ int isInCheck(const GameState *state, Color color);
 int isCheckmate(const GameState *state, Color color);
 int isStalemate(const GameState *state, Color color);
 int isInsufficientMaterial(const GameState *state);
+int isThreefoldRepetition(const GameState *state);
 int detectGameResult(GameState *state);
 
 #endif

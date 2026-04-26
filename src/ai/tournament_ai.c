@@ -6,6 +6,8 @@
 #include "core/position.h"
 #include "gameplay/endgame.h"
 
+#include <stddef.h>
+
 #define TOURNAMENT_MIN_MOVE_BUDGET_MS 300
 
 static int clamp_int_local(int value, int minValue, int maxValue) {

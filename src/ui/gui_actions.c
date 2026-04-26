@@ -438,7 +438,6 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
     Move move;
     char hintText[64];
-    const GameState *state;
     int result;
 
     (void)button;
@@ -450,7 +449,6 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
-    state = gui_get_state(gui);
     if (gui != NULL && gui->hint_provider != NULL) {
         gui_set_error(gui, ERR_HINT_UNAVAILABLE);
         return;

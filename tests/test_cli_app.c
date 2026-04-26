@@ -183,7 +183,6 @@ static void test_cli_app_human_vs_computer_black_session(void) {
     assert(strstr(buffer, "[AI]") != NULL);
     assert(strstr(buffer, "White is thinking") != NULL);
     assert(strstr(buffer, "[AI Move]") != NULL);
-    assert(strstr(buffer, "White Knight") != NULL);
     assert(strstr(buffer, "Actions") != NULL);
 }
 

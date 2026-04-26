@@ -39,6 +39,7 @@ INSTALL_SRC := $(firstword $(wildcard packaging/src/INSTALL INSTALL))
 USER_README_SRC := $(firstword $(wildcard packaging/user/README))
 USER_INSTALL_SRC := $(firstword $(wildcard packaging/user/INSTALL))
 USER_MANUAL_PDF := doc/Chess_UserManual.pdf
+ASSET_FILES := $(wildcard assets/*)
 
 CORE_SRCS := \
 	src/core/position.c \
@@ -88,7 +89,8 @@ CLI_SRCS := \
 	src/cli/cli_app.c
 
 AI_SRCS := \
-	src/ai/ai.c
+	src/ai/ai.c \
+	src/ai/book.c
 
 GUI_SRCS := \
 	src/ui/gui.c \
@@ -111,6 +113,7 @@ APP_SRCS := \
 
 GUI_APP_SRCS := \
 	$(APP_SRCS) \
+	$(AI_SRCS) \
 	$(GUI_SRCS)
 
 CLI_APP_SRCS := \
@@ -179,6 +182,7 @@ DEP_FILES := \
 ARCHIVE_SRC_DEPS := \
 	$(GUI_APP_SRCS) $(CLI_APP_SRCS) $(GUI_MAIN_SRC) $(CLI_MAIN_SRC) \
 	$(wildcard tests/*.c) \
+	$(ASSET_FILES) \
 	$(shell find include -name '*.h' 2>/dev/null)
 
 .PHONY: all gui cli tests test test-core test-system test-cli test-ai \
@@ -245,16 +249,18 @@ $(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT $(ARCHIVE_SRC_DE
 	$(CP) include $(SRC_STAGE_DIR)/
 	$(CP) src $(SRC_STAGE_DIR)/
 	$(CP) tests $(SRC_STAGE_DIR)/
+	$(CP) assets $(SRC_STAGE_DIR)/
 	@if [ -d doc ]; then $(CP) doc/. $(SRC_STAGE_DIR)/doc/; fi
 	$(TAR) -czf $(SRC_ARCHIVE) -C $(PKG_DIR) Chess_Alpha_src
 
-$(USER_ARCHIVE): $(CHESS_BIN) $(USER_README_SRC) $(USER_INSTALL_SRC) COPYRIGHT
+$(USER_ARCHIVE): $(CHESS_BIN) $(USER_README_SRC) $(USER_INSTALL_SRC) COPYRIGHT $(ASSET_FILES)
 	$(RMDIR) $(USER_STAGE_DIR)
 	$(MKDIR_P) $(USER_STAGE_DIR)/bin $(USER_STAGE_DIR)/bin/logs $(USER_STAGE_DIR)/doc
 	cp $(USER_README_SRC) $(USER_STAGE_DIR)/README
 	cp $(USER_INSTALL_SRC) $(USER_STAGE_DIR)/INSTALL
 	cp COPYRIGHT $(USER_STAGE_DIR)/
 	cp $(CHESS_BIN) $(USER_STAGE_DIR)/bin/chess
+	$(CP) assets $(USER_STAGE_DIR)/
 	@if [ -f $(USER_MANUAL_PDF) ]; then \
 		cp $(USER_MANUAL_PDF) $(USER_STAGE_DIR)/doc/; \
 	else \
@@ -285,4 +291,6 @@ $(CLI_BIN): $(BIN_DIR) $(LOG_DIR) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS)
 $(TEST_BIN_DIR)/%$(EXEEXT): $(TEST_BIN_DIR) $(OBJ_DIR)/tests/%.o $(TEST_APP_OBJS)
 	$(CC) $(LDFLAGS) $(OBJ_DIR)/tests/$*.o $(TEST_APP_OBJS) $(LDLIBS) -o $@
 
+ifneq ($(filter clean,$(MAKECMDGOALS)),clean)
 -include $(DEP_FILES)
+endif

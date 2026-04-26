@@ -22,16 +22,24 @@ void gui_clear_view_refs(Gui *gui) {
     gui->status_label = NULL;
     gui->from_entry = NULL;
     gui->to_entry = NULL;
+    gui->submit_button = NULL;
+    gui->undo_button = NULL;
+    gui->hint_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;
     gui->setup_minutes_spin = NULL;
     gui->setup_seconds_spin = NULL;
+    gui->setup_ai_time_spin = NULL;
     gui->setup_side_white = NULL;
     gui->setup_side_black = NULL;
+    gui->has_highlight_from = 0;
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
+            gui->board_cells[row][col] = NULL;
             gui->board_images[row][col] = NULL;
+            gui->board_piece_labels[row][col] = NULL;
+            gui->highlight_destinations[row][col] = 0;
         }
     }
 
@@ -114,6 +122,20 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
 void gui_set_error(Gui *gui, ErrorCode code) {
     const char *message = getErrorMessage(code);
 
+    if (code == ERR_FATAL) {
+        gui_show_message_dialog(gui, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Anteater Chess", message);
+        if (gui_window_is_valid(gui)) {
+            initDefaultGameConfig(&gui->pendingConfig);
+            initController(&gui->controller, &gui->pendingConfig);
+            gui_attach_move_provider(gui);
+            gui->last_rendered_state = EXIT_STATE;
+            gui->has_rendered_state = 0;
+            gui->endgame_dialog_shown = 0;
+            gui_sync_from_controller(gui);
+        }
+        return;
+    }
+
     if (gui != NULL && GTK_IS_WIDGET(gui->status_label) && GTK_IS_LABEL(gui->status_label)) {
         gui_set_status_text(gui, message);
         return;
@@ -141,6 +163,7 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 GtkWidget *gui_create_centered_button(const char *label) {
     GtkWidget *button = gtk_button_new_with_label(label);
 
+    gtk_widget_set_size_request(button, 180, 44);
     gtk_widget_set_hexpand(button, TRUE);
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
     return button;

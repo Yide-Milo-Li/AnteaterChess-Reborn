@@ -15,7 +15,9 @@ struct Gui {
     GtkWidget *main_box;
     GtkWidget *new_game_button;
     GtkWidget *quit_game_button;
+    GtkWidget *board_cells[8][10];
     GtkWidget *board_images[8][10];
+    GtkWidget *board_piece_labels[8][10];
     GtkWidget *turn_label;
     GtkWidget *time_display;
     GtkWidget *history_view;
@@ -24,21 +26,35 @@ struct Gui {
     GtkWidget *status_label;
     GtkWidget *from_entry;
     GtkWidget *to_entry;
+    GtkWidget *submit_button;
+    GtkWidget *undo_button;
+    GtkWidget *hint_button;
     GtkWidget *setup_timer_toggle;
     GtkWidget *setup_hours_spin;
     GtkWidget *setup_minutes_spin;
     GtkWidget *setup_seconds_spin;
     GtkWidget *setup_timer_widgets[6];
+    GtkWidget *setup_ai_time_spin;
     GtkWidget *setup_side_white;
     GtkWidget *setup_side_black;
     GtkWidget *setup_ai_diff_buttons[3];
     GtkWidget *setup_white_diff_buttons[3];
     GtkWidget *setup_black_diff_buttons[3];
+    GuiMoveProvider move_provider;
+    void *move_provider_context;
+    GuiHintProvider hint_provider;
+    void *hint_provider_context;
     Controller controller;
     GameConfig pendingConfig;
     SystemState last_rendered_state;
+    Color last_turn;
+    int last_move_count;
+    int highlight_destinations[8][10];
+    Position highlight_from;
     guint sync_source_id;
     int has_rendered_state;
+    int has_highlight_from;
+    int endgame_dialog_shown;
     int should_quit;
 };
 
@@ -52,6 +68,7 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
                              const char *message);
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
+void gui_attach_move_provider(Gui *gui);
 
 int gui_current_turn_is_ai(const GameState *state);
 const char *gui_game_mode_title(GameMode mode);
@@ -62,7 +79,9 @@ void gui_format_elapsed_text(char buffer[32], int64_t elapsedSeconds);
 void gui_format_timer_text(char buffer[32], const char *prefix, int seconds);
 void gui_format_position_text(Position pos, char buffer[8]);
 void gui_format_hint_text(Move move, char buffer[64]);
-const char *gui_get_piece_icon(Piece piece);
+const char *gui_get_piece_asset_path(Piece piece);
+GdkPixbuf *gui_get_piece_pixbuf(Piece piece, int size);
+void gui_format_piece_fallback_text(Piece piece, char buffer[4]);
 
 void gui_build_main_menu(Gui *gui);
 void gui_build_mode_menu(Gui *gui);
@@ -79,7 +98,10 @@ void gui_update_movelist(Gui *gui, const GameState *state);
 void gui_update_clock(Gui *gui);
 void gui_update_timers(Gui *gui, const GameState *state);
 void gui_update_turn_display(Gui *gui, Color turn);
+void gui_update_gameplay_controls(Gui *gui, const GameState *state);
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
+void gui_clear_move_highlights(Gui *gui);
+void gui_refresh_move_highlights(Gui *gui);
 
 void gui_sync_from_controller(Gui *gui);
 int gui_render_snapshot(Gui *gui, const GameState *state);
@@ -96,11 +118,14 @@ void gui_on_back_clicked(GtkButton *button, gpointer user_data);
 void gui_on_start_clicked(GtkButton *button, gpointer user_data);
 void gui_on_setup_timer_toggled(GtkToggleButton *button, gpointer user_data);
 void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data);
+void gui_on_move_entry_changed(GtkEditable *editable, gpointer user_data);
+gboolean gui_on_board_cell_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
 void gui_on_undo_clicked(GtkButton *button, gpointer user_data);
 void gui_on_hint_clicked(GtkButton *button, gpointer user_data);
 void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data);
+void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data);
 
 #endif

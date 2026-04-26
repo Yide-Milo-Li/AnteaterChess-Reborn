@@ -52,9 +52,10 @@
 #define AI_TOURNAMENT_TOTAL_MS 600999
 #define AI_TOURNAMENT_RESERVE_MS 30000
 #define AI_TOURNAMENT_BASE_MS 7000
-#define AI_TOURNAMENT_MAX_MS 10000
-#define AI_TOURNAMENT_MAX_EXTRA_MS 3000
-#define AI_TOURNAMENT_POOL_CAP_MS 180000
+#define AI_TOURNAMENT_MAX_MS 14000
+#define AI_TOURNAMENT_MAX_EXTRA_MS 7000
+#define AI_TOURNAMENT_BONUS_DIVISOR 2
+#define AI_TOURNAMENT_POOL_CAP_MS 240000
 #define AI_MIN_MOVE_BUDGET_MS 300
 
 enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
@@ -1484,7 +1485,7 @@ int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
     availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS
         ? remainingMs - AI_TOURNAMENT_RESERVE_MS
         : remainingMs;
-    bonusMs = manager->poolMs[index] / 4;
+    bonusMs = manager->poolMs[index] / AI_TOURNAMENT_BONUS_DIVISOR;
     bonusMs = clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
 
     budgetMs = AI_TOURNAMENT_BASE_MS + bonusMs;

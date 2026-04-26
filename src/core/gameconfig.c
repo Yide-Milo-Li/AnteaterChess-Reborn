@@ -49,7 +49,7 @@ int getDefaultAITimeBudgetMs(AIDifficulty difficulty) {
         case DIFFICULTY_EXPERIMENTAL:
             return 7000;
         case DIFFICULTY_TOURNAMENT:
-            return 10000;
+            return 14000;
         case DIFFICULTY_NONE:
         default:
             return 0;

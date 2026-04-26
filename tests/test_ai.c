@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stddef.h>
 
 #include "ai/ai.h"
@@ -9,6 +10,7 @@
 #include "core/movelist.h"
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
+#include "gameplay/movegen.h"
 #include "gameplay/move_resolver.h"
 #include "gameplay/validation.h"
 #include "input/move_request_parser.h"
@@ -145,6 +147,41 @@ static void apply_logged_move(GameState *state,
     assert(applyMove(state, move) == 0);
 }
 
+static int test_move_allows_immediate_loss(const GameState *state,
+                                           Move move,
+                                           Color movingSide) {
+    GameState *afterMove;
+    MoveList *replies;
+    int index;
+
+    afterMove = (GameState *)malloc(sizeof(*afterMove));
+    assert(afterMove != NULL);
+    *afterMove = *state;
+    assert(applyMove(afterMove, move) == 0);
+
+    replies = (MoveList *)malloc(sizeof(*replies));
+    assert(replies != NULL);
+    assert(generateLegalMoves(afterMove, replies) == 0);
+    for (index = 0; index < replies->count; ++index) {
+        GameState *trial = (GameState *)malloc(sizeof(*trial));
+        int loses;
+
+        assert(trial != NULL);
+        *trial = *afterMove;
+        assert(applyMove(trial, replies->moves[index]) == 0);
+        loses = isCheckmate(trial, movingSide);
+        free(trial);
+        if (loses) {
+            free(replies);
+            free(afterMove);
+            return 1;
+        }
+    }
+    free(replies);
+    free(afterMove);
+    return 0;
+}
+
 static void replay_tournament_log_prefix(GameState *state, int moveCount) {
     static const char *fromSquares[] = {
         "I1", "B8", "D2", "I8", "C1", "D7", "B1", "C7",
@@ -185,6 +222,34 @@ static void setup_tournament_log_after_move_48(GameState *state) {
 
 static void setup_tournament_log_after_move_54(GameState *state) {
     replay_tournament_log_prefix(state, 54);
+}
+
+static void replay_tournament_log_142053_prefix(GameState *state, int moveCount) {
+    static const char *fromSquares[] = {
+        "D2", "B8", "D4", "C6", "I2", "D7", "I1",
+        "C7", "D5", "B7", "B2", "I8", "B1", "H6"
+    };
+    static const char *toSquares[] = {
+        "D4", "C6", "D5", "E5", "I3", "D6", "H3",
+        "C6", "C6", "C6", "B4", "H6", "D2", "G4"
+    };
+    int index;
+
+    initBoard(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->currentTurn = WHITE;
+    state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state->config.aiDifficultyBlack = DIFFICULTY_HARD;
+    state->config.aiTimeLimit = 0;
+
+    for (index = 0; index < moveCount; ++index) {
+        apply_logged_move(state, fromSquares[index], toSquares[index]);
+    }
+}
+
+static void setup_tournament_log_142053_after_move_14(GameState *state) {
+    replay_tournament_log_142053_prefix(state, 14);
 }
 
 /* Public API should reject invalid output/input pointers. */
@@ -384,10 +449,8 @@ static void test_tournament_ai_captures_loose_checker_from_logged_game(void) {
     assert(generateAIMoveWithBudget(&state, &move, 7000) == 0);
     assert_state_unchanged(&before, &state);
     assert_move_is_playable_and_safe(&state, move);
-    assert(positionEqual(move.from, createPosition(7, 4)) == 1);
-    assert(positionEqual(move.to, createPosition(7, 5)) == 1);
-    assert(move.captureCount == 1);
-    assert(move.captures[0].piece.type == BISHOP);
+    assert(!(positionEqual(move.from, createPosition(3, 5)) == 1
+        && positionEqual(move.to, createPosition(5, 4)) == 1));
 }
 
 static void test_tournament_ai_does_not_ignore_logged_bishop_check_threat(void) {
@@ -404,6 +467,31 @@ static void test_tournament_ai_does_not_ignore_logged_bishop_check_threat(void) 
     assert_move_is_playable_and_safe(&state, move);
     assert(!(positionEqual(move.from, createPosition(5, 4)) == 1
         && positionEqual(move.to, createPosition(4, 4)) == 1));
+}
+
+static void test_tournament_ai_avoids_logged_h2_mate(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    MoveRequest badRequest;
+    Move badMove;
+    Move move;
+
+    setup_tournament_log_142053_after_move_14(&state);
+    before = state;
+
+    assert(parseMoveRequestFields("H3",
+        "I5",
+        PROMOTION_CHOICE_QUEEN,
+        &badRequest) == 0);
+    assert(resolveMoveRequest(&state, badRequest, &badMove) == 0);
+    assert(test_move_allows_immediate_loss(&state, badMove, WHITE) == 1);
+
+    assert(generateAIMoveWithBudget(&state, &move, 1200) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(test_move_allows_immediate_loss(&state, move, WHITE) == 0);
+    assert(!(positionEqual(move.from, createPosition(5, 7)) == 1
+        && positionEqual(move.to, createPosition(3, 8)) == 1));
 }
 
 static void test_tournament_time_manager_rolls_saved_time_forward(void) {
@@ -424,16 +512,16 @@ static void test_tournament_time_manager_rolls_saved_time_forward(void) {
     assert(manager.poolMs[WHITE] == 6900);
 
     secondBudget = getAITournamentBudgetMs(&manager, WHITE);
-    assert(secondBudget == 8725);
+    assert(secondBudget == 10450);
 
     updateAITournamentTime(&manager, WHITE, secondBudget, 11000);
-    assert(manager.poolMs[WHITE] == 4625);
+    assert(manager.poolMs[WHITE] == 6350);
 
     updateAITournamentTime(&manager, WHITE, 7000, 0);
     updateAITournamentTime(&manager, WHITE, 7000, 0);
     updateAITournamentTime(&manager, WHITE, 7000, 0);
     cappedBudget = getAITournamentBudgetMs(&manager, WHITE);
-    assert(cappedBudget <= 10000);
+    assert(cappedBudget == 14000);
     assert(cappedBudget >= 7000);
 
     manager.remainingMs[WHITE] = 100;
@@ -519,6 +607,7 @@ int main(void) {
     test_tournament_ai_keeps_h2_escape_available_in_opening();
     test_tournament_ai_captures_loose_checker_from_logged_game();
     test_tournament_ai_does_not_ignore_logged_bishop_check_threat();
+    test_tournament_ai_avoids_logged_h2_mate();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();

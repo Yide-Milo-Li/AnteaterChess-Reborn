@@ -5,8 +5,11 @@
 #include "core/board.h"
 #include "core/position.h"
 #include "gameplay/endgame.h"
+#include "gameplay/execution.h"
+#include "gameplay/movegen.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 
 #define TOURNAMENT_MIN_MOVE_BUDGET_MS 300
 #define TOURNAMENT_URGENT_PROMOTION_DISTANCE 3
@@ -1024,6 +1027,253 @@ static int side_has_urgent_promotion_threat(const GameState *state, Color color)
     return 0;
 }
 
+static int tournament_evaluate_adjustment(const GameState *state);
+
+static int opponent_has_immediate_winning_reply(const GameState *stateAfterMove,
+                                                Color movingSide) {
+    MoveList *replies;
+    int index;
+
+    if (stateAfterMove == NULL
+        || (movingSide != WHITE && movingSide != BLACK)) {
+        return 0;
+    }
+
+    replies = (MoveList *)malloc(sizeof(*replies));
+    if (replies == NULL) {
+        return 0;
+    }
+
+    if (generateLegalMoves(stateAfterMove, replies) != 0) {
+        free(replies);
+        return 0;
+    }
+
+    for (index = 0; index < replies->count; ++index) {
+        GameState *trial = (GameState *)malloc(sizeof(*trial));
+        int loses;
+
+        if (trial == NULL) {
+            continue;
+        }
+        *trial = *stateAfterMove;
+        if (applyMove(trial, replies->moves[index]) != 0) {
+            free(trial);
+            continue;
+        }
+        loses = isCheckmate(trial, movingSide);
+        free(trial);
+        if (loses) {
+            free(replies);
+            return 1;
+        }
+    }
+    free(replies);
+    return 0;
+}
+
+static int all_defenses_allow_immediate_loss(const GameState *stateInCheck,
+                                             Color movingSide) {
+    MoveList *defenses;
+    int index;
+
+    if (stateInCheck == NULL
+        || !isInCheck(stateInCheck, movingSide)) {
+        return 0;
+    }
+
+    defenses = (MoveList *)malloc(sizeof(*defenses));
+    if (defenses == NULL) {
+        return 0;
+    }
+    if (generateLegalMoves(stateInCheck, defenses) != 0) {
+        free(defenses);
+        return 0;
+    }
+    if (defenses->count <= 0) {
+        free(defenses);
+        return 1;
+    }
+
+    for (index = 0; index < defenses->count; ++index) {
+        GameState *afterDefense = (GameState *)malloc(sizeof(*afterDefense));
+        int stillLoses;
+
+        if (afterDefense == NULL) {
+            continue;
+        }
+        *afterDefense = *stateInCheck;
+        if (applyMove(afterDefense, defenses->moves[index]) != 0) {
+            free(afterDefense);
+            continue;
+        }
+        stillLoses = opponent_has_immediate_winning_reply(afterDefense, movingSide);
+        free(afterDefense);
+        if (!stillLoses) {
+            free(defenses);
+            return 0;
+        }
+    }
+
+    free(defenses);
+    return 1;
+}
+
+static int opponent_has_forcing_winning_reply(const GameState *stateAfterMove,
+                                              Color movingSide) {
+    MoveList *replies;
+    int index;
+
+    if (stateAfterMove == NULL
+        || (movingSide != WHITE && movingSide != BLACK)) {
+        return 0;
+    }
+
+    replies = (MoveList *)malloc(sizeof(*replies));
+    if (replies == NULL) {
+        return 0;
+    }
+    if (generateLegalMoves(stateAfterMove, replies) != 0) {
+        free(replies);
+        return 0;
+    }
+
+    for (index = 0; index < replies->count; ++index) {
+        GameState *trial = (GameState *)malloc(sizeof(*trial));
+        int loses;
+
+        if (trial == NULL) {
+            continue;
+        }
+        *trial = *stateAfterMove;
+        if (applyMove(trial, replies->moves[index]) != 0) {
+            free(trial);
+            continue;
+        }
+        loses = isCheckmate(trial, movingSide)
+            || all_defenses_allow_immediate_loss(trial, movingSide);
+        free(trial);
+        if (loses) {
+            free(replies);
+            return 1;
+        }
+    }
+
+    free(replies);
+    return 0;
+}
+
+static int move_allows_immediate_loss(const GameState *state,
+                                      const Move *move,
+                                      Color movingSide) {
+    GameState *afterMove;
+    int loses;
+
+    if (state == NULL || move == NULL) {
+        return 0;
+    }
+
+    afterMove = (GameState *)malloc(sizeof(*afterMove));
+    if (afterMove == NULL) {
+        return 0;
+    }
+    *afterMove = *state;
+    if (applyMove(afterMove, *move) != 0) {
+        free(afterMove);
+        return 0;
+    }
+    loses = opponent_has_forcing_winning_reply(afterMove, movingSide);
+    free(afterMove);
+    return loses;
+}
+
+static int root_guard_score(const GameState *stateAfterMove,
+                            const Move *move,
+                            Color movingSide) {
+    int score;
+
+    if (stateAfterMove == NULL || move == NULL) {
+        return -1000000;
+    }
+
+    score = (movingSide == WHITE)
+        ? tournament_evaluate_adjustment(stateAfterMove)
+        : -tournament_evaluate_adjustment(stateAfterMove);
+    score += initial_gain(move) * 2;
+    if (isInCheck(stateAfterMove, stateAfterMove->currentTurn)) {
+        score += 260;
+    }
+    score += king_crisis_score_for(stateAfterMove, stateAfterMove->currentTurn) / 3;
+    score -= king_crisis_score_for(stateAfterMove, movingSide) / 2;
+    return score;
+}
+
+static int replace_immediate_loss_blunder(const GameState *state, Move *move) {
+    MoveList *candidates;
+    Move bestMove;
+    Color movingSide;
+    int bestScore;
+    int found;
+    int index;
+
+    if (state == NULL || move == NULL
+        || (state->currentTurn != WHITE && state->currentTurn != BLACK)) {
+        return 0;
+    }
+
+    movingSide = state->currentTurn;
+    if (!move_allows_immediate_loss(state, move, movingSide)) {
+        return 0;
+    }
+
+    candidates = (MoveList *)malloc(sizeof(*candidates));
+    if (candidates == NULL) {
+        return 0;
+    }
+
+    if (generateLegalMoves(state, candidates) != 0) {
+        free(candidates);
+        return 0;
+    }
+
+    bestScore = -1000000;
+    found = 0;
+    for (index = 0; index < candidates->count; ++index) {
+        GameState *afterMove;
+        int score;
+
+        if (move_allows_immediate_loss(state, &candidates->moves[index], movingSide)) {
+            continue;
+        }
+        afterMove = (GameState *)malloc(sizeof(*afterMove));
+        if (afterMove == NULL) {
+            continue;
+        }
+        *afterMove = *state;
+        if (applyMove(afterMove, candidates->moves[index]) != 0) {
+            free(afterMove);
+            continue;
+        }
+
+        score = root_guard_score(afterMove, &candidates->moves[index], movingSide);
+        free(afterMove);
+        if (!found || score > bestScore) {
+            bestScore = score;
+            bestMove = candidates->moves[index];
+            found = 1;
+        }
+    }
+
+    if (!found) {
+        free(candidates);
+        return 0;
+    }
+
+    *move = bestMove;
+    free(candidates);
+    return 1;
+}
+
 static int tournament_evaluate_adjustment(const GameState *state) {
     int phase;
 
@@ -1146,6 +1396,7 @@ int generateTournamentAIMoveWithBudget(const GameState *state,
                                        Move *move,
                                        int budgetMs) {
     AISearchProfile profile;
+    int result;
 
     if (state == NULL || move == NULL || budgetMs <= 0) {
         return 1;
@@ -1168,5 +1419,10 @@ int generateTournamentAIMoveWithBudget(const GameState *state,
     profile.allowNullMove = tournament_allow_null_move;
     profile.extendMove = tournament_extend_move;
     profile.shouldStopAfterDepth = tournament_should_stop_after_depth;
-    return aiSearchBestMoveWithProfile(state, &profile, budgetMs, move);
+    result = aiSearchBestMoveWithProfile(state, &profile, budgetMs, move);
+    if (result != 0) {
+        return result;
+    }
+    (void)replace_immediate_loss_blunder(state, move);
+    return 0;
 }

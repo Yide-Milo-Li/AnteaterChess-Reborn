@@ -376,67 +376,96 @@ void gui_update_board(Gui *gui, const GameState *state) {
     }
 }
 
-void gui_update_movelist(Gui *gui, const GameState *state) {
-    GString *text;
-    GtkTextBuffer *buffer;
-    GtkTextIter endIter;
-    int index;
+static void gui_format_history_line(const GameState *state, int index, GString *text) {
+    Move move;
+    char fromText[8];
+    char toText[8];
+    char playerText[32];
 
-    if (gui == NULL || state == NULL
-        || !GTK_IS_WIDGET(gui->history_view) || !GTK_IS_TEXT_VIEW(gui->history_view)) {
+    if (state == NULL || text == NULL || index < 0 || index >= state->moveHistory.count) {
         return;
     }
 
-    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gui->history_view));
-    text = g_string_new("");
+    move = state->moveHistory.moves[index];
+    gui_format_position_text(move.from, fromText);
+    gui_format_position_text(move.to, toText);
+    gui_format_history_player(state, move.movedPiece.color, playerText);
+    g_string_append_printf(text,
+        "[Move %03d] %s | %s %s -> %s",
+        index + 1,
+        playerText,
+        gui_piece_type_text(move.movedPiece.type),
+        fromText,
+        toText);
+    if (move.captureCount > 0) {
+        g_string_append_printf(text, " | Captures: %d", move.captureCount);
+    }
+    if (move.specialType != NO_SPECIAL_MOVE) {
+        g_string_append_printf(text, " | Special: %s", gui_special_move_text(move.specialType));
+    }
+    g_string_append_c(text, '\n');
+}
 
-    for (index = 0; index < state->moveHistory.count; ++index) {
-        Move move = state->moveHistory.moves[index];
-        char fromText[8];
-        char toText[8];
-        char playerText[32];
+static GtkTextTag *gui_get_latest_move_tag(GtkTextBuffer *buffer) {
+    GtkTextTagTable *tagTable;
+    GtkTextTag *latestTag;
 
-        gui_format_position_text(move.from, fromText);
-        gui_format_position_text(move.to, toText);
-        gui_format_history_player(state, move.movedPiece.color, playerText);
-        g_string_append_printf(text,
-            "[Move %03d] %s | %s %s -> %s",
-            index + 1,
-            playerText,
-            gui_piece_type_text(move.movedPiece.type),
-            fromText,
-            toText);
-        if (move.captureCount > 0) {
-            g_string_append_printf(text, " | Captures: %d", move.captureCount);
-        }
-        if (move.specialType != NO_SPECIAL_MOVE) {
-            g_string_append_printf(text, " | Special: %s", gui_special_move_text(move.specialType));
-        }
-        g_string_append_c(text, '\n');
+    if (buffer == NULL) {
+        return NULL;
     }
 
-    gtk_text_buffer_set_text(buffer, text->str, -1);
-    if (state->moveHistory.count > 0) {
-        GtkTextTagTable *tagTable;
-        GtkTextTag *latestTag;
-        GtkTextIter lineStart;
-        GtkTextIter lineEnd;
-
-        tagTable = gtk_text_buffer_get_tag_table(buffer);
-        latestTag = gtk_text_tag_table_lookup(tagTable, "latest-move");
-        if (latestTag == NULL) {
-            latestTag = gtk_text_buffer_create_tag(buffer,
-                "latest-move",
-                "background", "#e0f2fe",
-                "foreground", "#0f172a",
-                NULL);
-        }
-
-        gtk_text_buffer_get_iter_at_line(buffer, &lineStart, state->moveHistory.count - 1);
-        lineEnd = lineStart;
-        gtk_text_iter_forward_to_line_end(&lineEnd);
-        gtk_text_buffer_apply_tag(buffer, latestTag, &lineStart, &lineEnd);
+    tagTable = gtk_text_buffer_get_tag_table(buffer);
+    latestTag = gtk_text_tag_table_lookup(tagTable, "latest-move");
+    if (latestTag == NULL) {
+        latestTag = gtk_text_buffer_create_tag(buffer,
+            "latest-move",
+            "background", "#e8f1fb",
+            "foreground", "#0f172a",
+            NULL);
     }
+    return latestTag;
+}
+
+static void gui_clear_latest_move_tag(GtkTextBuffer *buffer, GtkTextTag *latestTag) {
+    GtkTextIter start;
+    GtkTextIter end;
+
+    if (buffer == NULL || latestTag == NULL) {
+        return;
+    }
+
+    gtk_text_buffer_get_bounds(buffer, &start, &end);
+    gtk_text_buffer_remove_tag(buffer, latestTag, &start, &end);
+}
+
+static void gui_apply_latest_move_tag(GtkTextBuffer *buffer, int moveCount) {
+    GtkTextTag *latestTag;
+    GtkTextIter lineStart;
+    GtkTextIter lineEnd;
+
+    if (buffer == NULL || moveCount <= 0) {
+        return;
+    }
+
+    latestTag = gui_get_latest_move_tag(buffer);
+    if (latestTag == NULL) {
+        return;
+    }
+
+    gui_clear_latest_move_tag(buffer, latestTag);
+    gtk_text_buffer_get_iter_at_line(buffer, &lineStart, moveCount - 1);
+    lineEnd = lineStart;
+    gtk_text_iter_forward_to_line_end(&lineEnd);
+    gtk_text_buffer_apply_tag(buffer, latestTag, &lineStart, &lineEnd);
+}
+
+static void gui_scroll_history_to_end(Gui *gui, GtkTextBuffer *buffer) {
+    GtkTextIter endIter;
+
+    if (gui == NULL || buffer == NULL || !GTK_IS_TEXT_VIEW(gui->history_view)) {
+        return;
+    }
+
     gtk_text_buffer_get_end_iter(buffer, &endIter);
     gtk_text_buffer_place_cursor(buffer, &endIter);
     gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(gui->history_view),
@@ -445,7 +474,58 @@ void gui_update_movelist(Gui *gui, const GameState *state) {
         FALSE,
         0.0,
         1.0);
+}
+
+static void gui_rebuild_movelist_buffer(GtkTextBuffer *buffer, const GameState *state) {
+    GString *text;
+    int index;
+
+    if (buffer == NULL || state == NULL) {
+        return;
+    }
+
+    text = g_string_new("");
+    for (index = 0; index < state->moveHistory.count; ++index) {
+        gui_format_history_line(state, index, text);
+    }
+
+    gtk_text_buffer_set_text(buffer, text->str, -1);
     g_string_free(text, TRUE);
+}
+
+void gui_update_movelist(Gui *gui, const GameState *state) {
+    GtkTextBuffer *buffer;
+    GtkTextTag *latestTag;
+    int renderedCount;
+    int index;
+
+    if (gui == NULL || state == NULL
+        || !GTK_IS_WIDGET(gui->history_view) || !GTK_IS_TEXT_VIEW(gui->history_view)) {
+        return;
+    }
+
+    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gui->history_view));
+    renderedCount = gui->last_move_count;
+    if (renderedCount < 0 || renderedCount > state->moveHistory.count) {
+        gui_rebuild_movelist_buffer(buffer, state);
+    } else if (renderedCount < state->moveHistory.count) {
+        latestTag = gui_get_latest_move_tag(buffer);
+        gui_clear_latest_move_tag(buffer, latestTag);
+        for (index = renderedCount; index < state->moveHistory.count; ++index) {
+            GString *line = g_string_new("");
+            GtkTextIter endIter;
+
+            gui_format_history_line(state, index, line);
+            gtk_text_buffer_get_end_iter(buffer, &endIter);
+            gtk_text_buffer_insert(buffer, &endIter, line->str, -1);
+            g_string_free(line, TRUE);
+        }
+    } else {
+        return;
+    }
+
+    gui_apply_latest_move_tag(buffer, state->moveHistory.count);
+    gui_scroll_history_to_end(gui, buffer);
 }
 
 void gui_update_clock(Gui *gui) {

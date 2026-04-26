@@ -12,42 +12,6 @@ static GtkWidget *gui_create_menu_panel(void) {
     return panel;
 }
 
-static void gui_show_endgame_dialog(Gui *gui, const GameState *state) {
-    GtkWidget *dialog;
-    GtkWidget *content;
-    GtkWidget *result;
-    GtkWidget *clock;
-    char timeText[32];
-
-    if (!gui_window_is_valid(gui) || state == NULL || gui->endgame_dialog_shown) {
-        return;
-    }
-
-    dialog = gtk_dialog_new_with_buttons("Game Over",
-        GTK_WINDOW(gui->window),
-        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-        "New Game",
-        GTK_RESPONSE_ACCEPT,
-        "Main Menu",
-        GTK_RESPONSE_APPLY,
-        "Exit",
-        GTK_RESPONSE_CLOSE,
-        NULL);
-
-    content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-    result = gtk_label_new(gui_game_result_text(state->result));
-    gui_format_elapsed_text(timeText, getElapsedTimeSeconds());
-    clock = gtk_label_new(timeText);
-    gtk_box_pack_start(GTK_BOX(content), result, FALSE, FALSE, 8);
-    gtk_box_pack_start(GTK_BOX(content), clock, FALSE, FALSE, 8);
-
-    gui_prepare_modal_dialog(gui, dialog);
-    gui->endgame_dialog_shown = 1;
-    g_signal_connect(dialog, "response", G_CALLBACK(gui_on_endgame_dialog_response), gui);
-    gtk_widget_show_all(dialog);
-    gtk_window_present(GTK_WINDOW(dialog));
-}
-
 void gui_build_main_menu(Gui *gui) {
     GtkWidget *panel;
     GtkWidget *title;
@@ -152,6 +116,7 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     g_signal_connect(mainMenuButton, "clicked", G_CALLBACK(gui_on_endgame_main_menu_clicked), gui);
     g_signal_connect(exitButton, "clicked", G_CALLBACK(gui_on_endgame_exit_clicked), gui);
     gtk_widget_show_all(gui->window);
+    gtk_window_present(GTK_WINDOW(gui->window));
 }
 
 void gui_build_screen_for_state(Gui *gui, const GameState *state) {
@@ -170,15 +135,10 @@ void gui_build_screen_for_state(Gui *gui, const GameState *state) {
             gui_build_setup_menu(gui);
             break;
         case GAMEPLAY_STATE:
-            gui->endgame_dialog_shown = 0;
             gui_build_gameplay_ui(gui, state);
             break;
         case END_GAME_MENU_STATE:
-            if (gui->last_rendered_state == GAMEPLAY_STATE && GTK_IS_WIDGET(gui->main_box)) {
-                gui_show_endgame_dialog(gui, state);
-            } else {
-                gui_build_endgame_menu(gui, state);
-            }
+            gui_build_endgame_menu(gui, state);
             break;
         case EXIT_STATE:
             gui->should_quit = 1;

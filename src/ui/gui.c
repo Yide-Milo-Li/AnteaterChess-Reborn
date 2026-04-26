@@ -132,7 +132,6 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->last_move_count = 0;
     gui->has_rendered_state = 0;
     gui->has_highlight_from = 0;
-    gui->endgame_dialog_shown = 0;
     gui->sync_source_id = 0;
     gui->is_fullscreen = 0;
     gui->fullscreen_transition_pending = 0;

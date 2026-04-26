@@ -9,7 +9,9 @@
 #include "core/movelist.h"
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
+#include "gameplay/move_resolver.h"
 #include "gameplay/validation.h"
+#include "input/move_request_parser.h"
 #include "time/clock.h"
 
 static void clear_board(Board *board) {
@@ -94,6 +96,95 @@ static void assert_move_is_playable_and_safe(const GameState *state,
     assert(validateMove(state, move) == 1);
     assert(applyMove(&next, move) == 0);
     assert(isInCheck(&next, moving_side) == 0);
+}
+
+static void setup_tournament_opening_after_move_six(GameState *state) {
+    initBoard(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->currentTurn = WHITE;
+    state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state->config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state->config.aiTimeLimit = 0;
+
+    removePiece(&state->board, createPosition(6, 3));
+    setPiece(&state->board, createPosition(3, 3), createPiece(ANT, WHITE));
+    removePiece(&state->board, createPosition(6, 8));
+    setPiece(&state->board, createPosition(5, 8), createPiece(ANT, WHITE));
+    removePiece(&state->board, createPosition(0, 1));
+    setPiece(&state->board, createPosition(3, 4), createPiece(KNIGHT, BLACK));
+    removePiece(&state->board, createPosition(1, 3));
+    setPiece(&state->board, createPosition(2, 3), createPiece(ANT, BLACK));
+}
+
+static int white_h2_escape_is_blocked(const GameState *state) {
+    Piece king = getPiece(&state->board, createPosition(7, 5));
+    Piece shield = getPiece(&state->board, createPosition(6, 7));
+    Piece blocker = getPiece(&state->board, createPosition(5, 7));
+
+    if (king.type != KING || king.color != WHITE) {
+        return 0;
+    }
+    if (shield.type != ANT || shield.color != WHITE) {
+        return 0;
+    }
+    return blocker.color == WHITE;
+}
+
+static void apply_logged_move(GameState *state,
+                              const char *fromText,
+                              const char *toText) {
+    MoveRequest request;
+    Move move;
+
+    assert(parseMoveRequestFields(fromText,
+        toText,
+        PROMOTION_CHOICE_QUEEN,
+        &request) == 0);
+    assert(resolveMoveRequest(state, request, &move) == 0);
+    assert(applyMove(state, move) == 0);
+}
+
+static void replay_tournament_log_prefix(GameState *state, int moveCount) {
+    static const char *fromSquares[] = {
+        "I1", "B8", "D2", "I8", "C1", "D7", "B1", "C7",
+        "C3", "B7", "A4", "E7", "E3", "I7", "E2", "G7",
+        "H2", "J6", "G2", "H5", "C3", "H8", "A2", "B5",
+        "A1", "A6", "D3", "E5", "E2", "C8", "F1", "A6",
+        "F2", "A7", "B1", "E8", "I2", "F8", "E1", "G7",
+        "C2", "C5", "D4", "B3", "A1", "A8", "A4", "B8",
+        "E3", "C4", "G2", "D2", "F2", "E4"
+    };
+    static const char *toSquares[] = {
+        "J3", "A6", "D3", "J6", "E3", "D5", "C3", "C6",
+        "A4", "B5", "C3", "E5", "H6", "H6", "E3", "G5",
+        "H3", "H5", "G4", "F6", "E2", "I7", "A4", "A4",
+        "B1", "C5", "D4", "D4", "D4", "A6", "G2", "C4",
+        "F3", "A5", "A1", "E5", "I4", "G7", "D2", "H8",
+        "C3", "B3", "F5", "D2", "A4", "B8", "A5", "B2",
+        "E4", "F1", "F2", "E4", "E1", "C3"
+    };
+    int index;
+
+    initBoard(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->currentTurn = WHITE;
+    state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state->config.aiDifficultyBlack = DIFFICULTY_HARD;
+    state->config.aiTimeLimit = 0;
+
+    for (index = 0; index < moveCount; ++index) {
+        apply_logged_move(state, fromSquares[index], toSquares[index]);
+    }
+}
+
+static void setup_tournament_log_after_move_48(GameState *state) {
+    replay_tournament_log_prefix(state, 48);
+}
+
+static void setup_tournament_log_after_move_54(GameState *state) {
+    replay_tournament_log_prefix(state, 54);
 }
 
 /* Public API should reject invalid output/input pointers. */
@@ -185,6 +276,134 @@ static void test_ai_generates_move_with_explicit_budget(void) {
     assert(generateAIMoveWithBudget(&state, &move, 300) == 0);
     assert_state_unchanged(&before, &state);
     assert_move_is_playable_and_safe(&state, move);
+}
+
+static void test_tournament_ai_handles_black_king_pressure_with_budget(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    clear_board(&state.board);
+    state.currentTurn = BLACK;
+    state.config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state.config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state.config.aiTimeLimit = 0;
+
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(0, 9), createPiece(ROOK, BLACK));
+    setPiece(&state.board, createPosition(1, 4), createPiece(ANT, BLACK));
+
+    setPiece(&state.board, createPosition(3, 5), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(7, 0), createPiece(KING, WHITE));
+
+    before = state;
+    assert(isInCheck(&state, BLACK) == 1);
+    assert(generateAIMoveWithBudget(&state, &move, 500) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+}
+
+static void test_tournament_ai_prioritizes_stopping_near_promotion(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+    Position threat = createPosition(6, 5);
+
+    clear_board(&state.board);
+    state.currentTurn = WHITE;
+    state.config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state.config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state.config.aiTimeLimit = 0;
+
+    setPiece(&state.board, createPosition(7, 9), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 9), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(6, 0), createPiece(ROOK, WHITE));
+    setPiece(&state.board, threat, createPiece(ANT, BLACK));
+
+    before = state;
+    assert(generateAIMoveWithBudget(&state, &move, 800) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(positionEqual(move.to, threat) == 1);
+    assert(move.captureCount == 1);
+}
+
+static void test_tournament_ai_stops_clear_promotion_runner_early(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+    Position runner = createPosition(3, 9);
+
+    clear_board(&state.board);
+    state.currentTurn = WHITE;
+    state.config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state.config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state.config.aiTimeLimit = 0;
+
+    setPiece(&state.board, createPosition(7, 5), createPiece(KING, WHITE));
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(3, 0), createPiece(ROOK, WHITE));
+    setPiece(&state.board, runner, createPiece(ANT, BLACK));
+
+    before = state;
+    assert(generateAIMoveWithBudget(&state, &move, 900) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(positionEqual(move.to, runner) == 1);
+    assert(move.captureCount == 1);
+}
+
+static void test_tournament_ai_keeps_h2_escape_available_in_opening(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    setup_tournament_opening_after_move_six(&state);
+    before = state;
+
+    assert(generateAIMoveWithBudget(&state, &move, 800) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(!(positionEqual(move.from, createPosition(7, 8)) == 1
+        && positionEqual(move.to, createPosition(5, 7)) == 1));
+
+    before = state;
+    assert(applyMove(&before, move) == 0);
+    assert(white_h2_escape_is_blocked(&before) == 0);
+}
+
+static void test_tournament_ai_captures_loose_checker_from_logged_game(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    setup_tournament_log_after_move_54(&state);
+    before = state;
+
+    assert(isInCheck(&state, WHITE) == 1);
+    assert(generateAIMoveWithBudget(&state, &move, 7000) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(positionEqual(move.from, createPosition(7, 4)) == 1);
+    assert(positionEqual(move.to, createPosition(7, 5)) == 1);
+    assert(move.captureCount == 1);
+    assert(move.captures[0].piece.type == BISHOP);
+}
+
+static void test_tournament_ai_does_not_ignore_logged_bishop_check_threat(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    setup_tournament_log_after_move_48(&state);
+    before = state;
+
+    assert(isInCheck(&state, WHITE) == 0);
+    assert(generateAIMoveWithBudget(&state, &move, 1600) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(!(positionEqual(move.from, createPosition(5, 4)) == 1
+        && positionEqual(move.to, createPosition(4, 4)) == 1));
 }
 
 static void test_tournament_time_manager_rolls_saved_time_forward(void) {
@@ -294,6 +513,12 @@ int main(void) {
     test_hint_returns_legal_move_without_mutating_state();
     test_ai_respects_wall_clock_time_limit();
     test_ai_generates_move_with_explicit_budget();
+    test_tournament_ai_handles_black_king_pressure_with_budget();
+    test_tournament_ai_prioritizes_stopping_near_promotion();
+    test_tournament_ai_stops_clear_promotion_runner_early();
+    test_tournament_ai_keeps_h2_escape_available_in_opening();
+    test_tournament_ai_captures_loose_checker_from_logged_game();
+    test_tournament_ai_does_not_ignore_logged_bishop_check_threat();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();

@@ -525,34 +525,3 @@ void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
 
     gui_sync_from_controller(gui);
 }
-
-void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data) {
-    Gui *gui = (Gui *) user_data;
-    int result;
-
-    if (gui == NULL) {
-        gtk_widget_destroy(GTK_WIDGET(dialog));
-        return;
-    }
-
-    gui->endgame_dialog_shown = 0;
-    gtk_widget_destroy(GTK_WIDGET(dialog));
-
-    if (response_id == GTK_RESPONSE_ACCEPT) {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestNewGame(&gui->controller);
-    } else if (response_id == GTK_RESPONSE_APPLY) {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestBack(&gui->controller);
-    } else {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestExit(&gui->controller);
-    }
-
-    if (result != 0) {
-        gui_set_error(gui, ERR_FATAL);
-        return;
-    }
-
-    gui_sync_from_controller(gui);
-}

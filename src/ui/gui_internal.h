@@ -71,7 +71,6 @@ struct Gui {
     guint sync_source_id;
     int has_rendered_state;
     int has_highlight_from;
-    int endgame_dialog_shown;
     int is_fullscreen;
     int fullscreen_transition_pending;
     int should_quit;
@@ -154,7 +153,6 @@ void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data);
-void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data);
 gboolean gui_on_async_job_finished(gpointer user_data);
 
 #endif

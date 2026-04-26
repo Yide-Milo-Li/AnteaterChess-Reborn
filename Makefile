@@ -88,9 +88,11 @@ CLI_SRCS := \
 	src/cli/cli_gameplay.c \
 	src/cli/cli_app.c
 
+OPTIONAL_AI_SRCS := $(wildcard src/ai/tournament_ai.c)
+
 AI_SRCS := \
 	src/ai/ai.c \
-	src/ai/book.c
+	$(OPTIONAL_AI_SRCS)
 
 GUI_SRCS := \
 	src/ui/gui.c \

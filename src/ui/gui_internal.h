@@ -86,6 +86,7 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
                              GtkButtonsType buttons,
                              const char *title,
                              const char *message);
+void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog);
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
 void gui_attach_move_provider(Gui *gui);

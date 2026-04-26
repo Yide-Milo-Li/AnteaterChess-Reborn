@@ -41,9 +41,11 @@ static void gui_show_endgame_dialog(Gui *gui, const GameState *state) {
     gtk_box_pack_start(GTK_BOX(content), result, FALSE, FALSE, 8);
     gtk_box_pack_start(GTK_BOX(content), clock, FALSE, FALSE, 8);
 
+    gui_prepare_modal_dialog(gui, dialog);
     gui->endgame_dialog_shown = 1;
     g_signal_connect(dialog, "response", G_CALLBACK(gui_on_endgame_dialog_response), gui);
     gtk_widget_show_all(dialog);
+    gtk_window_present(GTK_WINDOW(dialog));
 }
 
 void gui_build_main_menu(Gui *gui) {

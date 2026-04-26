@@ -193,6 +193,7 @@ static int gui_select_promotion_choice(Gui *gui, PromotionChoice *choice) {
     gtk_dialog_add_button(GTK_DIALOG(dialog), "Bishop", PROMOTION_CHOICE_BISHOP);
     gtk_dialog_add_button(GTK_DIALOG(dialog), "Knight", PROMOTION_CHOICE_KNIGHT);
 
+    gui_prepare_modal_dialog(gui, dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 

@@ -93,6 +93,22 @@ static void test_game_config_mode_defaults(void) {
     assert(config.initialTimeSeconds == 0);
 }
 
+static void test_ai_time_budget_helpers(void) {
+    GameConfig config;
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_COMPUTER);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_NONE) == 0);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_EASY) == 350);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM) == 2200);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_HARD) == 7000);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_EXPERIMENTAL) == 7000);
+    assert(getAITimeBudgetMs(&config, DIFFICULTY_EASY) == 350);
+
+    config.aiTimeLimit = 2;
+    assert(getAITimeBudgetMs(&config, DIFFICULTY_EASY) == 2000);
+    assert(getAITimeBudgetMs(NULL, DIFFICULTY_MEDIUM) == 2200);
+}
+
 /* Check history bookkeeping and result/gameOver consistency helpers. */
 static void test_history_and_result_helpers(void) {
     GameState state;
@@ -148,6 +164,7 @@ int main(void) {
     test_game_state_initialization_defaults();
     test_game_state_player_setup_follows_mode();
     test_game_config_mode_defaults();
+    test_ai_time_budget_helpers();
     test_history_and_result_helpers();
     test_get_current_player_tracks_turn();
     return 0;

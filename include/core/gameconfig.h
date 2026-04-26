@@ -29,5 +29,7 @@ typedef struct {
 
 void initDefaultGameConfig(GameConfig *config);
 void initGameConfigForMode(GameConfig *config, GameMode mode);
+int getDefaultAITimeBudgetMs(AIDifficulty difficulty);
+int getAITimeBudgetMs(const GameConfig *config, AIDifficulty difficulty);
 
 #endif

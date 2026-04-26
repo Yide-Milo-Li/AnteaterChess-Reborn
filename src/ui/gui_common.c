@@ -29,7 +29,6 @@ void gui_clear_view_refs(Gui *gui) {
     gui->setup_hours_spin = NULL;
     gui->setup_minutes_spin = NULL;
     gui->setup_seconds_spin = NULL;
-    gui->setup_ai_time_spin = NULL;
     gui->setup_side_white = NULL;
     gui->setup_side_black = NULL;
     gui->has_highlight_from = 0;

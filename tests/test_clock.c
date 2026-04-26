@@ -59,9 +59,20 @@ static void test_clock_pause_and_resume(void) {
     assert(afterResume > beforePause);
 }
 
+static void test_monotonic_milliseconds_progress(void) {
+    int64_t first;
+    int64_t second;
+
+    assert(getMonotonicMilliseconds(&first) == 0);
+    assert(getMonotonicMilliseconds(&second) == 0);
+    assert(second >= first);
+    assert(getMonotonicMilliseconds(NULL) != 0);
+}
+
 /* Run the global clock regression suite. */
 int main(void) {
     test_clock_initialization_and_progress();
     test_clock_pause_and_resume();
+    test_monotonic_milliseconds_progress();
     return 0;
 }

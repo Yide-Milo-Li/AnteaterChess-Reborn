@@ -1,5 +1,8 @@
 #include "time/clock.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <stdint.h>
 #include <time.h>
 
@@ -62,6 +65,50 @@ int updateClock(void) {
     }
 
     return 0;
+}
+
+int getMonotonicMilliseconds(int64_t *outMilliseconds) {
+    if (outMilliseconds == NULL) {
+        return 1;
+    }
+
+#ifdef _WIN32
+    {
+        LARGE_INTEGER counter;
+        LARGE_INTEGER frequency;
+
+        if (!QueryPerformanceFrequency(&frequency)
+            || !QueryPerformanceCounter(&counter)
+            || frequency.QuadPart <= 0) {
+            return 1;
+        }
+
+        *outMilliseconds = (int64_t)((counter.QuadPart * 1000) / frequency.QuadPart);
+        return 0;
+    }
+#elif defined(CLOCK_MONOTONIC)
+    {
+        struct timespec now;
+
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+            return 1;
+        }
+
+        *outMilliseconds = ((int64_t)now.tv_sec * 1000) + ((int64_t)now.tv_nsec / 1000000);
+        return 0;
+    }
+#else
+    {
+        time_t now = get_wall_time();
+
+        if (now == (time_t)-1) {
+            return 1;
+        }
+
+        *outMilliseconds = (int64_t)now * 1000;
+        return 0;
+    }
+#endif
 }
 
 /* Freeze elapsed-time accumulation while the program is outside gameplay. */

@@ -36,7 +36,6 @@ struct Gui {
     GtkWidget *setup_minutes_spin;
     GtkWidget *setup_seconds_spin;
     GtkWidget *setup_timer_widgets[6];
-    GtkWidget *setup_ai_time_spin;
     GtkWidget *setup_side_white;
     GtkWidget *setup_side_black;
     GtkWidget *setup_ai_diff_buttons[3];

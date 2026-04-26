@@ -183,8 +183,39 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     assert(strstr(buffer, "Total Elapsed Time: ") != NULL);
 }
 
+static void test_log_default_ai_budget_header(void) {
+    GameConfig config;
+    char path[256];
+    char buffer[4096];
+
+    initGameConfigForMode(&config, MODE_COMPUTER_VS_COMPUTER);
+    config.aiDifficultyWhite = DIFFICULTY_EASY;
+    config.aiDifficultyBlack = DIFFICULTY_HARD;
+    config.aiTimeLimit = 0;
+
+    assert(initClock() == 0);
+    assert(initLog(&config) == 0);
+    assert(logGameStart(&config) == 0);
+    closeLog();
+
+    find_latest_log_path(path, sizeof(path));
+    read_log_file(path, buffer, sizeof(buffer));
+    assert(strstr(buffer, "AI Budget: White Easy 350ms, Black Hard 7000ms") != NULL);
+    assert(strstr(buffer, "AI Time Limit: 0") == NULL);
+
+    initGameConfigForMode(&config, MODE_HUMAN_VS_HUMAN);
+    assert(initLog(&config) == 0);
+    assert(logGameStart(&config) == 0);
+    closeLog();
+
+    find_latest_log_path(path, sizeof(path));
+    read_log_file(path, buffer, sizeof(buffer));
+    assert(strstr(buffer, "AI Budget: None") != NULL);
+}
+
 /* Run the persistent log regression suite. */
 int main(void) {
     test_log_lifecycle_and_history_rebuild();
+    test_log_default_ai_budget_header();
     return 0;
 }

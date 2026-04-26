@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <stddef.h>
 
 #include "ai/ai.h"
@@ -9,6 +10,7 @@
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
 #include "gameplay/validation.h"
+#include "time/clock.h"
 
 static void clear_board(Board *board) {
     int row;
@@ -153,6 +155,20 @@ static void test_hint_returns_legal_move_without_mutating_state(void) {
     assert_move_is_playable_and_safe(&state, move);
 }
 
+static void test_ai_respects_wall_clock_time_limit(void) {
+    GameState state = create_ai_ready_state();
+    Move move;
+    int64_t startMs;
+    int64_t endMs;
+
+    assert(getMonotonicMilliseconds(&startMs) == 0);
+    assert(generateAIMove(&state, &move) == 0);
+    assert(getMonotonicMilliseconds(&endMs) == 0);
+    assert(endMs >= startMs);
+    assert(endMs - startMs <= 2500);
+    assert_move_is_playable_and_safe(&state, move);
+}
+
 /* Terminal positions with no legal moves should report failure instead of
  * fabricating a move. */
 static void test_ai_fails_cleanly_when_no_legal_move_exists(void) {
@@ -221,6 +237,7 @@ int main(void) {
     test_ai_returns_legal_move_without_mutating_initial_state();
     test_ai_resolves_check_with_safe_move();
     test_hint_returns_legal_move_without_mutating_state();
+    test_ai_respects_wall_clock_time_limit();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();
     test_ai_can_choose_en_passant();

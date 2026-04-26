@@ -91,8 +91,48 @@ static const char *difficulty_to_string(AIDifficulty difficulty) {
             return "Medium";
         case DIFFICULTY_HARD:
             return "Hard";
+        case DIFFICULTY_EXPERIMENTAL:
+            return "Experimental";
         default:
             return "Unknown";
+    }
+}
+
+static int write_ai_budget_section(const GameConfig *config) {
+    if (logFile == NULL || config == NULL) {
+        return 1;
+    }
+
+    if (config->aiTimeLimit > 0) {
+        fprintf(logFile, "AI Time Limit: %ds\n", config->aiTimeLimit);
+        return 0;
+    }
+
+    switch (config->mode) {
+        case MODE_HUMAN_VS_COMPUTER:
+            if (config->aiDifficultyWhite != DIFFICULTY_NONE) {
+                fprintf(logFile, "AI Budget: White %s %dms\n",
+                    difficulty_to_string(config->aiDifficultyWhite),
+                    getDefaultAITimeBudgetMs(config->aiDifficultyWhite));
+            } else if (config->aiDifficultyBlack != DIFFICULTY_NONE) {
+                fprintf(logFile, "AI Budget: Black %s %dms\n",
+                    difficulty_to_string(config->aiDifficultyBlack),
+                    getDefaultAITimeBudgetMs(config->aiDifficultyBlack));
+            } else {
+                fprintf(logFile, "AI Budget: None\n");
+            }
+            return 0;
+        case MODE_COMPUTER_VS_COMPUTER:
+            fprintf(logFile, "AI Budget: White %s %dms, Black %s %dms\n",
+                difficulty_to_string(config->aiDifficultyWhite),
+                getDefaultAITimeBudgetMs(config->aiDifficultyWhite),
+                difficulty_to_string(config->aiDifficultyBlack),
+                getDefaultAITimeBudgetMs(config->aiDifficultyBlack));
+            return 0;
+        case MODE_HUMAN_VS_HUMAN:
+        default:
+            fprintf(logFile, "AI Budget: None\n");
+            return 0;
     }
 }
 
@@ -259,7 +299,9 @@ static int write_header_section(const GameConfig *config) {
     fprintf(logFile, "AI Black: %s\n", difficulty_to_string(config->aiDifficultyBlack));
     fprintf(logFile, "Timer Enabled: %s\n", config->timerEnabled ? "Yes" : "No");
     fprintf(logFile, "Initial Time Per Turn: %ds\n", config->initialTimeSeconds);
-    fprintf(logFile, "AI Time Limit: %ds\n", config->aiTimeLimit);
+    if (write_ai_budget_section(config) != 0) {
+        return 1;
+    }
     fprintf(logFile, "\nMove History:\n");
     return 0;
 }

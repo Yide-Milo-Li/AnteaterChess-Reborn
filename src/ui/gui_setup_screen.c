@@ -1,5 +1,7 @@
 #include "gui_internal.h"
 
+#include <stdio.h>
+
 static void build_difficulty_group(GtkWidget *parent, const char *labelText,
                                    GtkWidget *buttons[3]) {
     GtkWidget *label;
@@ -64,24 +66,6 @@ static void build_timer_controls(Gui *gui, GtkWidget *parent) {
     g_signal_connect(gui->setup_timer_toggle, "toggled", G_CALLBACK(gui_on_setup_timer_toggled), gui);
 }
 
-static void build_ai_time_controls(Gui *gui, GtkWidget *parent) {
-    GtkWidget *box;
-    GtkWidget *label;
-
-    label = gtk_label_new("AI Time Limit (seconds)");
-    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
-
-    box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), box, FALSE, FALSE, 0);
-
-    gui->setup_ai_time_spin = gtk_spin_button_new_with_range(0, 60, 1);
-    gtk_widget_set_size_request(gui->setup_ai_time_spin, 80, -1);
-    gtk_box_pack_start(GTK_BOX(box), gui->setup_ai_time_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(box), gtk_label_new("0 uses default"), FALSE, FALSE, 0);
-}
-
 static void apply_difficulty_selection(GtkWidget *buttons[3], AIDifficulty difficulty) {
     int index = gui_difficulty_index(difficulty);
 
@@ -101,6 +85,19 @@ static AIDifficulty selected_difficulty(GtkWidget *buttons[3], AIDifficulty fall
     }
 
     return fallback;
+}
+
+static void build_ai_budget_summary(GtkWidget *parent) {
+    GtkWidget *label;
+    char text[128];
+
+    snprintf(text, sizeof(text), "AI Budget: Easy %dms / Medium %dms / Hard %dms",
+        getDefaultAITimeBudgetMs(DIFFICULTY_EASY),
+        getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM),
+        getDefaultAITimeBudgetMs(DIFFICULTY_HARD));
+    label = gtk_label_new(text);
+    gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
 }
 
 void gui_apply_pending_setup_config(Gui *gui) {
@@ -137,11 +134,6 @@ void gui_apply_pending_setup_config(Gui *gui) {
             (gui->pendingConfig.playerColor == BLACK) ? gui->setup_side_black : gui->setup_side_white), TRUE);
     }
 
-    if (GTK_IS_SPIN_BUTTON(gui->setup_ai_time_spin)) {
-        gtk_spin_button_set_value(GTK_SPIN_BUTTON(gui->setup_ai_time_spin),
-            gui->pendingConfig.aiTimeLimit);
-    }
-
     if (gui->pendingConfig.mode == MODE_HUMAN_VS_COMPUTER) {
         if (gui->pendingConfig.playerColor == WHITE) {
             apply_difficulty_selection(gui->setup_ai_diff_buttons, gui->pendingConfig.aiDifficultyBlack);
@@ -169,6 +161,7 @@ int gui_collect_setup_config(Gui *gui, GameConfig *config, ErrorCode *errorCode)
 
     *config = gui->pendingConfig;
     initGameConfigForMode(config, gui->pendingConfig.mode);
+    config->aiTimeLimit = 0;
 
     config->timerEnabled = (GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)
         && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle))) ? 1 : 0;
@@ -180,11 +173,6 @@ int gui_collect_setup_config(Gui *gui, GameConfig *config, ErrorCode *errorCode)
     seconds = GTK_IS_SPIN_BUTTON(gui->setup_seconds_spin)
         ? gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(gui->setup_seconds_spin)) : 0;
     totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-    if (GTK_IS_SPIN_BUTTON(gui->setup_ai_time_spin)) {
-        config->aiTimeLimit = gtk_spin_button_get_value_as_int(
-            GTK_SPIN_BUTTON(gui->setup_ai_time_spin));
-    }
-
     if (config->timerEnabled) {
         if (totalSeconds <= 0) {
             if (errorCode != NULL) {
@@ -265,11 +253,11 @@ void gui_build_setup_menu(Gui *gui) {
         gtk_box_pack_start(GTK_BOX(sideBox), gui->setup_side_black, FALSE, FALSE, 0);
 
         build_difficulty_group(contentBox, "AI Difficulty", gui->setup_ai_diff_buttons);
-        build_ai_time_controls(gui, contentBox);
+        build_ai_budget_summary(contentBox);
     } else if (gui->pendingConfig.mode == MODE_COMPUTER_VS_COMPUTER) {
         build_difficulty_group(contentBox, "White AI Difficulty", gui->setup_white_diff_buttons);
         build_difficulty_group(contentBox, "Black AI Difficulty", gui->setup_black_diff_buttons);
-        build_ai_time_controls(gui, contentBox);
+        build_ai_budget_summary(contentBox);
     }
 
     build_timer_controls(gui, contentBox);

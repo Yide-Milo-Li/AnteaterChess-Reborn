@@ -114,7 +114,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
             const char *icon = gui_get_piece_icon(state->board.cells[row][col]);
 
             if (icon != NULL) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(image), icon, GTK_ICON_SIZE_BUTTON);
+                gtk_image_set_from_file(GTK_IMAGE(image), icon);
             }
 
             gui->board_images[row][col] = image;
@@ -211,9 +211,7 @@ void gui_update_board(Gui *gui, const GameState *state) {
 
             icon = gui_get_piece_icon(state->board.cells[row][col]);
             if (icon != NULL) {
-                gtk_image_set_from_icon_name(GTK_IMAGE(gui->board_images[row][col]),
-                    icon,
-                    GTK_ICON_SIZE_BUTTON);
+                gtk_image_set_from_file(GTK_IMAGE(gui->board_images[row][col]), icon);
             } else {
                 gtk_image_clear(GTK_IMAGE(gui->board_images[row][col]));
             }

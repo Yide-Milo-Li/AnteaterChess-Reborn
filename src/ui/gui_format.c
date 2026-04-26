@@ -134,22 +134,22 @@ void gui_format_hint_text(Move move, char buffer[64]) {
 
 const char *gui_get_piece_icon(Piece piece) {
     static const char *whiteIcons[] = {
-        "gtk-dialog-info",
-        "gtk-dialog-warning",
-        "gtk-dialog-question",
-        "gtk-dialog-error",
-        "gtk-dialog-authentication",
-        "gtk-dialog-password",
-        "gtk-dialog-info"
+        "assets/WhiteAntsvg.svg",
+        "assets/WhiteRook.svg",
+        "assets/WhiteKnight.svg",
+        "assets/WhiteBishop.svg",
+        "assets/WhiteQueen.svg",
+        "assets/WhiteKing.svg",
+        "assets/WhiteAnteater.svg"
     };
     static const char *blackIcons[] = {
-        "gtk-dialog-warning",
-        "gtk-dialog-question",
-        "gtk-dialog-error",
-        "gtk-dialog-authentication",
-        "gtk-dialog-password",
-        "gtk-dialog-info",
-        "gtk-dialog-warning"
+        "assets/BlackAnt.svg",
+        "assets/BlackRook.svg",
+        "assets/BlackKnight.svg",
+        "assets/BlackBishop.svg",
+        "assets/BlackQueen.svg",
+        "assets/BlackKing.svg",
+        "assets/BlackAnteater.svg"
     };
     int index;
 

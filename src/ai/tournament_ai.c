@@ -416,6 +416,156 @@ static int knight_check_jump_pressure_for(const Board *board, Color color) {
     return pressure;
 }
 
+static int knight_check_staging_pressure_for(const Board *board, Color color) {
+    static const int rowOffsets[] = {-2, -2, -1, -1, 1, 1, 2, 2};
+    static const int colOffsets[] = {-1, 1, -2, 2, -2, 2, -1, 1};
+    Position kingPos;
+    Color enemy;
+    int pressure;
+    int homeRow;
+    int row;
+    int col;
+
+    if (board == NULL) {
+        return 0;
+    }
+
+    kingPos = find_king_position(board, color);
+    if (!isValidPosition(kingPos)) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    homeRow = (color == WHITE) ? 7 : 0;
+    pressure = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position from = createPosition(row, col);
+            Piece piece = getPiece(board, from);
+            int stageIndex;
+
+            if (piece.type != KNIGHT || piece.color != enemy) {
+                continue;
+            }
+
+            for (stageIndex = 0; stageIndex < 8; ++stageIndex) {
+                Position stage = createPosition(from.row + rowOffsets[stageIndex],
+                                                from.col + colOffsets[stageIndex]);
+                Piece stageOccupant;
+                int landingIndex;
+
+                if (!isValidPosition(stage)) {
+                    continue;
+                }
+                stageOccupant = getPiece(board, stage);
+                if (stageOccupant.color == enemy) {
+                    continue;
+                }
+
+                for (landingIndex = 0; landingIndex < 8; ++landingIndex) {
+                    Position landing = createPosition(stage.row + rowOffsets[landingIndex],
+                                                      stage.col + colOffsets[landingIndex]);
+                    Piece landingOccupant;
+                    int stageDistance;
+
+                    if (!isValidPosition(landing)
+                        || !local_knight_attacks_square(landing, kingPos)) {
+                        continue;
+                    }
+
+                    landingOccupant = getPiece(board, landing);
+                    if (landingOccupant.color == enemy) {
+                        continue;
+                    }
+
+                    stageDistance = abs_int(stage.row - kingPos.row)
+                        + abs_int(stage.col - kingPos.col);
+                    pressure += 95;
+                    if (stageDistance <= 4) {
+                        pressure += (5 - stageDistance) * 22;
+                    }
+                    if (abs_int(landing.row - homeRow) <= 1) {
+                        pressure += 42;
+                    }
+                    if (abs_int(kingPos.row - homeRow) <= 1) {
+                        pressure += 38;
+                    }
+                    if (landingOccupant.color == color) {
+                        pressure += 45;
+                    }
+                    if (stageOccupant.color == color) {
+                        pressure -= 35;
+                    }
+                }
+            }
+        }
+    }
+    return pressure;
+}
+
+static int blocked_knight_landing_escape_penalty_for(const Board *board, Color color) {
+    Position kingPos;
+    int homeRow;
+    int forwardStep;
+    int penalty;
+    int row;
+    int col;
+
+    if (board == NULL) {
+        return 0;
+    }
+
+    kingPos = find_king_position(board, color);
+    if (!isValidPosition(kingPos)) {
+        return 0;
+    }
+
+    homeRow = (color == WHITE) ? 7 : 0;
+    if (abs_int(kingPos.row - homeRow) > 1) {
+        return 0;
+    }
+
+    forwardStep = (color == WHITE) ? -1 : 1;
+    penalty = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position landing = createPosition(row, col);
+            Position escape;
+            Piece landingPiece;
+            Piece blocker;
+
+            if (abs_int(row - homeRow) > 1
+                || !local_knight_attacks_square(landing, kingPos)) {
+                continue;
+            }
+
+            landingPiece = getPiece(board, landing);
+            if (landingPiece.color != color || landingPiece.type == KING) {
+                continue;
+            }
+
+            escape = createPosition(row + forwardStep, col);
+            if (!isValidPosition(escape)) {
+                continue;
+            }
+
+            blocker = getPiece(board, escape);
+            if (blocker.color != color) {
+                continue;
+            }
+
+            penalty += 520;
+            if (landingPiece.type == ANT) {
+                penalty += 220;
+            }
+            if (blocker.type == KNIGHT || blocker.type == BISHOP || blocker.type == ANTEATER) {
+                penalty += 220;
+            }
+        }
+    }
+    return penalty;
+}
+
 static int enemy_major_count(const Board *board, Color color) {
     Color enemy;
     int count;
@@ -509,10 +659,13 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
     score -= king_ring_pressure(&state->board, color) * ((phase >= 12) ? 12 : 7);
     score -= king_zone_pressure(&state->board, color) * ((phase >= 12) ? 2 : 3);
     score -= knight_check_jump_pressure_for(&state->board, color);
+    score -= knight_check_staging_pressure_for(&state->board, color) / 2;
+    score -= blocked_knight_landing_escape_penalty_for(&state->board, color);
     return score;
 }
 
-static int promotion_pressure_for(const GameState *state, Color color) {
+static int promotion_pressure_for(const GameState *state, Color color, int phase) {
+    Color enemy;
     int score;
     int row;
     int col;
@@ -521,6 +674,7 @@ static int promotion_pressure_for(const GameState *state, Color color) {
         return 0;
     }
 
+    enemy = (color == WHITE) ? BLACK : WHITE;
     score = 0;
     for (row = 0; row < ROWS; ++row) {
         for (col = 0; col < COLS; ++col) {
@@ -553,6 +707,16 @@ static int promotion_pressure_for(const GameState *state, Color color) {
             }
             if (is_edge_file(pos)) {
                 advanceScore += 35;
+            }
+            if (distance >= 3 && phase >= 18) {
+                advanceScore /= 2;
+            }
+            if (distance >= 3 && square_attacked_by(&state->board, pos, enemy)) {
+                if (square_attacked_by(&state->board, pos, color)) {
+                    advanceScore -= 70;
+                } else {
+                    advanceScore -= 150;
+                }
             }
             score += advanceScore;
         }
@@ -638,6 +802,8 @@ static int king_crisis_score_for(const GameState *state, Color color) {
     score = king_ring_pressure(&state->board, color) * 32;
     score += king_zone_pressure(&state->board, color) * 4;
     score += knight_check_jump_pressure_for(&state->board, color);
+    score += knight_check_staging_pressure_for(&state->board, color) / 2;
+    score += blocked_knight_landing_escape_penalty_for(&state->board, color);
     score -= back_rank_invasion_pressure_for(state, color);
     if (isInCheck(state, color)) {
         score += 220;
@@ -685,8 +851,8 @@ static int tournament_evaluate_adjustment(const GameState *state) {
     phase = board_phase(&state->board);
     return king_safety_adjustment_for(state, WHITE, phase)
         - king_safety_adjustment_for(state, BLACK, phase)
-        + promotion_pressure_for(state, WHITE)
-        - promotion_pressure_for(state, BLACK)
+        + promotion_pressure_for(state, WHITE, phase)
+        - promotion_pressure_for(state, BLACK, phase)
         + back_rank_invasion_pressure_for(state, WHITE)
         - back_rank_invasion_pressure_for(state, BLACK);
 }

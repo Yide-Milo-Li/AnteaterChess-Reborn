@@ -96,75 +96,37 @@ static void assert_move_is_playable_and_safe(const GameState *state,
     assert(isInCheck(&next, moving_side) == 0);
 }
 
-static void setup_tournament_knight_jump_position(GameState *state) {
-    clear_board(&state->board);
+static void setup_tournament_opening_after_move_six(GameState *state) {
+    initBoard(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
     state->currentTurn = WHITE;
     state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
     state->config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
     state->config.aiTimeLimit = 0;
 
-    setPiece(&state->board, createPosition(7, 0), createPiece(ROOK, WHITE));
-    setPiece(&state->board, createPosition(7, 2), createPiece(BISHOP, WHITE));
-    setPiece(&state->board, createPosition(7, 3), createPiece(ANTEATER, WHITE));
-    setPiece(&state->board, createPosition(7, 4), createPiece(QUEEN, WHITE));
-    setPiece(&state->board, createPosition(7, 5), createPiece(KING, WHITE));
-    setPiece(&state->board, createPosition(7, 6), createPiece(ANTEATER, WHITE));
-    setPiece(&state->board, createPosition(7, 7), createPiece(BISHOP, WHITE));
-    setPiece(&state->board, createPosition(7, 9), createPiece(ROOK, WHITE));
-    setPiece(&state->board, createPosition(6, 0), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 2), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 3), createPiece(KNIGHT, WHITE));
-    setPiece(&state->board, createPosition(6, 4), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 5), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 6), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 7), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(6, 9), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(5, 7), createPiece(KNIGHT, WHITE));
+    removePiece(&state->board, createPosition(6, 3));
+    setPiece(&state->board, createPosition(3, 3), createPiece(ANT, WHITE));
+    removePiece(&state->board, createPosition(6, 8));
     setPiece(&state->board, createPosition(5, 8), createPiece(ANT, WHITE));
-    setPiece(&state->board, createPosition(4, 1), createPiece(ANT, WHITE));
-
-    setPiece(&state->board, createPosition(0, 0), createPiece(ROOK, BLACK));
-    setPiece(&state->board, createPosition(0, 2), createPiece(BISHOP, BLACK));
-    setPiece(&state->board, createPosition(0, 3), createPiece(ANTEATER, BLACK));
-    setPiece(&state->board, createPosition(0, 4), createPiece(QUEEN, BLACK));
-    setPiece(&state->board, createPosition(0, 5), createPiece(KING, BLACK));
-    setPiece(&state->board, createPosition(0, 6), createPiece(ANTEATER, BLACK));
-    setPiece(&state->board, createPosition(0, 7), createPiece(BISHOP, BLACK));
-    setPiece(&state->board, createPosition(0, 9), createPiece(ROOK, BLACK));
-    setPiece(&state->board, createPosition(1, 0), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 4), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 5), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 6), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 7), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 8), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(1, 9), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(2, 2), createPiece(ANT, BLACK));
-    setPiece(&state->board, createPosition(2, 3), createPiece(ANT, BLACK));
+    removePiece(&state->board, createPosition(0, 1));
     setPiece(&state->board, createPosition(3, 4), createPiece(KNIGHT, BLACK));
-    setPiece(&state->board, createPosition(4, 6), createPiece(KNIGHT, BLACK));
+    removePiece(&state->board, createPosition(1, 3));
+    setPiece(&state->board, createPosition(2, 3), createPiece(ANT, BLACK));
 }
 
-static int black_knight_h2_mate_available(const GameState *state) {
-    GameState trial;
-    Move move;
-    Position from = createPosition(4, 6);
-    Position to = createPosition(6, 7);
-    Piece target;
+static int white_h2_escape_is_blocked(const GameState *state) {
+    Piece king = getPiece(&state->board, createPosition(7, 5));
+    Piece shield = getPiece(&state->board, createPosition(6, 7));
+    Piece blocker = getPiece(&state->board, createPosition(5, 7));
 
-    trial = *state;
-    move = createMove(from, to, createPiece(KNIGHT, BLACK));
-    target = getPiece(&trial.board, to);
-    if (target.color == WHITE) {
-        addCapture(&move, to, target);
-    }
-
-    if (validateMove(&trial, move) != 1) {
+    if (king.type != KING || king.color != WHITE) {
         return 0;
     }
-    if (applyMove(&trial, move) != 0) {
+    if (shield.type != ANT || shield.color != WHITE) {
         return 0;
     }
-    return isCheckmate(&trial, WHITE);
+    return blocker.color == WHITE;
 }
 
 /* Public API should reject invalid output/input pointers. */
@@ -333,22 +295,23 @@ static void test_tournament_ai_stops_clear_promotion_runner_early(void) {
     assert(move.captureCount == 1);
 }
 
-static void test_tournament_ai_defuses_near_king_knight_jump(void) {
+static void test_tournament_ai_keeps_h2_escape_available_in_opening(void) {
     GameState state = create_ai_ready_state();
     GameState before;
-    GameState after;
     Move move;
 
-    setup_tournament_knight_jump_position(&state);
+    setup_tournament_opening_after_move_six(&state);
     before = state;
 
-    assert(generateAIMoveWithBudget(&state, &move, 1200) == 0);
+    assert(generateAIMoveWithBudget(&state, &move, 800) == 0);
     assert_state_unchanged(&before, &state);
     assert_move_is_playable_and_safe(&state, move);
+    assert(!(positionEqual(move.from, createPosition(7, 8)) == 1
+        && positionEqual(move.to, createPosition(5, 7)) == 1));
 
-    after = state;
-    assert(applyMove(&after, move) == 0);
-    assert(black_knight_h2_mate_available(&after) == 0);
+    before = state;
+    assert(applyMove(&before, move) == 0);
+    assert(white_h2_escape_is_blocked(&before) == 0);
 }
 
 static void test_tournament_time_manager_rolls_saved_time_forward(void) {
@@ -461,7 +424,7 @@ int main(void) {
     test_tournament_ai_handles_black_king_pressure_with_budget();
     test_tournament_ai_prioritizes_stopping_near_promotion();
     test_tournament_ai_stops_clear_promotion_runner_early();
-    test_tournament_ai_defuses_near_king_knight_jump();
+    test_tournament_ai_keeps_h2_escape_available_in_opening();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();

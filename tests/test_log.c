@@ -26,11 +26,11 @@
  */
 
 /* Spin until the elapsed gameplay clock changes or a hard loop cap is reached. */
-static int64_t wait_for_elapsed_change(int64_t baseline) {
+static int64_t wait_for_elapsed_millisecond_change(int64_t baseline) {
     time_t deadline = time(NULL) + 3;
 
     while (time(NULL) <= deadline) {
-        int64_t current = getElapsedTimeSeconds();
+        int64_t current = getElapsedTimeMilliseconds();
 
         if (current != baseline) {
             return current;
@@ -140,7 +140,7 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     Move blackMove;
     char path[256];
     char buffer[4096];
-    char firstMoveLine[256];
+    char firstMoveLine[320];
     int64_t baselineElapsed;
 
     assert(initClock() == 0);
@@ -151,8 +151,8 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     assert(addMoveToHistory(&state, whiteMove) == 0);
     assert(logMove(&state, whiteMove) == 0);
 
-    baselineElapsed = getElapsedTimeSeconds();
-    assert(wait_for_elapsed_change(baselineElapsed) != baselineElapsed);
+    baselineElapsed = getElapsedTimeMilliseconds();
+    assert(wait_for_elapsed_millisecond_change(baselineElapsed) != baselineElapsed);
 
     blackMove = createMove(createPosition(1, 4), createPosition(2, 4), createPiece(ANT, BLACK));
     assert(addMoveToHistory(&state, blackMove) == 0);
@@ -164,8 +164,10 @@ static void test_log_lifecycle_and_history_rebuild(void) {
     assert(strstr(buffer, "Mode: Human vs Computer") != NULL);
     assert(strstr(buffer, "Timer Enabled: Yes") != NULL);
     assert(strstr(buffer, "AI Time Limit: 12") != NULL);
-    assert(strstr(buffer, "[Move 001] 00:00:00 | White | Ant E2 -> E3") != NULL);
-    assert(strstr(buffer, "Black (AI) | Ant E7 -> E6") != NULL);
+    assert(strstr(buffer, "[Move 001] Elapsed: ") != NULL);
+    assert(strstr(buffer, " | Duration: ") != NULL);
+    assert(strstr(buffer, "ms | White | Ant E2 -> E3") != NULL);
+    assert(strstr(buffer, "ms | Black (AI) | Ant E7 -> E6") != NULL);
     extract_line_by_prefix(buffer, "[Move 001]", firstMoveLine, sizeof(firstMoveLine));
 
     assert(removeLastMoveFromHistory(&state) == 0);

@@ -8,15 +8,30 @@
  * Alignment assumptions for future extensions:
  * - The clock module is a standalone gameplay stopwatch shared by services.
  * - These tests lock pause/resume behavior rather than any controller-specific transition logic.
- * - Elapsed time is second-granularity, so tests wait for whole-second changes.
+ * - Elapsed milliseconds drive the clock; elapsed seconds remain a compatibility view.
  */
 
-/* Spin until the elapsed clock reading changes or a hard loop cap is reached. */
-static int64_t wait_for_elapsed_change(int64_t baseline) {
+static void wait_for_monotonic_delta(int64_t minimumDeltaMilliseconds) {
+    int64_t baseline;
+    int64_t current;
+    time_t deadline = time(NULL) + 3;
+
+    assert(getMonotonicMilliseconds(&baseline) == 0);
+    current = baseline;
+
+    while (time(NULL) <= deadline && current - baseline < minimumDeltaMilliseconds) {
+        assert(getMonotonicMilliseconds(&current) == 0);
+    }
+
+    assert(current - baseline >= minimumDeltaMilliseconds);
+}
+
+/* Spin until the elapsed millisecond reading changes or a hard loop cap is reached. */
+static int64_t wait_for_elapsed_millisecond_change(int64_t baseline) {
     time_t deadline = time(NULL) + 3;
 
     while (time(NULL) <= deadline) {
-        int64_t current = getElapsedTimeSeconds();
+        int64_t current = getElapsedTimeMilliseconds();
 
         if (current != baseline) {
             return current;
@@ -32,14 +47,16 @@ static void test_clock_initialization_and_progress(void) {
     int64_t advanced;
 
     assert(getElapsedTimeSeconds() == 0);
+    assert(getElapsedTimeMilliseconds() == 0);
     assert(updateClock() != 0);
     assert(initClock() == 0);
     assert(updateClock() == 0);
 
-    baseline = getElapsedTimeSeconds();
-    advanced = wait_for_elapsed_change(baseline);
+    baseline = getElapsedTimeMilliseconds();
+    advanced = wait_for_elapsed_millisecond_change(baseline);
     assert(advanced >= baseline);
     assert(advanced != baseline);
+    assert(getElapsedTimeSeconds() == getElapsedTimeMilliseconds() / 1000);
 }
 
 /* Verify paused intervals do not contribute to gameplay elapsed time. */
@@ -49,13 +66,14 @@ static void test_clock_pause_and_resume(void) {
     int64_t afterResume;
 
     assert(initClock() == 0);
-    beforePause = getElapsedTimeSeconds();
     assert(pauseClock() == 0);
-    whilePaused = wait_for_elapsed_change(beforePause);
+    beforePause = getElapsedTimeMilliseconds();
+    wait_for_monotonic_delta(20);
+    whilePaused = getElapsedTimeMilliseconds();
     assert(whilePaused == beforePause);
 
     assert(resumeClock() == 0);
-    afterResume = wait_for_elapsed_change(beforePause);
+    afterResume = wait_for_elapsed_millisecond_change(beforePause);
     assert(afterResume > beforePause);
 }
 

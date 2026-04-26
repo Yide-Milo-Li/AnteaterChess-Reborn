@@ -28,7 +28,8 @@
 
 static FILE *logFile = NULL;
 static char sessionLogPath[256];
-static int64_t moveTimestampsSeconds[MAX_MOVES];
+static int64_t moveElapsedMilliseconds[MAX_MOVES];
+static int64_t moveDurationsMilliseconds[MAX_MOVES];
 
 /* Return the human-readable name for one piece type. */
 static const char *piece_type_to_string(PieceType type) {
@@ -194,7 +195,7 @@ static void format_position(Position pos, char buffer[4]) {
     buffer[2] = '\0';
 }
 
-/* Format elapsed seconds into the HH:MM:SS layout required by the log spec. */
+/* Format elapsed seconds into the HH:MM:SS layout required by the summary spec. */
 static void format_elapsed_time(int64_t elapsedSeconds, char buffer[32]) {
     int64_t hours;
     int64_t minutes;
@@ -208,6 +209,29 @@ static void format_elapsed_time(int64_t elapsedSeconds, char buffer[32]) {
     minutes = (elapsedSeconds % 3600) / 60;
     seconds = elapsedSeconds % 60;
     snprintf(buffer, 32, "%02lld:%02lld:%02lld", (long long) hours, (long long) minutes, (long long) seconds);
+}
+
+static void format_elapsed_milliseconds(int64_t elapsedMilliseconds, char buffer[32]) {
+    int64_t hours;
+    int64_t minutes;
+    int64_t seconds;
+    int64_t milliseconds;
+
+    if (elapsedMilliseconds < 0) {
+        elapsedMilliseconds = 0;
+    }
+
+    hours = elapsedMilliseconds / 3600000;
+    minutes = (elapsedMilliseconds % 3600000) / 60000;
+    seconds = (elapsedMilliseconds % 60000) / 1000;
+    milliseconds = elapsedMilliseconds % 1000;
+    snprintf(buffer,
+        32,
+        "%02lld:%02lld:%02lld.%03lld",
+        (long long) hours,
+        (long long) minutes,
+        (long long) seconds,
+        (long long) milliseconds);
 }
 
 /* Build the player label, explicitly tagging AI-controlled sides. */
@@ -307,7 +331,11 @@ static int write_header_section(const GameConfig *config) {
 }
 
 /* Write one move line in the strict replay-friendly format. */
-static int write_move_line(const GameState *state, int moveNumber, int64_t elapsedSeconds, Move move) {
+static int write_move_line(const GameState *state,
+                           int moveNumber,
+                           int64_t elapsedMilliseconds,
+                           int64_t durationMilliseconds,
+                           Move move) {
     char timestamp[32];
     char playerLabel[32];
     char from[4];
@@ -317,16 +345,17 @@ static int write_move_line(const GameState *state, int moveNumber, int64_t elaps
         return 1;
     }
 
-    format_elapsed_time(elapsedSeconds, timestamp);
+    format_elapsed_milliseconds(elapsedMilliseconds, timestamp);
     format_player_label(state, move.movedPiece.color, playerLabel);
     format_position(move.from, from);
     format_position(move.to, to);
 
     fprintf(
         logFile,
-        "[Move %03d] %s | %s | %s %s -> %s",
+        "[Move %03d] Elapsed: %s | Duration: %lldms | %s | %s %s -> %s",
         moveNumber,
         timestamp,
+        (long long) ((durationMilliseconds < 0) ? 0 : durationMilliseconds),
         playerLabel,
         piece_type_to_string(move.movedPiece.type),
         from,
@@ -380,7 +409,8 @@ int initLog(const GameConfig *config) {
         return 1;
     }
 
-    memset(moveTimestampsSeconds, 0, sizeof(moveTimestampsSeconds));
+    memset(moveElapsedMilliseconds, 0, sizeof(moveElapsedMilliseconds));
+    memset(moveDurationsMilliseconds, 0, sizeof(moveDurationsMilliseconds));
     return 0;
 }
 
@@ -397,6 +427,8 @@ int logGameStart(const GameConfig *config) {
 /* Append one validated move and remember its original elapsed timestamp. */
 int logMove(const GameState *state, Move move) {
     int moveIndex;
+    int64_t elapsedMilliseconds;
+    int64_t previousElapsedMilliseconds;
 
     if (logFile == NULL || state == NULL) {
         return 1;
@@ -407,9 +439,19 @@ int logMove(const GameState *state, Move move) {
         return 1;
     }
 
-    moveTimestampsSeconds[moveIndex] = getElapsedTimeSeconds();
+    elapsedMilliseconds = getElapsedTimeMilliseconds();
+    previousElapsedMilliseconds = (moveIndex > 0) ? moveElapsedMilliseconds[moveIndex - 1] : 0;
+    moveElapsedMilliseconds[moveIndex] = elapsedMilliseconds;
+    moveDurationsMilliseconds[moveIndex] = elapsedMilliseconds - previousElapsedMilliseconds;
+    if (moveDurationsMilliseconds[moveIndex] < 0) {
+        moveDurationsMilliseconds[moveIndex] = 0;
+    }
 
-    if (write_move_line(state, moveIndex + 1, moveTimestampsSeconds[moveIndex], move) != 0) {
+    if (write_move_line(state,
+            moveIndex + 1,
+            moveElapsedMilliseconds[moveIndex],
+            moveDurationsMilliseconds[moveIndex],
+            move) != 0) {
         return 1;
     }
 
@@ -430,7 +472,11 @@ int rebuildLogFromHistory(const GameState *state) {
     }
 
     for (index = 0; index < state->moveHistory.count; ++index) {
-        if (write_move_line(state, index + 1, moveTimestampsSeconds[index], state->moveHistory.moves[index]) != 0) {
+        if (write_move_line(state,
+                index + 1,
+                moveElapsedMilliseconds[index],
+                moveDurationsMilliseconds[index],
+                state->moveHistory.moves[index]) != 0) {
             return 1;
         }
     }
@@ -463,5 +509,6 @@ void closeLog(void) {
     }
 
     sessionLogPath[0] = '\0';
-    memset(moveTimestampsSeconds, 0, sizeof(moveTimestampsSeconds));
+    memset(moveElapsedMilliseconds, 0, sizeof(moveElapsedMilliseconds));
+    memset(moveDurationsMilliseconds, 0, sizeof(moveDurationsMilliseconds));
 }

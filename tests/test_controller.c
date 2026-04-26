@@ -394,6 +394,28 @@ static void test_controller_submit_ai_move_cvc_advances_one_step(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
+/* Check that tournament-style AI time forfeits end the game in favor of the
+ * opponent through the controller facade. */
+static void test_controller_time_forfeit_awards_opponent_win(void) {
+    Controller controller;
+    GameConfig config;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+
+    errorCode = ERR_FATAL;
+    assert(controllerDeclareTimeForfeit(&controller, WHITE, &errorCode) == 0);
+    assert(controller.state.systemState == END_GAME_MENU_STATE);
+    assert(controller.state.gameOver == 1);
+    assert(controller.state.result == RESULT_BLACK_WIN);
+}
+
 /* Check that the facade-style new-game request bootstraps INIT before
  * advancing to the next UI-facing menu. */
 static void test_controller_request_new_game_advances_to_mode_menu(void) {
@@ -653,6 +675,7 @@ int main(void) {
     test_controller_submit_ai_move_rejects_human_turn();
     test_controller_submit_ai_move_rejects_illegal_move();
     test_controller_submit_ai_move_cvc_advances_one_step();
+    test_controller_time_forfeit_awards_opponent_win();
     test_controller_request_new_game_advances_to_mode_menu();
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();

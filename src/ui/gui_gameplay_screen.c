@@ -66,11 +66,75 @@ static void gui_format_history_player(const GameState *state, Color color, char 
     snprintf(buffer, 32, "%s", colorText);
 }
 
+static const char *gui_ai_difficulty_text(AIDifficulty difficulty) {
+    switch (difficulty) {
+        case DIFFICULTY_EASY:
+            return "Easy";
+        case DIFFICULTY_MEDIUM:
+            return "Medium";
+        case DIFFICULTY_HARD:
+            return "Hard";
+        case DIFFICULTY_EXPERIMENTAL:
+            return "Experimental";
+        case DIFFICULTY_TOURNAMENT:
+            return "Tournament";
+        case DIFFICULTY_NONE:
+        default:
+            return "None";
+    }
+}
+
+static void gui_update_history_ai_summary(Gui *gui, const GameState *state) {
+    char text[96];
+
+    if (gui == NULL || state == NULL
+        || !GTK_IS_WIDGET(gui->history_ai_summary_label)
+        || !GTK_IS_LABEL(gui->history_ai_summary_label)) {
+        return;
+    }
+
+    switch (state->config.mode) {
+        case MODE_HUMAN_VS_COMPUTER:
+            if (state->config.aiDifficultyWhite != DIFFICULTY_NONE) {
+                snprintf(text,
+                    sizeof(text),
+                    "White AI: %s",
+                    gui_ai_difficulty_text(state->config.aiDifficultyWhite));
+            } else if (state->config.aiDifficultyBlack != DIFFICULTY_NONE) {
+                snprintf(text,
+                    sizeof(text),
+                    "Black AI: %s",
+                    gui_ai_difficulty_text(state->config.aiDifficultyBlack));
+            } else {
+                gtk_label_set_text(GTK_LABEL(gui->history_ai_summary_label), "");
+                gtk_widget_hide(gui->history_ai_summary_label);
+                return;
+            }
+            break;
+        case MODE_COMPUTER_VS_COMPUTER:
+            snprintf(text,
+                sizeof(text),
+                "White AI: %s | Black AI: %s",
+                gui_ai_difficulty_text(state->config.aiDifficultyWhite),
+                gui_ai_difficulty_text(state->config.aiDifficultyBlack));
+            break;
+        case MODE_HUMAN_VS_HUMAN:
+        default:
+            gtk_label_set_text(GTK_LABEL(gui->history_ai_summary_label), "");
+            gtk_widget_hide(gui->history_ai_summary_label);
+            return;
+    }
+
+    gtk_label_set_text(GTK_LABEL(gui->history_ai_summary_label), text);
+    gtk_widget_show(gui->history_ai_summary_label);
+}
+
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *historyPanel;
     GtkWidget *historyHeader;
     GtkWidget *historyIcon;
     GtkWidget *historyLabel;
+    GtkWidget *aiSummaryLabel;
     GtkWidget *scrolledWindow;
     GtkWidget *enterBox;
     GtkWidget *moveBox;
@@ -100,6 +164,17 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_widget_set_hexpand(gui->time_display, TRUE);
     gtk_widget_set_halign(gui->time_display, GTK_ALIGN_END);
     gtk_box_pack_end(GTK_BOX(historyHeader), gui->time_display, TRUE, TRUE, 0);
+
+    aiSummaryLabel = gtk_label_new("");
+    gui->history_ai_summary_label = aiSummaryLabel;
+    gtk_label_set_xalign(GTK_LABEL(aiSummaryLabel), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(aiSummaryLabel), TRUE);
+    gtk_widget_set_halign(aiSummaryLabel, GTK_ALIGN_START);
+    gtk_widget_set_no_show_all(aiSummaryLabel, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(aiSummaryLabel),
+        "ai-summary");
+    gtk_box_pack_start(GTK_BOX(historyPanel), aiSummaryLabel, FALSE, FALSE, 0);
+    gtk_widget_hide(aiSummaryLabel);
 
     gui->history_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(gui->history_view), FALSE);
@@ -309,6 +384,7 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     build_gameplay_board(gui, rightBox, state);
 
     leaveButton = gtk_button_new_with_label("Leave Game");
+    gui->leave_game_button = leaveButton;
     gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
     gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
     gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
@@ -598,6 +674,8 @@ void gui_update_gameplay_controls(Gui *gui, const GameState *state) {
         return;
     }
 
+    gui_update_history_ai_summary(gui, state);
+
     gameplayState = state->systemState == GAMEPLAY_STATE;
     aiTurn = gameplayState && gui_current_turn_is_ai(state);
     humanTurn = gameplayState && !aiTurn;
@@ -640,5 +718,8 @@ void gui_update_gameplay_controls(Gui *gui, const GameState *state) {
     if (GTK_IS_WIDGET(gui->hint_button)) {
         gtk_widget_set_sensitive(gui->hint_button,
             canUseHumanControls && gui->hint_job == NULL);
+    }
+    if (GTK_IS_WIDGET(gui->leave_game_button)) {
+        gtk_widget_set_sensitive(gui->leave_game_button, gameplayState);
     }
 }

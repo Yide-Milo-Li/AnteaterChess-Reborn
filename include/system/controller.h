@@ -58,6 +58,9 @@ int controllerSubmitMoveRequest(Controller *controller, MoveRequest request);
 int controllerSubmitAIMoveDetailed(Controller *controller,
                                    Move move,
                                    ErrorCode *errorCode);
+int controllerDeclareTimeForfeit(Controller *controller,
+                                 Color losingColor,
+                                 ErrorCode *errorCode);
 int controllerRequestUndo(Controller *controller);
 int controllerRequestLeaveGame(Controller *controller);
 int controllerGetHint(const Controller *controller, Move *move);

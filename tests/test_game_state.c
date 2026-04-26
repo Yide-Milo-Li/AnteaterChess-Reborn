@@ -102,6 +102,7 @@ static void test_ai_time_budget_helpers(void) {
     assert(getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM) == 2200);
     assert(getDefaultAITimeBudgetMs(DIFFICULTY_HARD) == 7000);
     assert(getDefaultAITimeBudgetMs(DIFFICULTY_EXPERIMENTAL) == 7000);
+    assert(getDefaultAITimeBudgetMs(DIFFICULTY_TOURNAMENT) == 14000);
     assert(getAITimeBudgetMs(&config, DIFFICULTY_EASY) == 350);
 
     config.aiTimeLimit = 2;
@@ -127,6 +128,16 @@ static void test_ai_time_budget_helpers(void) {
     assert(getRequiredAITurnTimerSeconds(&config) == 8);
     assert(isAITurnTimerSettingValid(&config) == 0);
     config.initialTimeSeconds = 8;
+    assert(isAITurnTimerSettingValid(&config) == 1);
+
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = WHITE;
+    config.aiDifficultyWhite = DIFFICULTY_NONE;
+    config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    config.initialTimeSeconds = 14;
+    assert(getRequiredAITurnTimerSeconds(&config) == 15);
+    assert(isAITurnTimerSettingValid(&config) == 0);
+    config.initialTimeSeconds = 15;
     assert(isAITurnTimerSettingValid(&config) == 1);
 
     config.mode = MODE_HUMAN_VS_HUMAN;

@@ -193,6 +193,7 @@ static int gui_select_promotion_choice(Gui *gui, PromotionChoice *choice) {
     gtk_dialog_add_button(GTK_DIALOG(dialog), "Bishop", PROMOTION_CHOICE_BISHOP);
     gtk_dialog_add_button(GTK_DIALOG(dialog), "Knight", PROMOTION_CHOICE_KNIGHT);
 
+    gui_prepare_modal_dialog(gui, dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 
@@ -212,6 +213,7 @@ void gui_on_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -256,6 +258,7 @@ void gui_on_back_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -284,6 +287,9 @@ void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
     }
 
     gui_attach_move_provider(gui);
+    if (gui->move_provider_reset != NULL) {
+        gui->move_provider_reset(gui->move_provider_reset_context, &config);
+    }
     gui->pendingConfig = config;
     gui_sync_from_controller(gui);
 }
@@ -487,6 +493,7 @@ void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -500,6 +507,7 @@ void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -513,39 +521,9 @@ void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {
-        gui_set_error(gui, ERR_FATAL);
-        return;
-    }
-
-    gui_sync_from_controller(gui);
-}
-
-void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data) {
-    Gui *gui = (Gui *) user_data;
-    int result;
-
-    if (gui == NULL) {
-        gtk_widget_destroy(GTK_WIDGET(dialog));
-        return;
-    }
-
-    gui->endgame_dialog_shown = 0;
-    gtk_widget_destroy(GTK_WIDGET(dialog));
-
-    if (response_id == GTK_RESPONSE_ACCEPT) {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestNewGame(&gui->controller);
-    } else if (response_id == GTK_RESPONSE_APPLY) {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestBack(&gui->controller);
-    } else {
-        gui_invalidate_async_results(gui);
-        result = controllerRequestExit(&gui->controller);
-    }
-
-    if (result != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
     }

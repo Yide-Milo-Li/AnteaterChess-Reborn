@@ -19,6 +19,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->turn_label = NULL;
     gui->time_display = NULL;
     gui->history_view = NULL;
+    gui->history_ai_summary_label = NULL;
     gui->black_timer_label = NULL;
     gui->white_timer_label = NULL;
     gui->status_label = NULL;
@@ -27,6 +28,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->submit_button = NULL;
     gui->undo_button = NULL;
     gui->hint_button = NULL;
+    gui->leave_game_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;
     gui->setup_minutes_spin = NULL;
@@ -48,7 +50,7 @@ void gui_clear_view_refs(Gui *gui) {
         gui->setup_timer_widgets[index] = NULL;
     }
 
-    for (index = 0; index < 3; ++index) {
+    for (index = 0; index < GUI_AI_DIFFICULTY_COUNT; ++index) {
         gui->setup_ai_diff_buttons[index] = NULL;
         gui->setup_white_diff_buttons[index] = NULL;
         gui->setup_black_diff_buttons[index] = NULL;
@@ -114,8 +116,41 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
         gtk_window_set_title(GTK_WINDOW(dialog), title);
     }
 
+    gui_prepare_modal_dialog(gui, dialog);
     (void)gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
+}
+
+void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog) {
+    GtkWindow *window;
+
+    if (!GTK_IS_WINDOW(dialog)) {
+        return;
+    }
+
+    window = GTK_WINDOW(dialog);
+    if (gui_window_is_valid(gui)) {
+        gtk_window_set_transient_for(window, GTK_WINDOW(gui->window));
+        gtk_window_set_destroy_with_parent(window, TRUE);
+    }
+
+    gtk_window_set_modal(window, TRUE);
+    gtk_window_set_keep_above(window, TRUE);
+    gtk_window_set_position(window, GTK_WIN_POS_CENTER_ON_PARENT);
+}
+
+void gui_destroy_endgame_dialog(Gui *gui) {
+    GtkWidget *dialog;
+
+    if (gui == NULL || gui->endgame_dialog == NULL) {
+        return;
+    }
+
+    dialog = gui->endgame_dialog;
+    gui->endgame_dialog = NULL;
+    if (GTK_IS_WIDGET(dialog)) {
+        gtk_widget_destroy(dialog);
+    }
 }
 
 int gui_confirm(Gui *gui, const char *title, const char *message) {
@@ -142,6 +177,7 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
     }
 
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
+    gui_prepare_modal_dialog(gui, dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     return response == GTK_RESPONSE_YES;
@@ -158,7 +194,6 @@ void gui_set_error(Gui *gui, ErrorCode code) {
             initController(&gui->controller, &gui->pendingConfig);
             gui->last_rendered_state = EXIT_STATE;
             gui->has_rendered_state = 0;
-            gui->endgame_dialog_shown = 0;
             gui_sync_from_controller(gui);
         }
         return;

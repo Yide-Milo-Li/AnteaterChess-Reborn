@@ -18,6 +18,11 @@ typedef enum {
     GUI_STATUS_ERROR
 } GuiStatusKind;
 
+/* 5 difficulty radios in the setup menu:
+ * Easy / Medium / Hard / Tournament / Experimental.
+ * Experimental routes through the optional ai/alien/ plugin. */
+#define GUI_AI_DIFFICULTY_COUNT 5
+
 struct Gui {
     GtkWidget *window;
     GtkWidget *main_box;
@@ -29,6 +34,7 @@ struct Gui {
     GtkWidget *turn_label;
     GtkWidget *time_display;
     GtkWidget *history_view;
+    GtkWidget *history_ai_summary_label;
     GtkWidget *black_timer_label;
     GtkWidget *white_timer_label;
     GtkWidget *status_label;
@@ -37,6 +43,8 @@ struct Gui {
     GtkWidget *submit_button;
     GtkWidget *undo_button;
     GtkWidget *hint_button;
+    GtkWidget *leave_game_button;
+    GtkWidget *endgame_dialog;
     GtkWidget *setup_timer_toggle;
     GtkWidget *setup_hours_spin;
     GtkWidget *setup_minutes_spin;
@@ -44,11 +52,13 @@ struct Gui {
     GtkWidget *setup_timer_widgets[6];
     GtkWidget *setup_side_white;
     GtkWidget *setup_side_black;
-    GtkWidget *setup_ai_diff_buttons[3];
-    GtkWidget *setup_white_diff_buttons[3];
-    GtkWidget *setup_black_diff_buttons[3];
+    GtkWidget *setup_ai_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
+    GtkWidget *setup_white_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
+    GtkWidget *setup_black_diff_buttons[GUI_AI_DIFFICULTY_COUNT];
     GuiMoveProvider move_provider;
     void *move_provider_context;
+    GuiMoveProviderReset move_provider_reset;
+    void *move_provider_reset_context;
     GuiHintProvider hint_provider;
     void *hint_provider_context;
     GuiAsyncJob *ai_job;
@@ -67,7 +77,6 @@ struct Gui {
     guint sync_source_id;
     int has_rendered_state;
     int has_highlight_from;
-    int endgame_dialog_shown;
     int is_fullscreen;
     int fullscreen_transition_pending;
     int should_quit;
@@ -82,6 +91,8 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
                              GtkButtonsType buttons,
                              const char *title,
                              const char *message);
+void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog);
+void gui_destroy_endgame_dialog(Gui *gui);
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
 void gui_attach_move_provider(Gui *gui);
@@ -149,7 +160,6 @@ void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data);
-void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data);
 gboolean gui_on_async_job_finished(gpointer user_data);
 
 #endif

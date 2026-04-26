@@ -48,6 +48,10 @@ AIDifficulty gui_difficulty_from_index(int index) {
             return DIFFICULTY_MEDIUM;
         case 2:
             return DIFFICULTY_HARD;
+        case 3:
+            return DIFFICULTY_TOURNAMENT;
+        case 4:
+            return DIFFICULTY_EXPERIMENTAL;
         default:
             return DIFFICULTY_EASY;
     }
@@ -58,8 +62,11 @@ int gui_difficulty_index(AIDifficulty difficulty) {
         case DIFFICULTY_MEDIUM:
             return 1;
         case DIFFICULTY_HARD:
-        case DIFFICULTY_EXPERIMENTAL:
             return 2;
+        case DIFFICULTY_TOURNAMENT:
+            return 3;
+        case DIFFICULTY_EXPERIMENTAL:
+            return 4;
         case DIFFICULTY_EASY:
         case DIFFICULTY_NONE:
         default:

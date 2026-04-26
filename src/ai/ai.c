@@ -12,14 +12,24 @@
 #endif
 
 #include "ai/ai.h"
-#include "ai/book.h"
+#include "ai_search_internal.h"
+
+#if defined(__has_include)
+#if __has_include("tournament_ai.h")
+#include "tournament_ai.h"
+#define HAS_TOURNAMENT_AI 1
+#else
+#define HAS_TOURNAMENT_AI 0
+#endif
+#else
+#define HAS_TOURNAMENT_AI 0
+#endif
 
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "core/board.h"
 #include "core/hash.h"
@@ -28,6 +38,7 @@
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
 #include "gameplay/movegen.h"
+#include "time/clock.h"
 
 // AI Constants
 #define AI_INF 100000000       // Infinity
@@ -38,6 +49,14 @@
 #define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
+#define AI_TOURNAMENT_TOTAL_MS 600999
+#define AI_TOURNAMENT_RESERVE_MS 30000
+#define AI_TOURNAMENT_BASE_MS 8500
+#define AI_TOURNAMENT_MAX_MS 14000
+#define AI_TOURNAMENT_MAX_EXTRA_MS 7000
+#define AI_TOURNAMENT_BONUS_DIVISOR 2
+#define AI_TOURNAMENT_POOL_CAP_MS 240000
+#define AI_MIN_MOVE_BUDGET_MS 300
 
 enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
 typedef struct {
@@ -52,7 +71,7 @@ typedef struct {
 } TTEntry;
 
 typedef struct {
-    clock_t searchStart;
+    int64_t searchStartMs;
     int timeLimitMs;
     int softTimeLimitMs;
     int stopSearch;
@@ -63,6 +82,7 @@ typedef struct {
     uint64_t gameHashes[MAX_MOVES + 1];
     int gameHashCount;
     int gameHistoryStart;
+    AISearchProfile profile;
     int repetitionLimit[AI_MAX_PLY + 1];
     unsigned char nullMoveActive[AI_MAX_PLY + 1];
 } SearchContext;
@@ -1379,11 +1399,46 @@ static int evaluate_relative(const GameState *state) {
     return -absoluteScore + 1;
 }
 
-static int elapsed_ms(const SearchContext *ctx) {
-    clock_t now;
+static int evaluate_relative_for_search(const SearchContext *ctx, const GameState *state) {
+    int score;
+    int adjustment;
 
-    now = clock();
-    return (int)(((now - ctx->searchStart) * 1000) / CLOCKS_PER_SEC);
+    score = evaluate_relative(state);
+    if (ctx == NULL || ctx->profile.evaluateAdjustment == NULL) {
+        return score;
+    }
+
+    adjustment = ctx->profile.evaluateAdjustment(state);
+    return (state->currentTurn == WHITE) ? score + adjustment : score - adjustment;
+}
+
+static int clamp_int(int value, int minValue, int maxValue) {
+    if (value < minValue) {
+        return minValue;
+    }
+    if (value > maxValue) {
+        return maxValue;
+    }
+    return value;
+}
+
+static int color_time_index(Color color) {
+    if (color == BLACK) {
+        return 1;
+    }
+    return 0;
+}
+
+static int elapsed_ms(const SearchContext *ctx) {
+    int64_t now;
+
+    if (ctx == NULL || getMonotonicMilliseconds(&now) != 0 || now < ctx->searchStartMs) {
+        return 0;
+    }
+    if (now - ctx->searchStartMs > INT_MAX) {
+        return INT_MAX;
+    }
+    return (int)(now - ctx->searchStartMs);
 }
 
 static int time_is_up(SearchContext *ctx) {
@@ -1391,12 +1446,99 @@ static int time_is_up(SearchContext *ctx) {
         return 0;
     }
 
-    // equal to % 2048, every 2048 nodes, check time
-    if ((ctx->nodes & 2047) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
+    if ((ctx->nodes & 1023) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
         ctx->stopSearch = 1;
     }
 
     return ctx->stopSearch;
+}
+
+void initAITimeManager(AITimeManager *manager) {
+    int index;
+
+    if (manager == NULL) {
+        return;
+    }
+
+    for (index = 0; index < 2; ++index) {
+        manager->remainingMs[index] = AI_TOURNAMENT_TOTAL_MS;
+        manager->poolMs[index] = 0;
+    }
+}
+
+int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
+    int index;
+    int remainingMs;
+    int availableMs;
+    int bonusMs;
+    int budgetMs;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return AI_TOURNAMENT_BASE_MS;
+    }
+
+    index = color_time_index(color);
+    remainingMs = manager->remainingMs[index];
+    if (remainingMs <= AI_MIN_MOVE_BUDGET_MS) {
+        return AI_MIN_MOVE_BUDGET_MS;
+    }
+    availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS
+        ? remainingMs - AI_TOURNAMENT_RESERVE_MS
+        : remainingMs;
+    bonusMs = manager->poolMs[index] / AI_TOURNAMENT_BONUS_DIVISOR;
+    bonusMs = clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
+
+    budgetMs = AI_TOURNAMENT_BASE_MS + bonusMs;
+    budgetMs = clamp_int(budgetMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+    if (availableMs > 0 && budgetMs > availableMs) {
+        budgetMs = clamp_int(availableMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+    }
+    return budgetMs;
+}
+
+int isAITournamentTimeExpired(const AITimeManager *manager, Color color) {
+    int index;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return 0;
+    }
+
+    index = color_time_index(color);
+    return manager->remainingMs[index] <= 0;
+}
+
+void updateAITournamentTime(AITimeManager *manager,
+                            Color color,
+                            int budgetMs,
+                            int elapsedMs) {
+    int index;
+    int poolMs;
+
+    if (manager == NULL || (color != WHITE && color != BLACK)) {
+        return;
+    }
+
+    if (budgetMs <= 0) {
+        budgetMs = AI_TOURNAMENT_BASE_MS;
+    }
+    if (elapsedMs < 0) {
+        elapsedMs = 0;
+    }
+
+    index = color_time_index(color);
+    if (manager->remainingMs[index] > elapsedMs) {
+        manager->remainingMs[index] -= elapsedMs;
+    } else {
+        manager->remainingMs[index] = 0;
+    }
+
+    poolMs = manager->poolMs[index];
+    if (elapsedMs < budgetMs) {
+        poolMs += budgetMs - elapsedMs;
+    } else {
+        poolMs -= elapsedMs - budgetMs;
+    }
+    manager->poolMs[index] = clamp_int(poolMs, 0, AI_TOURNAMENT_POOL_CAP_MS);
 }
 
 // reset and init
@@ -1427,8 +1569,53 @@ static void age_history_scores(void) {
     }
 }
 
-static int init_search_context(SearchContext *ctx, int timeLimitMs) {
-    if (ctx == NULL) {
+AISearchProfile aiSearchProfileForDifficulty(AIDifficulty difficulty) {
+    AISearchProfile profile;
+
+    profile.maxDepth = 8;
+    profile.softNumerator = 4;
+    profile.softDenominator = 5;
+    profile.lmrQuietStart = 4;
+    profile.lmrDepthStart = 4;
+    profile.lmrSecondStart = 8;
+    profile.lmrThirdStart = 12;
+    profile.nullDepthStart = 3;
+    profile.nullReductionBase = NULL_MOVE_R;
+    profile.nullReductionDeep = NULL_MOVE_R + 1;
+    profile.tacticalExtensionMaxDepth = 6;
+    profile.evaluateAdjustment = NULL;
+    profile.softLimitMs = NULL;
+    profile.allowNullMove = NULL;
+    profile.extendMove = NULL;
+    profile.shouldStopAfterDepth = NULL;
+
+    switch (difficulty) {
+    case DIFFICULTY_EASY:
+        profile.maxDepth = 2;
+        break;
+    case DIFFICULTY_MEDIUM:
+        profile.maxDepth = 10;
+        break;
+    case DIFFICULTY_HARD:
+    case DIFFICULTY_EXPERIMENTAL:
+    case DIFFICULTY_TOURNAMENT:
+        profile.maxDepth = 24;
+        break;
+    case DIFFICULTY_NONE:
+    default:
+        break;
+    }
+    return profile;
+}
+
+static int init_search_context(SearchContext *ctx, int timeLimitMs, const AISearchProfile *profile) {
+    int64_t now;
+
+    if (ctx == NULL || profile == NULL) {
+        return 1;
+    }
+
+    if (getMonotonicMilliseconds(&now) != 0) {
         return 1;
     }
 
@@ -1440,8 +1627,11 @@ static int init_search_context(SearchContext *ctx, int timeLimitMs) {
     }
 
     ctx->timeLimitMs = timeLimitMs;
-    ctx->softTimeLimitMs = (timeLimitMs > 0) ? (timeLimitMs * 4) / 5 : 0;
-    ctx->searchStart = clock();
+    ctx->softTimeLimitMs = (timeLimitMs > 0)
+        ? (timeLimitMs * profile->softNumerator) / profile->softDenominator
+        : 0;
+    ctx->profile = *profile;
+    ctx->searchStartMs = now;
     ++g_ttGeneration;
     if (g_ttGeneration == 0) {
         ++g_ttGeneration;
@@ -1888,9 +2078,9 @@ static int try_null_move(SearchContext *ctx, GameState *state, int depth, int be
     ctx->repetitionLimit[ply + 1] = ply + 1;
     ctx->nullMoveActive[ply + 1] = 1;
 
-    reduction = NULL_MOVE_R;
+    reduction = ctx->profile.nullReductionBase;
     if (depth >= 6) {
-        ++reduction;
+        reduction = ctx->profile.nullReductionDeep;
     }
     score = -alpha_beta(ctx, state, depth - 1 - reduction, -beta, -beta + 1, ply + 1, 0);
 
@@ -1916,11 +2106,11 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     Color movingSide;
 
     if (time_is_up(ctx)) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
 
     if (ply >= AI_MAX_PLY - 2) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
 
     ++ctx->nodes;
@@ -1961,7 +2151,11 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         return quiescence(ctx, state, alpha, beta, ply, 0);
     }
 
-    if (allowNull && !pvNode && !inCheck && depth >= 3 && side_has_major_material(&state->board, state->currentTurn)) {
+    if (allowNull && !pvNode && !inCheck
+        && depth >= ctx->profile.nullDepthStart
+        && side_has_major_material(&state->board, state->currentTurn)
+        && (ctx->profile.allowNullMove == NULL
+            || ctx->profile.allowNullMove(state, depth))) {
         int nullScore = try_null_move(ctx, state, depth, beta, ply);
 
         if (ctx->stopSearch) {
@@ -1977,7 +2171,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
 
     moves = &ctx->moveBuffers[ply];
     if (generate_search_moves(state, moves, 0) != 0) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
     if (moves->count == 0) {
         if (inCheck) {
@@ -1999,21 +2193,23 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         int childDepth;
         int reduction;
         int extension;
+        int givesCheck;
 
         if (applyMove(state, move) != 0) {
             continue;
         }
         if (isInCheck(state, movingSide) != 0) {
             if (undoMove(state) != 0) {
-                return evaluate_relative(state);
+                return evaluate_relative_for_search(ctx, state);
             }
             continue;
         }
+        givesCheck = isInCheck(state, state->currentTurn);
 
         ++legalCount;
         if (advanceHashState(state, move, &ctx->hashStack[ply], &ctx->hashStack[ply + 1]) != 0) {
             if (undoMove(state) != 0) {
-                return evaluate_relative(state);
+                return evaluate_relative_for_search(ctx, state);
             }
             continue;
         }
@@ -2021,22 +2217,31 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         ctx->nullMoveActive[ply + 1] = ctx->nullMoveActive[ply];
 
         extension = 0;
-        if (depth <= 6) {
+        if (depth <= ctx->profile.tacticalExtensionMaxDepth) {
             if (is_promotion_move(&move)) {
                 extension = 1;
             } else if (move.specialType == ANTEATER_CAPTURE && move.captureCount >= 2) {
                 extension = 1;
             }
         }
+        if (ctx->profile.extendMove != NULL
+            && ctx->profile.extendMove(state, &move, depth, givesCheck)) {
+            extension = 1;
+        }
         childDepth = depth - 1 + extension;
 
         reduction = 0;
-        if (legalCount >= 4 && depth >= 4 && !inCheck && is_quiet_move(&move) && !pvNode) {
+        if (legalCount >= ctx->profile.lmrQuietStart
+            && depth >= ctx->profile.lmrDepthStart
+            && !inCheck
+            && !givesCheck
+            && is_quiet_move(&move)
+            && !pvNode) {
             reduction = 1;
-            if (legalCount >= 8 && depth >= 5) {
+            if (legalCount >= ctx->profile.lmrSecondStart && depth >= ctx->profile.lmrDepthStart + 1) {
                 ++reduction;
             }
-            if (legalCount >= 12 && depth >= 8) {
+            if (legalCount >= ctx->profile.lmrThirdStart && depth >= ctx->profile.lmrDepthStart + 4) {
                 ++reduction;
             }
             if (reduction > childDepth - 1) {
@@ -2065,7 +2270,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         }
 
         if (undoMove(state) != 0) {
-            return evaluate_relative(state);
+            return evaluate_relative_for_search(ctx, state);
         }
         if (ctx->stopSearch) {
             return alpha;
@@ -2120,10 +2325,10 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
     Color movingSide;
 
     if (time_is_up(ctx)) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
     if (ply >= AI_MAX_PLY - 2) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
 
     ++ctx->nodes;
@@ -2150,7 +2355,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
     inCheck = isInCheck(state, state->currentTurn);
     standPat = alpha;
     if (!inCheck) {
-        standPat = evaluate_relative(state);
+        standPat = evaluate_relative_for_search(ctx, state);
         if (standPat >= beta) {
             tt_store(key, 0, ply, standPat, TT_FLAG_LOWER, NULL, ctx->generation);
             return standPat;
@@ -2164,7 +2369,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
             return alpha;
         }
     } else if (qDepth >= AI_Q_DEPTH + 2) {
-        return evaluate_relative(state);
+        return evaluate_relative_for_search(ctx, state);
     }
 
     moves = &ctx->moveBuffers[ply];
@@ -2262,20 +2467,6 @@ static AIDifficulty difficulty_for_turn(const GameState *state) {
     return difficulty;
 }
 
-static int depth_for_difficulty(AIDifficulty difficulty) {
-    switch (difficulty) {
-    case DIFFICULTY_EASY:
-        return 2;
-    case DIFFICULTY_MEDIUM:
-        return 10;
-    case DIFFICULTY_HARD:
-        return 24;
-    case DIFFICULTY_NONE:
-    default:
-        return 8;
-    }
-}
-
 static int time_budget_for_state(const GameState *state, AIDifficulty difficulty) {
     if (state->config.aiTimeLimit > 0) {
         return state->config.aiTimeLimit * 1000;
@@ -2287,14 +2478,60 @@ static int time_budget_for_state(const GameState *state, AIDifficulty difficulty
     case DIFFICULTY_MEDIUM:
         return 2200;
     case DIFFICULTY_HARD:
+    case DIFFICULTY_EXPERIMENTAL:
         return 7000;
+    case DIFFICULTY_TOURNAMENT:
+        return AI_TOURNAMENT_MAX_MS;
     case DIFFICULTY_NONE:
     default:
         return 2200;
     }
 }
 
-static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs, Move *bestMove) {
+static int root_score_gap(const int scores[MAX_MOVES], int count) {
+    if (count < 2) {
+        return AI_INF;
+    }
+    return scores[0] - scores[1];
+}
+
+static int adaptive_soft_limit_ms(const AISearchProfile *profile,
+                                  const GameState *state,
+                                  const MoveList *rootMoves,
+                                  int maxTimeMs) {
+    if (maxTimeMs <= 0 || profile == NULL) {
+        return 0;
+    }
+    if (profile->softLimitMs != NULL) {
+        return profile->softLimitMs(state, rootMoves, maxTimeMs);
+    }
+    (void)state;
+    (void)rootMoves;
+    return (maxTimeMs * profile->softNumerator) / profile->softDenominator;
+}
+
+static int profile_should_stop_after_depth(const SearchContext *ctx,
+                                           const int rootScores[MAX_MOVES],
+                                           int rootCount,
+                                           int stableDepths) {
+    int elapsed;
+
+    if (ctx == NULL || ctx->profile.shouldStopAfterDepth == NULL || ctx->softTimeLimitMs <= 0) {
+        return 1;
+    }
+
+    elapsed = elapsed_ms(ctx);
+    return ctx->profile.shouldStopAfterDepth(elapsed,
+        ctx->timeLimitMs,
+        ctx->softTimeLimitMs,
+        root_score_gap(rootScores, rootCount),
+        stableDepths);
+}
+
+int aiSearchBestMoveWithProfile(const GameState *state,
+                                const AISearchProfile *profile,
+                                int maxTimeMs,
+                                Move *bestMove) {
     SearchContext ctx;
     GameState searchState;
     MoveList *rootMoves;
@@ -2302,16 +2539,14 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
     int rootScores[MAX_MOVES];
     Move currentBest;
     int currentBestScore;
+    int stableDepths;
     int depth;
 
-    if (state == NULL || bestMove == NULL) {
+    if (state == NULL || profile == NULL || bestMove == NULL) {
         return 1;
     }
 
-    if (maxDepth > AI_MAX_PLY - 2) {
-        maxDepth = AI_MAX_PLY - 2;
-    }
-    if (init_search_context(&ctx, maxTimeMs) != 0) {
+    if (init_search_context(&ctx, maxTimeMs, profile) != 0) {
         return 1;
     }
     age_history_scores();
@@ -2342,6 +2577,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
     } else {
         sort_moves(&ctx, &searchState, rootMoves, 0, NULL);
     }
+    ctx.softTimeLimitMs = adaptive_soft_limit_ms(profile, &searchState, rootMoves, maxTimeMs);
 
     *bestMove = rootMoves->moves[0];
     if (rootMoves->count == 1) {
@@ -2351,8 +2587,9 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
 
     currentBest = rootMoves->moves[0];
     currentBestScore = -AI_INF;
+    stableDepths = 0;
 
-    for (depth = 1; depth <= maxDepth; ++depth) {
+    for (depth = 1; depth <= profile->maxDepth && depth <= AI_MAX_PLY - 2; ++depth) {
         Move iterationBest;
         int iterationBestScore;
         int aspiration;
@@ -2458,6 +2695,11 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
             break;
         }
 
+        if (move_equal_signature(&iterationBest, &currentBest)) {
+            ++stableDepths;
+        } else {
+            stableDepths = 1;
+        }
         currentBest = iterationBest;
         currentBestScore = iterationBestScore;
         *bestMove = currentBest;
@@ -2467,7 +2709,9 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
         if (currentBestScore >= AI_MATE - 1000 || currentBestScore <= -AI_MATE + 1000) {
             break;
         }
-        if (ctx.softTimeLimitMs > 0 && elapsed_ms(&ctx) >= ctx.softTimeLimitMs) {
+        if (ctx.softTimeLimitMs > 0
+            && elapsed_ms(&ctx) >= ctx.softTimeLimitMs
+            && profile_should_stop_after_depth(&ctx, rootScores, rootMoves->count, stableDepths)) {
             break;
         }
     }
@@ -2478,8 +2722,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
 
 int generateAIMove(const GameState *state, Move *move) {
     AIDifficulty difficulty;
-    AIDifficulty effective;
-    int maxDepth;
+    AISearchProfile profile;
     int maxTimeMs;
 
     if (state == NULL || move == NULL) {
@@ -2487,6 +2730,13 @@ int generateAIMove(const GameState *state, Move *move) {
     }
 
     difficulty = difficulty_for_turn(state);
+    maxTimeMs = time_budget_for_state(state, difficulty);
+
+#if HAS_TOURNAMENT_AI
+    if (difficulty == DIFFICULTY_TOURNAMENT) {
+        return generateTournamentAIMoveWithBudget(state, move, maxTimeMs);
+    }
+#endif
 
     if (difficulty == DIFFICULTY_EXPERIMENTAL) {
 #if HAS_ALIEN_PLUGIN
@@ -2496,26 +2746,45 @@ int generateAIMove(const GameState *state, Move *move) {
         }
         /* Plugin failed — degrade to HARD instead of forfeiting. */
 #endif
-        effective = DIFFICULTY_HARD;
+        profile = aiSearchProfileForDifficulty(DIFFICULTY_HARD);
     } else {
-        effective = difficulty;
+        profile = aiSearchProfileForDifficulty(difficulty);
     }
 
-    maxDepth = depth_for_difficulty(effective);
-    maxTimeMs = time_budget_for_state(state, effective);
-    if (search_best_move(state, maxDepth, maxTimeMs, move) != 0) {
+    if (aiSearchBestMoveWithProfile(state, &profile, maxTimeMs, move) != 0) {
         return 1;
     }
     return 0;
 }
 
+int generateAIMoveWithBudget(const GameState *state, Move *move, int budgetMs) {
+    AIDifficulty difficulty;
+    AISearchProfile profile;
+
+    if (state == NULL || move == NULL || budgetMs <= 0) {
+        return 1;
+    }
+
+    difficulty = difficulty_for_turn(state);
+#if HAS_TOURNAMENT_AI
+    if (difficulty == DIFFICULTY_TOURNAMENT) {
+        return generateTournamentAIMoveWithBudget(state, move, budgetMs);
+    }
+#endif
+    profile = aiSearchProfileForDifficulty(difficulty);
+    return aiSearchBestMoveWithProfile(state, &profile, budgetMs, move);
+}
+
 int generateHintMove(const GameState *state, Move *move) {
     int maxTimeMs;
+    AISearchProfile profile;
 
     if (state == NULL || move == NULL) {
         return 1;
     }
 
     maxTimeMs = time_budget_for_state(state, DIFFICULTY_MEDIUM);
-    return search_best_move(state, 8, maxTimeMs, move);
+    profile = aiSearchProfileForDifficulty(DIFFICULTY_NONE);
+    profile.maxDepth = 8;
+    return aiSearchBestMoveWithProfile(state, &profile, maxTimeMs, move);
 }

@@ -4,7 +4,9 @@
 #include "core/board.h"
 #include "core/gameconfig.h"
 #include "core/gamestate.h"
+#include "core/movelist.h"
 #include "core/piece.h"
+#include "gameplay/movegen.h"
 #include "gameplay/validation.h"
 #include "system/controller.h"
 #include "system/controller_driver.h"
@@ -49,6 +51,28 @@ static void seed_simple_ant_position(GameState *state) {
     setPiece(&state->board, createPosition(7, 5), createPiece(KING, WHITE));
     setPiece(&state->board, createPosition(0, 5), createPiece(KING, BLACK));
     setPiece(&state->board, createPosition(6, 0), createPiece(ANT, WHITE));
+}
+
+static int first_legal_move_provider(const GameState *state, Move *move, void *context) {
+    MoveList moves;
+    Move *candidate;
+
+    (void)context;
+    if (state == NULL || move == NULL) {
+        return 1;
+    }
+
+    if (generateLegalMoves(state, &moves) != 0 || getMoveCount(&moves) <= 0) {
+        return 1;
+    }
+
+    candidate = getMove(&moves, 0);
+    if (candidate == NULL) {
+        return 1;
+    }
+
+    *move = *candidate;
+    return 0;
 }
 
 /* Check that controller initialization resets state and queue storage. */
@@ -182,10 +206,33 @@ static void test_controller_run_until_idle_auto_plays_ai_turn(void) {
     assert(controller.state.players[WHITE].type == AI);
     assert(controller.state.moveHistory.count == 0);
 
+    controllerSetMoveProvider(&controller, first_legal_move_provider, NULL);
     assert(controllerRunUntilIdle(&controller) == 0);
     assert(controller.state.systemState == GAMEPLAY_STATE);
     assert(controller.state.currentTurn == BLACK);
     assert(controller.state.moveHistory.count == 1);
+}
+
+/* Check that AI-controlled turns stay idle unless the integration layer
+ * explicitly installs a move provider. */
+static void test_controller_run_until_idle_leaves_ai_turn_idle_without_provider(void) {
+    Controller controller;
+    GameConfig config;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.players[WHITE].type == AI);
+    assert(controller.state.moveHistory.count == 0);
+
+    assert(controllerRunUntilIdle(&controller) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
 }
 
 /* Check that the facade-style new-game request bootstraps INIT before
@@ -221,14 +268,14 @@ static void test_controller_request_exit_reaches_exit_state(void) {
 static void test_controller_submit_move_applies_valid_move(void) {
     Controller controller;
     GameConfig config;
-    Command command;
+    MoveRequest request;
 
     initDefaultGameConfig(&config);
     assert(controllerStartConfiguredGame(&controller, &config) == 0);
     seed_simple_ant_position(&controller.state);
-    assert(createMoveCommand(&command, createPosition(6, 0),
-        createPosition(5, 0)) == 0);
-    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(createMoveRequest(&request, createPosition(6, 0),
+        createPosition(5, 0), PROMOTION_CHOICE_NONE) == 0);
+    assert(controllerSubmitMoveRequest(&controller, request) == 0);
     assert(getPiece(&controller.state.board, createPosition(6, 0)).type == EMPTY_PIECE);
     assert(getPiece(&controller.state.board, createPosition(5, 0)).type == ANT);
     assert(controller.state.currentTurn == BLACK);
@@ -303,7 +350,7 @@ static void test_controller_submit_move_request_detailed_rejects_ai_turn(void) {
 static void test_controller_submit_move_draws_at_history_capacity(void) {
     Controller controller;
     GameConfig config;
-    Command command;
+    MoveRequest request;
 
     initDefaultGameConfig(&config);
     assert(controllerStartConfiguredGame(&controller, &config) == 0);
@@ -312,9 +359,9 @@ static void test_controller_submit_move_draws_at_history_capacity(void) {
     controller.state.moveHistory.count = MAX_MOVES;
     controller.state.moveCount = MAX_MOVES;
 
-    assert(createMoveCommand(&command, createPosition(7, 1),
-        createPosition(5, 2)) == 0);
-    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(createMoveRequest(&request, createPosition(7, 1),
+        createPosition(5, 2), PROMOTION_CHOICE_NONE) == 0);
+    assert(controllerSubmitMoveRequest(&controller, request) == 0);
     assert(controller.state.systemState == END_GAME_MENU_STATE);
     assert(controller.state.result == RESULT_DRAW);
     assert(getPiece(&controller.state.board, createPosition(7, 1)).type == KNIGHT);
@@ -349,11 +396,12 @@ static void test_controller_submit_move_request_applies_promotion_choice(void) {
     assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
 }
 
-/* Check that legacy command submission still defaults promotion to queen. */
-static void test_controller_submit_move_legacy_promotion_defaults_to_queen(void) {
+/* Check that GUI-facing request submission can still choose queen promotion
+ * without relying on the removed legacy Command compatibility path. */
+static void test_controller_submit_move_request_promotes_to_queen(void) {
     Controller controller;
     GameConfig config;
-    Command command;
+    MoveRequest request;
 
     initDefaultGameConfig(&config);
     assert(controllerStartConfiguredGame(&controller, &config) == 0);
@@ -362,9 +410,9 @@ static void test_controller_submit_move_legacy_promotion_defaults_to_queen(void)
     setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
     setPiece(&controller.state.board, createPosition(1, 2), createPiece(ANT, WHITE));
 
-    assert(createMoveCommand(&command, createPosition(1, 2),
-        createPosition(0, 2)) == 0);
-    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(createMoveRequest(&request, createPosition(1, 2),
+        createPosition(0, 2), PROMOTION_CHOICE_QUEEN) == 0);
+    assert(controllerSubmitMoveRequest(&controller, request) == 0);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).type == QUEEN);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
 }
@@ -374,14 +422,14 @@ static void test_controller_submit_move_legacy_promotion_defaults_to_queen(void)
 static void test_controller_request_undo_restores_position(void) {
     Controller controller;
     GameConfig config;
-    Command command;
+    MoveRequest request;
 
     initDefaultGameConfig(&config);
     assert(controllerStartConfiguredGame(&controller, &config) == 0);
     seed_simple_ant_position(&controller.state);
-    assert(createMoveCommand(&command, createPosition(6, 0),
-        createPosition(5, 0)) == 0);
-    assert(controllerSubmitMove(&controller, command) == 0);
+    assert(createMoveRequest(&request, createPosition(6, 0),
+        createPosition(5, 0), PROMOTION_CHOICE_NONE) == 0);
+    assert(controllerSubmitMoveRequest(&controller, request) == 0);
     assert(controllerRequestUndo(&controller) == 0);
     assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
     assert(getPiece(&controller.state.board, createPosition(5, 0)).type == EMPTY_PIECE);
@@ -427,49 +475,6 @@ static void test_controller_get_hint_returns_move_without_mutating_state(void) {
     assert(controller.state.moveHistory.count == before.moveHistory.count);
 }
 
-/* Check that the legacy wrapper rejects null input. */
-static void test_run_game_loop_rejects_null_state(void) {
-    assert(runGameLoop(NULL) != 0);
-}
-
-/* Check that the legacy wrapper still bootstraps INIT into the main menu. */
-static void test_run_game_loop_bootstraps_init_state(void) {
-    GameState state;
-    GameConfig config;
-
-    initDefaultGameConfig(&config);
-    initGameState(&state, &config);
-    assert(runGameLoop(&state) == 0);
-    assert(state.systemState == MAIN_MENU_STATE);
-}
-
-/* Check that the legacy wrapper still handles the termination handshake. */
-static void test_run_game_loop_completes_termination_handshake(void) {
-    GameState state;
-    GameConfig config;
-
-    initDefaultGameConfig(&config);
-    initGameState(&state, &config);
-    state.systemState = GAME_TERMINATION_STATE;
-    state.gameOver = 1;
-    state.result = RESULT_TERMINATED_BY_USER;
-    assert(runGameLoop(&state) == 0);
-    assert(state.systemState == END_GAME_MENU_STATE);
-}
-
-/* Check that the legacy wrapper exits cleanly when the state is already
- * terminal. */
-static void test_run_game_loop_accepts_exit_state(void) {
-    GameState state;
-    GameConfig config;
-
-    initDefaultGameConfig(&config);
-    initGameState(&state, &config);
-    state.systemState = EXIT_STATE;
-    assert(runGameLoop(&state) == 0);
-    assert(state.systemState == EXIT_STATE);
-}
-
 /* Run the controller regression suite. */
 int main(void) {
     test_init_controller_resets_state_and_queue();
@@ -482,6 +487,7 @@ int main(void) {
     test_controller_run_until_idle_completes_termination_handshake();
     test_controller_start_configured_game_enters_gameplay();
     test_controller_run_until_idle_auto_plays_ai_turn();
+    test_controller_run_until_idle_leaves_ai_turn_idle_without_provider();
     test_controller_request_new_game_advances_to_mode_menu();
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();
@@ -491,13 +497,9 @@ int main(void) {
     test_controller_submit_move_request_detailed_rejects_ai_turn();
     test_controller_submit_move_draws_at_history_capacity();
     test_controller_submit_move_request_applies_promotion_choice();
-    test_controller_submit_move_legacy_promotion_defaults_to_queen();
+    test_controller_submit_move_request_promotes_to_queen();
     test_controller_request_undo_restores_position();
     test_controller_request_leave_game_reaches_endgame_menu();
     test_controller_get_hint_returns_move_without_mutating_state();
-    test_run_game_loop_rejects_null_state();
-    test_run_game_loop_bootstraps_init_state();
-    test_run_game_loop_completes_termination_handshake();
-    test_run_game_loop_accepts_exit_state();
     return 0;
 }

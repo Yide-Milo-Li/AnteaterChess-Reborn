@@ -3,11 +3,8 @@
 
 #include "core/move.h"
 #include "error/error_code.h"
-#include "input/command.h"
 
 typedef enum {
-    /* Legacy command payload. Controller resolves it before FSM dispatch. */
-    EVENT_MOVE_INPUT,
     EVENT_PLAYER_MOVE,
     EVENT_AI_MOVE,
     EVENT_UNDO,
@@ -30,12 +27,10 @@ typedef struct {
     EventType type;
     union {
         Move move;
-        Command command;
         ErrorCode errorCode;
     } data;
 } Event;
 
-Event createMoveInputEvent(Command cmd);
 Event createPlayerMoveEvent(Move move);
 Event createAIMoveEvent(Move move);
 Event createSystemEvent(EventType type);

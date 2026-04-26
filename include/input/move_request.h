@@ -2,7 +2,6 @@
 #define CHESS_INPUT_MOVE_REQUEST_H
 
 #include "core/position.h"
-#include "input/command.h"
 
 typedef enum {
     PROMOTION_CHOICE_NONE,
@@ -21,6 +20,5 @@ typedef struct {
 int isValidPromotionChoice(PromotionChoice promotion);
 int createMoveRequest(MoveRequest *request, Position from, Position to,
                       PromotionChoice promotion);
-int createMoveRequestFromCommand(MoveRequest *request, Command command);
 
 #endif

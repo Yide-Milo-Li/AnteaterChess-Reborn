@@ -2,7 +2,8 @@
 
 #include <stddef.h>
 
-#include "ai/ai.h"
+#include "core/movelist.h"
+#include "gameplay/movegen.h"
 #include "gameplay/move_resolver.h"
 #include "gameplay/validation.h"
 #include "input/move_request.h"
@@ -31,7 +32,6 @@ static QueueType queue_type_for_event(EventType type) {
             return QUEUE_CONTROL;
         case EVENT_TIMER_EXPIRED:
             return QUEUE_SYSTEM;
-        case EVENT_MOVE_INPUT:
         case EVENT_PLAYER_MOVE:
         case EVENT_AI_MOVE:
         case EVENT_UNDO:
@@ -81,7 +81,6 @@ static int current_turn_is_ai(const GameState *state) {
  * active human turn timer before it enters the queue. */
 static int is_human_gameplay_input(EventType type) {
     switch (type) {
-        case EVENT_MOVE_INPUT:
         case EVENT_PLAYER_MOVE:
         case EVENT_UNDO:
         case EVENT_LEAVE_GAME:
@@ -100,32 +99,6 @@ static int enqueue_controller_event(Controller *controller, Event event) {
     }
 
     return enqueueEvent(&controller->queue, event, queue_type_for_event(event.type));
-}
-
-/* Resolve one frontend move request before it reaches the FSM. */
-static int enqueue_move_request(Controller *controller, MoveRequest request) {
-    Move resolvedMove;
-
-    if (controller == NULL) {
-        return 1;
-    }
-
-    if (resolveMoveRequest(&controller->state, request, &resolvedMove) != 0) {
-        return 1;
-    }
-
-    return enqueue_controller_event(controller, createPlayerMoveEvent(resolvedMove));
-}
-
-/* Keep legacy command events usable without making the FSM parse commands. */
-static int enqueue_legacy_move_input(Controller *controller, Command command) {
-    MoveRequest request;
-
-    if (createMoveRequestFromCommand(&request, command) != 0) {
-        return 1;
-    }
-
-    return enqueue_move_request(controller, request);
 }
 
 /* Lifecycle advancement is the only controller path that synthesizes
@@ -170,8 +143,8 @@ static int seed_timer_expiry_if_needed(Controller *controller) {
     return 0;
 }
 
-/* AI scheduling is controller-owned background work. The selected move is still
- * applied by the FSM after it receives EVENT_AI_MOVE. */
+/* External move-provider scheduling is controller-owned background work. The
+ * selected move is still applied by the FSM after it receives EVENT_AI_MOVE. */
 static int seed_ai_turn_if_needed(Controller *controller) {
     GameState *state;
     Move move;
@@ -185,7 +158,11 @@ static int seed_ai_turn_if_needed(Controller *controller) {
         return 0;
     }
 
-    if (generateAIMove(state, &move) != 0) {
+    if (controller->moveProvider == NULL) {
+        return 0;
+    }
+
+    if (controller->moveProvider(state, &move, controller->moveProviderContext) != 0) {
         return 1;
     }
 
@@ -287,6 +264,8 @@ void initController(Controller *controller, const GameConfig *config) {
 
     initGameState(&controller->state, config);
     controller->queue = (EventQueue){0};
+    controller->moveProvider = NULL;
+    controller->moveProviderContext = NULL;
 }
 
 /* Return the read-only runtime state owned by one controller. */
@@ -296,6 +275,17 @@ const GameState *controllerGetState(const Controller *controller) {
     }
 
     return &controller->state;
+}
+
+void controllerSetMoveProvider(Controller *controller,
+                               ControllerMoveProvider provider,
+                               void *context) {
+    if (controller == NULL) {
+        return;
+    }
+
+    controller->moveProvider = provider;
+    controller->moveProviderContext = context;
 }
 
 /* Route one externally supplied event through the controller queue policy. */
@@ -318,10 +308,6 @@ int controllerEnqueueEvent(Controller *controller, Event event) {
         if (isTimeUp(state) == 1) {
             return enqueue_controller_event(controller, createSystemEvent(EVENT_TIMER_EXPIRED));
         }
-    }
-
-    if (event.type == EVENT_MOVE_INPUT) {
-        return enqueue_legacy_move_input(controller, event.data.command);
     }
 
     return enqueue_controller_event(controller, event);
@@ -596,18 +582,6 @@ int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
     return controllerSubmitMoveRequestDetailed(controller, request, NULL);
 }
 
-/* Submit one legacy move command by converting it to the richer frontend move
- * request format. */
-int controllerSubmitMove(Controller *controller, Command command) {
-    MoveRequest request;
-
-    if (createMoveRequestFromCommand(&request, command) != 0) {
-        return 1;
-    }
-
-    return controllerSubmitMoveRequest(controller, request);
-}
-
 /* Request one undo and drain controller-owned follow-up work before the GUI
  * reads back state again. */
 int controllerRequestUndo(Controller *controller) {
@@ -647,6 +621,9 @@ int controllerRequestLeaveGame(Controller *controller) {
 /* Return one hint move for the current gameplay position without mutating the
  * controller-owned state. */
 int controllerGetHint(const Controller *controller, Move *move) {
+    MoveList moves;
+    Move *candidate;
+
     if (controller == NULL || move == NULL) {
         return 1;
     }
@@ -655,24 +632,16 @@ int controllerGetHint(const Controller *controller, Move *move) {
         return 1;
     }
 
-    return generateHintMove(&controller->state, move);
-}
-
-/* Drive one legacy public runtime loop by copying state into a temporary
- * controller, draining controller-owned work, then copying state back out. */
-int runGameLoop(GameState *state) {
-    Controller controller;
-
-    if (state == NULL) {
+    if (generateLegalMoves(&controller->state, &moves) != 0
+        || getMoveCount(&moves) <= 0) {
         return 1;
     }
 
-    controller.state = *state;
-    controller.queue = (EventQueue){0};
-    if (controllerRunUntilIdle(&controller) != 0) {
+    candidate = getMove(&moves, 0);
+    if (candidate == NULL) {
         return 1;
     }
 
-    *state = controller.state;
+    *move = *candidate;
     return 0;
 }

@@ -3,7 +3,7 @@
 
 #include "input/command.h"
 
-/* Parse two GUI-style move fields into one Command. Field parsing is tolerant
+/* Parse two legacy move fields into one Command. Field parsing is tolerant
  * of case and leading/trailing whitespace, but not of malformed coordinates. */
 int parseMoveCommand(const char *fromText, const char *toText, Command *cmd);
 

@@ -3,12 +3,10 @@
 #include <stddef.h>
 
 /*
- * Interface alignment notes for Phase F:
- * - Treat command.h as the only public contract for this file.
+ * Legacy CLI alignment notes:
+ * - Treat command.h as the contract for Command compatibility only.
+ * - New GUI-facing input should use MoveRequest instead of Command.
  * - Input code constructs Command values, not gameplay Move objects.
- * - Text parsing is limited to two coordinate tokens in this phase.
- * - GUI input should also be normalized into Command later, but that state
- *   machine belongs above the input module.
  */
 
 /* Reset a command to the explicit invalid sentinel state. */

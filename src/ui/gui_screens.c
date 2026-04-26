@@ -29,9 +29,7 @@ void gui_build_mode_menu(Gui *gui) {
         const char *label;
         GameMode mode;
     } modes[] = {
-        {"Human vs. Human", MODE_HUMAN_VS_HUMAN},
-        {"Human vs. Computer", MODE_HUMAN_VS_COMPUTER},
-        {"Computer vs. Computer", MODE_COMPUTER_VS_COMPUTER}
+        {"Human vs. Human", MODE_HUMAN_VS_HUMAN}
     };
 
     gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
@@ -40,7 +38,7 @@ void gui_build_mode_menu(Gui *gui) {
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
 
-    for (index = 0; index < 3; ++index) {
+    for (index = 0; index < (int)(sizeof(modes) / sizeof(modes[0])); ++index) {
         button = gui_create_centered_button(modes[index].label);
         g_object_set_data(G_OBJECT(button), "game-mode", GINT_TO_POINTER(modes[index].mode));
         g_signal_connect(button, "clicked", G_CALLBACK(gui_on_mode_selected), gui);

@@ -7,7 +7,8 @@
 #include "core/move.h"
 #include "core/movelist.h"
 #include "core/piece.h"
-#include "input/command.h"
+#include "gameplay/move_resolver.h"
+#include "input/move_request.h"
 #include "system/controller.h"
 #include "system/controller_driver.h"
 #include "system/event.h"
@@ -35,6 +36,22 @@ static int enqueue_and_tick(Controller *controller, Event event) {
     }
 
     return controllerTick(controller, &processedEvent);
+}
+
+static int submit_request_and_tick(Controller *controller, Position from, Position to) {
+    MoveRequest request;
+    Move move;
+
+    assert(controller != NULL);
+    if (createMoveRequest(&request, from, to, PROMOTION_CHOICE_QUEEN) != 0) {
+        return 1;
+    }
+
+    if (resolveMoveRequest(&controller->state, request, &move) != 0) {
+        return 1;
+    }
+
+    return enqueue_and_tick(controller, createPlayerMoveEvent(move));
 }
 
 /* Prepare a minimal board where one white ant has exactly one simple forward
@@ -91,31 +108,27 @@ static void push_history_move(GameState *state, Move move) {
     ++state->moveCount;
 }
 
-/* Check that a valid move command is applied through the public controller
+/* Check that a valid move request is applied through the public controller
  * path. */
 static void test_controller_applies_valid_move(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_simple_ant_position(&controller.state);
-    assert(createMoveCommand(&command, createPosition(6, 0),
-                             createPosition(5, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(6, 0), createPosition(5, 0)) == 0);
     assert(getPiece(&controller.state.board, createPosition(6, 0)).type == EMPTY_PIECE);
     assert(getPiece(&controller.state.board, createPosition(5, 0)).type == ANT);
     assert(controller.state.currentTurn == BLACK);
     assert(controller.state.moveHistory.count == 1);
 }
 
-/* Check that an illegal move command is rejected without mutating the board. */
+/* Check that an illegal move request is rejected without mutating the board. */
 static void test_controller_rejects_illegal_move(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_simple_ant_position(&controller.state);
-    assert(createMoveCommand(&command, createPosition(6, 0),
-                             createPosition(6, 1)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) != 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(6, 0), createPosition(6, 1)) != 0);
     assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
     assert(getPiece(&controller.state.board, createPosition(4, 0)).type == EMPTY_PIECE);
     assert(controller.state.currentTurn == WHITE);
@@ -126,13 +139,11 @@ static void test_controller_rejects_illegal_move(void) {
  * initial position. */
 static void test_controller_undo_restores_position(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_simple_ant_position(&controller.state);
     controller.state.config.mode = MODE_HUMAN_VS_HUMAN;
-    assert(createMoveCommand(&command, createPosition(6, 0),
-                             createPosition(5, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(6, 0), createPosition(5, 0)) == 0);
     assert(enqueue_and_tick(&controller, createUndoEvent()) == 0);
     assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
     assert(getPiece(&controller.state.board, createPosition(5, 0)).type == EMPTY_PIECE);
@@ -144,8 +155,6 @@ static void test_controller_undo_restores_position(void) {
  * after only Black's latest move. */
 static void test_controller_hvh_undo_rewinds_full_round(void) {
     Controller controller = fresh_gameplay_controller();
-    Command whiteCommand;
-    Command blackCommand;
 
     seed_empty_gameplay_position(&controller.state, WHITE);
     controller.state.config.mode = MODE_HUMAN_VS_HUMAN;
@@ -154,12 +163,10 @@ static void test_controller_hvh_undo_rewinds_full_round(void) {
     setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
     setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
-    assert(createMoveCommand(&whiteCommand, createPosition(6, 0),
-        createPosition(5, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(whiteCommand)) == 0);
-    assert(createMoveCommand(&blackCommand, createPosition(1, 0),
-        createPosition(2, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(blackCommand)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(6, 0), createPosition(5, 0)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(1, 0), createPosition(2, 0)) == 0);
     assert(controller.state.currentTurn == WHITE);
     assert(controller.state.moveHistory.count == 2);
 
@@ -176,7 +183,6 @@ static void test_controller_hvh_undo_rewinds_full_round(void) {
  * turn instead of stopping on the AI turn. */
 static void test_controller_hvc_undo_returns_to_previous_white_human_turn(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
     Move aiMove;
 
     seed_empty_gameplay_position(&controller.state, WHITE);
@@ -186,9 +192,8 @@ static void test_controller_hvc_undo_returns_to_previous_white_human_turn(void) 
     setPiece(&controller.state.board, createPosition(6, 0), createPiece(ANT, WHITE));
     setPiece(&controller.state.board, createPosition(1, 0), createPiece(ANT, BLACK));
 
-    assert(createMoveCommand(&command, createPosition(6, 0),
-        createPosition(5, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(6, 0), createPosition(5, 0)) == 0);
 
     aiMove = createMove(createPosition(1, 0), createPosition(2, 0), createPiece(ANT, BLACK));
     assert(enqueue_and_tick(&controller, createAIMoveEvent(aiMove)) == 0);
@@ -208,7 +213,6 @@ static void test_controller_hvc_undo_returns_to_previous_white_human_turn(void) 
  * turn after White's opening AI move. */
 static void test_controller_hvc_undo_returns_to_previous_black_human_turn(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
     Move aiOpeningMove;
     Move aiReplyMove;
 
@@ -222,9 +226,8 @@ static void test_controller_hvc_undo_returns_to_previous_black_human_turn(void) 
     aiOpeningMove = createMove(createPosition(6, 0), createPosition(5, 0), createPiece(ANT, WHITE));
     assert(enqueue_and_tick(&controller, createAIMoveEvent(aiOpeningMove)) == 0);
 
-    assert(createMoveCommand(&command, createPosition(1, 0),
-        createPosition(2, 0)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(1, 0), createPosition(2, 0)) == 0);
 
     aiReplyMove = createMove(createPosition(5, 0), createPosition(4, 0), createPiece(ANT, WHITE));
     assert(enqueue_and_tick(&controller, createAIMoveEvent(aiReplyMove)) == 0);
@@ -264,47 +267,41 @@ static void test_controller_hvc_black_opening_undo_unavailable(void) {
     assert(controller.state.moveHistory.count == 1);
 }
 
-/* Check that public move input auto-promotes to queen without changing the
- * command interface. */
+/* Check that public move requests can promote to queen explicitly. */
 static void test_controller_auto_promotes_to_queen(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_empty_gameplay_position(&controller.state, WHITE);
     setPiece(&controller.state.board, createPosition(1, 2), createPiece(ANT, WHITE));
     setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
     setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
 
-    assert(createMoveCommand(&command, createPosition(1, 2),
-        createPosition(0, 2)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(1, 2), createPosition(0, 2)) == 0);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).type == QUEEN);
     assert(getPiece(&controller.state.board, createPosition(0, 2)).color == WHITE);
 }
 
-/* Check that castling resolves correctly from the existing from/to command
+/* Check that castling resolves correctly from the existing from/to request
  * input format. */
 static void test_controller_applies_castling(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_empty_gameplay_position(&controller.state, WHITE);
     setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
     setPiece(&controller.state.board, createPosition(7, 9), createPiece(ROOK, WHITE));
     setPiece(&controller.state.board, createPosition(0, 5), createPiece(KING, BLACK));
 
-    assert(createMoveCommand(&command, createPosition(7, 5),
-        createPosition(7, 7)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(7, 5), createPosition(7, 7)) == 0);
     assert(getPiece(&controller.state.board, createPosition(7, 7)).type == KING);
     assert(getPiece(&controller.state.board, createPosition(7, 6)).type == ROOK);
 }
 
-/* Check that en passant resolves correctly from the existing from/to command
+/* Check that en passant resolves correctly from the existing from/to request
  * input format and latest move history. */
 static void test_controller_applies_en_passant(void) {
     Controller controller = fresh_gameplay_controller();
-    Command command;
 
     seed_empty_gameplay_position(&controller.state, WHITE);
     setPiece(&controller.state.board, createPosition(7, 5), createPiece(KING, WHITE));
@@ -314,9 +311,8 @@ static void test_controller_applies_en_passant(void) {
     push_history_move(&controller.state,
         createMove(createPosition(1, 5), createPosition(3, 5), createPiece(ANT, BLACK)));
 
-    assert(createMoveCommand(&command, createPosition(3, 4),
-        createPosition(2, 5)) == 0);
-    assert(enqueue_and_tick(&controller, createMoveInputEvent(command)) == 0);
+    assert(submit_request_and_tick(&controller,
+        createPosition(3, 4), createPosition(2, 5)) == 0);
     assert(getPiece(&controller.state.board, createPosition(2, 5)).type == ANT);
     assert(getPiece(&controller.state.board, createPosition(3, 5)).type == EMPTY_PIECE);
 }

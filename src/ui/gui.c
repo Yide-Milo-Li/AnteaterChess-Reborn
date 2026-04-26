@@ -18,8 +18,8 @@ Gui *gui_create(int *argc, char ***argv) {
 
     provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
-        "GtkWindow { background-color: #2c3e50; } "
-        "label { color: #f8fafc; } "
+        "GtkWindow { background-color: #e5e7eb; } "
+        "label { color: #111827; } "
         "button { color: #111827; background-image: none; background-color: #f8fafc; } "
         "button label { color: #111827; } "
         "entry { color: #111827; background-color: #ffffff; } "

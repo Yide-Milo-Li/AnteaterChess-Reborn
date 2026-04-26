@@ -1,9 +1,50 @@
 #include "gui_internal.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "time/clock.h"
 #include "turn/turn_timer.h"
+
+static void set_piece_image_if_changed(GtkWidget *image, const char *icon) {
+    const char *currentIcon;
+    GdkPixbuf *pixbuf;
+    GError *error = NULL;
+
+    if (!GTK_IS_IMAGE(image)) {
+        return;
+    }
+
+    currentIcon = g_object_get_data(G_OBJECT(image), "piece-icon-path");
+    if (icon == NULL) {
+        if (currentIcon != NULL) {
+            gtk_image_clear(GTK_IMAGE(image));
+            g_object_set_data(G_OBJECT(image), "piece-icon-path", NULL);
+        }
+        return;
+    }
+
+    if (currentIcon != NULL && strcmp(currentIcon, icon) == 0) {
+        return;
+    }
+
+    /* Decode piece SVGs at board-cell size to avoid loading very large source
+     * dimensions (for example 4096x4096), which can crash Cairo/GDK. */
+    pixbuf = gdk_pixbuf_new_from_file_at_scale(icon, 56, 56, TRUE, &error);
+    if (pixbuf == NULL) {
+        if (error != NULL) {
+            g_warning("Failed to load piece icon '%s': %s", icon, error->message);
+            g_error_free(error);
+        }
+        gtk_image_clear(GTK_IMAGE(image));
+        g_object_set_data(G_OBJECT(image), "piece-icon-path", NULL);
+        return;
+    }
+
+    gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
+    g_object_unref(pixbuf);
+    g_object_set_data(G_OBJECT(image), "piece-icon-path", (gpointer) icon);
+}
 
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *timeBox;
@@ -113,9 +154,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
             GtkWidget *eventBox = gtk_event_box_new();
             const char *icon = gui_get_piece_icon(state->board.cells[row][col]);
 
-            if (icon != NULL) {
-                gtk_image_set_from_file(GTK_IMAGE(image), icon);
-            }
+            set_piece_image_if_changed(image, icon);
 
             gui->board_images[row][col] = image;
             gtk_container_add(GTK_CONTAINER(eventBox), image);
@@ -210,11 +249,7 @@ void gui_update_board(Gui *gui, const GameState *state) {
             }
 
             icon = gui_get_piece_icon(state->board.cells[row][col]);
-            if (icon != NULL) {
-                gtk_image_set_from_file(GTK_IMAGE(gui->board_images[row][col]), icon);
-            } else {
-                gtk_image_clear(GTK_IMAGE(gui->board_images[row][col]));
-            }
+            set_piece_image_if_changed(gui->board_images[row][col], icon);
         }
     }
 }

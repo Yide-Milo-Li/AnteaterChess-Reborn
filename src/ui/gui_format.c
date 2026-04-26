@@ -134,24 +134,28 @@ void gui_format_hint_text(Move move, char buffer[64]) {
 
 const char *gui_get_piece_icon(Piece piece) {
     static const char *whiteIcons[] = {
-        "assets/WhiteAntsvg.svg",
-        "assets/WhiteRook.svg",
-        "assets/WhiteKnight.svg",
-        "assets/WhiteBishop.svg",
-        "assets/WhiteQueen.svg",
-        "assets/WhiteKing.svg",
-        "assets/WhiteAnteater.svg"
+        "WhiteAntsvg.svg",
+        "WhiteRook.svg",
+        "WhiteKnight.svg",
+        "WhiteBishop.svg",
+        "WhiteQueen.svg",
+        "WhiteKing.svg",
+        "WhiteAnteater.svg"
     };
     static const char *blackIcons[] = {
-        "assets/BlackAnt.svg",
-        "assets/BlackRook.svg",
-        "assets/BlackKnight.svg",
-        "assets/BlackBishop.svg",
-        "assets/BlackQueen.svg",
-        "assets/BlackKing.svg",
-        "assets/BlackAnteater.svg"
+        "BlackAnt.svg",
+        "BlackRook.svg",
+        "BlackKnight.svg",
+        "BlackBishop.svg",
+        "BlackQueen.svg",
+        "BlackKing.svg",
+        "BlackAnteater.svg"
     };
+    static char resolvedPaths[2][7][128];
+    static int isResolved = 0;
+    static const char *prefixes[] = {"assets", "../assets"};
     int index;
+    int colorIndex;
 
     if (!isValidPiece(piece) || piece.type == EMPTY_PIECE) {
         return NULL;
@@ -162,5 +166,41 @@ const char *gui_get_piece_icon(Piece piece) {
         return NULL;
     }
 
-    return piece.color == WHITE ? whiteIcons[index] : blackIcons[index];
+    if (!isResolved) {
+        int color;
+        int pieceIndex;
+
+        for (color = 0; color < 2; ++color) {
+            for (pieceIndex = 0; pieceIndex < 7; ++pieceIndex) {
+                const char *iconName = (color == 0) ? whiteIcons[pieceIndex] : blackIcons[pieceIndex];
+                int prefixIndex;
+                int found = 0;
+
+                for (prefixIndex = 0; prefixIndex < 2; ++prefixIndex) {
+                    g_snprintf(resolvedPaths[color][pieceIndex],
+                        sizeof(resolvedPaths[color][pieceIndex]),
+                        "%s/%s",
+                        prefixes[prefixIndex],
+                        iconName);
+                    if (g_file_test(resolvedPaths[color][pieceIndex], G_FILE_TEST_IS_REGULAR)) {
+                        found = 1;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    g_snprintf(resolvedPaths[color][pieceIndex],
+                        sizeof(resolvedPaths[color][pieceIndex]),
+                        "%s/%s",
+                        prefixes[0],
+                        iconName);
+                }
+            }
+        }
+
+        isResolved = 1;
+    }
+
+    colorIndex = (piece.color == WHITE) ? 0 : 1;
+    return resolvedPaths[colorIndex][index];
 }

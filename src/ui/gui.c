@@ -1,6 +1,48 @@
 #include "gui_internal.h"
 
+#include <gdk/gdkkeysyms.h>
+
 #include "error/error.h"
+
+static gboolean gui_on_window_key_press(GtkWidget *widget, GdkEventKey *event, gpointer userData) {
+    Gui *gui = (Gui *)userData;
+
+    (void)widget;
+    if (gui == NULL || event == NULL || !GTK_IS_WINDOW(gui->window)) {
+        return FALSE;
+    }
+
+    if (event->keyval == GDK_KEY_F11) {
+        if (gui->is_fullscreen) {
+            gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+        } else {
+            gtk_window_fullscreen(GTK_WINDOW(gui->window));
+        }
+        return TRUE;
+    }
+
+    if (event->keyval == GDK_KEY_Escape && gui->is_fullscreen) {
+        gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static gboolean gui_on_window_state_event(GtkWidget *widget,
+                                          GdkEventWindowState *event,
+                                          gpointer userData) {
+    Gui *gui = (Gui *)userData;
+
+    (void)widget;
+    if (gui == NULL || event == NULL) {
+        return FALSE;
+    }
+
+    gui->is_fullscreen =
+        (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) ? 1 : 0;
+    return FALSE;
+}
 
 Gui *gui_create(int *argc, char ***argv) {
     GtkCssProvider *provider;
@@ -15,6 +57,7 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_window_set_resizable(GTK_WINDOW(gui->window), FALSE);
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
+    gtk_widget_add_events(gui->window, GDK_KEY_PRESS_MASK | GDK_STRUCTURE_MASK);
 
     provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
@@ -40,8 +83,11 @@ Gui *gui_create(int *argc, char ***argv) {
         ".clock-text { color: #475569; font-weight: bold; } "
         ".history-panel { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; } "
         ".history-view, textview, textview text { color: #0f172a; background-color: #ffffff; font-size: 12px; } "
-        ".status-normal { color: #334155; } "
-        ".status-error { color: #991b1b; background-color: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; padding: 6px; } "
+        ".status-normal, .status-busy, .status-error, .status-success { border-radius: 6px; padding: 6px; } "
+        ".status-normal { color: #334155; background-color: transparent; border: 1px solid transparent; } "
+        ".status-busy { color: #1e3a8a; background-color: #dbeafe; border: 1px solid #93c5fd; } "
+        ".status-success { color: #166534; background-color: #dcfce7; border: 1px solid #86efac; } "
+        ".status-error { color: #991b1b; background-color: #fee2e2; border: 1px solid #fecaca; } "
         ".hint-button { background-color: #f8fafc; border-color: #cbd5e1; } "
         ".hint-button:hover { background-color: #eef6ff; border-color: #94a3b8; } "
         ".format-help { background-color: transparent; border-radius: 999px; padding: 4px; } "
@@ -74,9 +120,12 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->has_highlight_from = 0;
     gui->endgame_dialog_shown = 0;
     gui->sync_source_id = 0;
+    gui->is_fullscreen = 0;
     gui->should_quit = 0;
 
     g_signal_connect(gui->window, "destroy", G_CALLBACK(gui_on_window_destroy), gui);
+    g_signal_connect(gui->window, "key-press-event", G_CALLBACK(gui_on_window_key_press), gui);
+    g_signal_connect(gui->window, "window-state-event", G_CALLBACK(gui_on_window_state_event), gui);
     return gui;
 }
 

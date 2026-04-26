@@ -187,6 +187,31 @@ static void test_ai_generates_move_with_explicit_budget(void) {
     assert_move_is_playable_and_safe(&state, move);
 }
 
+static void test_tournament_ai_handles_black_king_pressure_with_budget(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    clear_board(&state.board);
+    state.currentTurn = BLACK;
+    state.config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state.config.aiDifficultyBlack = DIFFICULTY_TOURNAMENT;
+    state.config.aiTimeLimit = 0;
+
+    setPiece(&state.board, createPosition(0, 5), createPiece(KING, BLACK));
+    setPiece(&state.board, createPosition(0, 9), createPiece(ROOK, BLACK));
+    setPiece(&state.board, createPosition(1, 4), createPiece(ANT, BLACK));
+
+    setPiece(&state.board, createPosition(3, 5), createPiece(ROOK, WHITE));
+    setPiece(&state.board, createPosition(7, 0), createPiece(KING, WHITE));
+
+    before = state;
+    assert(isInCheck(&state, BLACK) == 1);
+    assert(generateAIMoveWithBudget(&state, &move, 500) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+}
+
 static void test_tournament_time_manager_rolls_saved_time_forward(void) {
     AITimeManager manager;
     int firstBudget;
@@ -294,6 +319,7 @@ int main(void) {
     test_hint_returns_legal_move_without_mutating_state();
     test_ai_respects_wall_clock_time_limit();
     test_ai_generates_move_with_explicit_budget();
+    test_tournament_ai_handles_black_king_pressure_with_budget();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();

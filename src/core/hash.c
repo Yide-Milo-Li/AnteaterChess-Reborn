@@ -1,5 +1,5 @@
 #include "core/hash.h"
-
+#include <stddef.h>
 #include <stdint.h>
 
 #include "core/board.h"

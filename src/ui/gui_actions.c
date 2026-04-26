@@ -212,6 +212,7 @@ void gui_on_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -228,6 +229,7 @@ void gui_on_quit_game_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -241,6 +243,7 @@ void gui_on_mode_selected(GtkButton *button, gpointer user_data) {
     GameMode mode = (GameMode) GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "game-mode"));
 
     initGameConfigForMode(&gui->pendingConfig, mode);
+    gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -253,6 +256,7 @@ void gui_on_back_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -272,6 +276,7 @@ void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_invalidate_async_results(gui);
     if (controllerStartConfiguredGame(&gui->controller, &config) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -343,6 +348,7 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
     }
 
     errorCode = ERR_ILLEGAL_MOVE;
+    gui_invalidate_async_results(gui);
     if (controllerSubmitMoveRequestDetailed(&gui->controller, request, &errorCode) != 0) {
         gui_set_error(gui, errorCode);
         return;
@@ -418,6 +424,7 @@ void gui_on_undo_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestUndo(&gui->controller) != 0) {
         gui_set_error(gui, ERR_UNDO_UNAVAILABLE);
         return;
@@ -435,9 +442,18 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
     int result;
 
     (void)button;
+    if (gui == NULL) {
+        return;
+    }
+
+    if (gui_start_hint_job(gui) == 0) {
+        return;
+    }
+
     state = gui_get_state(gui);
     if (gui != NULL && gui->hint_provider != NULL) {
-        result = gui->hint_provider(state, &move, gui->hint_provider_context);
+        gui_set_error(gui, ERR_HINT_UNAVAILABLE);
+        return;
     } else {
         result = controllerGetHint(&gui->controller, &move);
     }
@@ -459,6 +475,7 @@ void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_invalidate_async_results(gui);
     if (controllerRequestLeaveGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -471,6 +488,7 @@ void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -483,6 +501,7 @@ void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -495,6 +514,7 @@ void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
@@ -516,10 +536,13 @@ void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointe
     gtk_widget_destroy(GTK_WIDGET(dialog));
 
     if (response_id == GTK_RESPONSE_ACCEPT) {
+        gui_invalidate_async_results(gui);
         result = controllerRequestNewGame(&gui->controller);
     } else if (response_id == GTK_RESPONSE_APPLY) {
+        gui_invalidate_async_results(gui);
         result = controllerRequestBack(&gui->controller);
     } else {
+        gui_invalidate_async_results(gui);
         result = controllerRequestExit(&gui->controller);
     }
 

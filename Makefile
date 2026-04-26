@@ -95,6 +95,7 @@ AI_SRCS := \
 GUI_SRCS := \
 	src/ui/gui.c \
 	src/ui/gui_actions.c \
+	src/ui/gui_async.c \
 	src/ui/gui_common.c \
 	src/ui/gui_format.c \
 	src/ui/gui_gameplay_screen.c \

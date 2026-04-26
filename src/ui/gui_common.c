@@ -125,9 +125,9 @@ void gui_set_error(Gui *gui, ErrorCode code) {
     if (code == ERR_FATAL) {
         gui_show_message_dialog(gui, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Anteater Chess", message);
         if (gui_window_is_valid(gui)) {
+            gui_invalidate_async_results(gui);
             initDefaultGameConfig(&gui->pendingConfig);
             initController(&gui->controller, &gui->pendingConfig);
-            gui_attach_move_provider(gui);
             gui->last_rendered_state = EXIT_STATE;
             gui->has_rendered_state = 0;
             gui->endgame_dialog_shown = 0;

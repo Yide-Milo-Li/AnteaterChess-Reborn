@@ -20,6 +20,7 @@ static void test_known_error_messages(void) {
     assert(strcmp(getErrorMessage(ERR_INVALID_TIMER_SETTING), "Enter a time from 1 to 3600.") == 0);
     assert(strcmp(getErrorMessage(ERR_UNDO_UNAVAILABLE), "Undo unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_HINT_UNAVAILABLE), "Hint unavailable.") == 0);
+    assert(strcmp(getErrorMessage(ERR_AI_UNAVAILABLE), "AI move unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_NOT_YOUR_TURN), "Not your turn.") == 0);
     assert(strcmp(getErrorMessage(ERR_TIME_UP), "Time is up.") == 0);
     assert(strcmp(getErrorMessage(ERR_ACTION_UNAVAILABLE), "Action unavailable.") == 0);

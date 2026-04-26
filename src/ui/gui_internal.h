@@ -10,6 +10,8 @@
 #include "system/controller.h"
 #include "ui/gui.h"
 
+typedef struct GuiAsyncJob GuiAsyncJob;
+
 struct Gui {
     GtkWidget *window;
     GtkWidget *main_box;
@@ -44,11 +46,17 @@ struct Gui {
     void *move_provider_context;
     GuiHintProvider hint_provider;
     void *hint_provider_context;
+    GuiAsyncJob *ai_job;
+    GuiAsyncJob *hint_job;
     Controller controller;
     GameConfig pendingConfig;
     SystemState last_rendered_state;
     Color last_turn;
     int last_move_count;
+    unsigned int async_generation;
+    int ai_failure_active;
+    int ai_failure_move_count;
+    Color ai_failure_turn;
     int highlight_destinations[8][10];
     Position highlight_from;
     guint sync_source_id;
@@ -69,6 +77,10 @@ void gui_show_message_dialog(Gui *gui, GtkMessageType type,
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
 void gui_attach_move_provider(Gui *gui);
+void gui_invalidate_async_results(Gui *gui);
+void gui_cancel_async_jobs(Gui *gui);
+void gui_maybe_start_ai_job(Gui *gui, const GameState *state);
+int gui_start_hint_job(Gui *gui);
 
 int gui_current_turn_is_ai(const GameState *state);
 const char *gui_game_mode_title(GameMode mode);
@@ -127,5 +139,6 @@ void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_dialog_response(GtkDialog *dialog, gint response_id, gpointer user_data);
+gboolean gui_on_async_job_finished(gpointer user_data);
 
 #endif

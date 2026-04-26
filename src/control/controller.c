@@ -582,6 +582,50 @@ int controllerSubmitMoveRequest(Controller *controller, MoveRequest request) {
     return controllerSubmitMoveRequestDetailed(controller, request, NULL);
 }
 
+int controllerSubmitAIMoveDetailed(Controller *controller,
+                                   Move move,
+                                   ErrorCode *errorCode) {
+    Event processedEvent;
+
+    if (controller == NULL || advance_lifecycle_before_external_request(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controller->state.systemState != GAMEPLAY_STATE) {
+        set_controller_error(errorCode, ERR_ACTION_UNAVAILABLE);
+        return 1;
+    }
+
+    if (!current_turn_is_ai(&controller->state)) {
+        set_controller_error(errorCode, ERR_NOT_YOUR_TURN);
+        return 1;
+    }
+
+    if (!validateMove(&controller->state, move)) {
+        set_controller_error(errorCode, ERR_ILLEGAL_MOVE);
+        return 1;
+    }
+
+    if (!all_queues_empty(&controller->queue)) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controllerEnqueueEvent(controller, createAIMoveEvent(move)) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (controllerTick(controller, &processedEvent) != 0
+        || processedEvent.type != EVENT_AI_MOVE) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    return 0;
+}
+
 /* Request one undo and drain controller-owned follow-up work before the GUI
  * reads back state again. */
 int controllerRequestUndo(Controller *controller) {

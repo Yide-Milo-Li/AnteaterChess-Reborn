@@ -235,6 +235,99 @@ static void test_controller_run_until_idle_leaves_ai_turn_idle_without_provider(
     assert(controller.state.moveHistory.count == 0);
 }
 
+/* Check that GUI-style AI submission applies exactly one legal AI move through
+ * the controller/FSM path. */
+static void test_controller_submit_ai_move_applies_one_move(void) {
+    Controller controller;
+    GameConfig config;
+    Move move;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(first_legal_move_provider(&controller.state, &move, NULL) == 0);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitAIMoveDetailed(&controller, move, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
+}
+
+/* Check that AI submission cannot be used to move during a human turn. */
+static void test_controller_submit_ai_move_rejects_human_turn(void) {
+    Controller controller;
+    GameConfig config;
+    Move move;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    seed_simple_ant_position(&controller.state);
+    assert(first_legal_move_provider(&controller.state, &move, NULL) == 0);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitAIMoveDetailed(&controller, move, &errorCode) != 0);
+    assert(errorCode == ERR_NOT_YOUR_TURN);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
+    assert(getPiece(&controller.state.board, createPosition(6, 0)).type == ANT);
+}
+
+/* Check that an AI provider returning an illegal move fails without mutating
+ * the game state. */
+static void test_controller_submit_ai_move_rejects_illegal_move(void) {
+    Controller controller;
+    GameConfig config;
+    Move move;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = BLACK;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    move = createMove(createPosition(0, 1), createPosition(2, 2), createPiece(KNIGHT, BLACK));
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitAIMoveDetailed(&controller, move, &errorCode) != 0);
+    assert(errorCode == ERR_ILLEGAL_MOVE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(controller.state.moveHistory.count == 0);
+    assert(getPiece(&controller.state.board, createPosition(0, 1)).type == KNIGHT);
+}
+
+/* Check that computer-vs-computer GUI integration can advance one AI move at a
+ * time instead of draining the whole AI game in one sync call. */
+static void test_controller_submit_ai_move_cvc_advances_one_step(void) {
+    Controller controller;
+    GameConfig config;
+    Move move;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_COMPUTER_VS_COMPUTER;
+    config.playerColor = EMPTY_COLOR;
+    config.aiDifficultyWhite = DIFFICULTY_EASY;
+    config.aiDifficultyBlack = DIFFICULTY_EASY;
+
+    assert(controllerStartConfiguredGame(&controller, &config) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == WHITE);
+    assert(first_legal_move_provider(&controller.state, &move, NULL) == 0);
+
+    errorCode = ERR_FATAL;
+    assert(controllerSubmitAIMoveDetailed(&controller, move, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+    assert(controller.state.currentTurn == BLACK);
+    assert(controller.state.moveHistory.count == 1);
+}
+
 /* Check that the facade-style new-game request bootstraps INIT before
  * advancing to the next UI-facing menu. */
 static void test_controller_request_new_game_advances_to_mode_menu(void) {
@@ -488,6 +581,10 @@ int main(void) {
     test_controller_start_configured_game_enters_gameplay();
     test_controller_run_until_idle_auto_plays_ai_turn();
     test_controller_run_until_idle_leaves_ai_turn_idle_without_provider();
+    test_controller_submit_ai_move_applies_one_move();
+    test_controller_submit_ai_move_rejects_human_turn();
+    test_controller_submit_ai_move_rejects_illegal_move();
+    test_controller_submit_ai_move_cvc_advances_one_step();
     test_controller_request_new_game_advances_to_mode_menu();
     test_controller_request_back_returns_to_main_menu();
     test_controller_request_exit_reaches_exit_state();

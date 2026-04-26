@@ -32,6 +32,8 @@ const char *getErrorMessage(ErrorCode code) {
             return "Undo unavailable.";
         case ERR_HINT_UNAVAILABLE:
             return "Hint unavailable.";
+        case ERR_AI_UNAVAILABLE:
+            return "AI move unavailable.";
         case ERR_NOT_YOUR_TURN:
             return "Not your turn.";
         case ERR_TIME_UP:

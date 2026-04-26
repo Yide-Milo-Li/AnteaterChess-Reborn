@@ -58,10 +58,12 @@ void gui_destroy(Gui *gui) {
         return;
     }
 
+    gui->should_quit = 1;
     if (gui->sync_source_id != 0) {
         g_source_remove(gui->sync_source_id);
         gui->sync_source_id = 0;
     }
+    gui_cancel_async_jobs(gui);
 
     if (gui_window_is_valid(gui)) {
         gtk_widget_destroy(gui->window);
@@ -77,7 +79,6 @@ void gui_set_move_provider(Gui *gui, GuiMoveProvider provider, void *context) {
 
     gui->move_provider = provider;
     gui->move_provider_context = context;
-    gui_attach_move_provider(gui);
 }
 
 void gui_set_hint_provider(Gui *gui, GuiHintProvider provider, void *context) {
@@ -90,13 +91,7 @@ void gui_set_hint_provider(Gui *gui, GuiHintProvider provider, void *context) {
 }
 
 void gui_attach_move_provider(Gui *gui) {
-    if (gui == NULL) {
-        return;
-    }
-
-    controllerSetMoveProvider(&gui->controller,
-        (ControllerMoveProvider)gui->move_provider,
-        gui->move_provider_context);
+    (void)gui;
 }
 
 void gui_run(Gui *gui) {
@@ -167,6 +162,7 @@ void gui_sync_from_controller(Gui *gui) {
         gui_update_turn_display(gui, state->currentTurn);
         gui_update_gameplay_controls(gui, state);
         gui_refresh_move_highlights(gui);
+        gui_maybe_start_ai_job(gui, state);
     }
 
     gui->last_turn = state->currentTurn;
@@ -180,6 +176,7 @@ int gui_render_snapshot(Gui *gui, const GameState *state) {
 
     gui->controller.state = *state;
     gui->controller.queue = (EventQueue){0};
+    gui_invalidate_async_results(gui);
     gui->pendingConfig = state->config;
     gui->has_rendered_state = 0;
     gui_sync_from_controller(gui);

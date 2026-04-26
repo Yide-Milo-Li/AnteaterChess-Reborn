@@ -405,25 +405,28 @@ void gui_update_turn_display(Gui *gui, Color turn) {
 
 void gui_update_gameplay_controls(Gui *gui, const GameState *state) {
     gboolean humanTurn;
+    gboolean canUseHumanControls;
 
     if (gui == NULL || state == NULL) {
         return;
     }
 
     humanTurn = state->systemState == GAMEPLAY_STATE && !gui_current_turn_is_ai(state);
+    canUseHumanControls = humanTurn && gui->ai_job == NULL;
     if (GTK_IS_WIDGET(gui->from_entry)) {
-        gtk_widget_set_sensitive(gui->from_entry, humanTurn);
+        gtk_widget_set_sensitive(gui->from_entry, canUseHumanControls);
     }
     if (GTK_IS_WIDGET(gui->to_entry)) {
-        gtk_widget_set_sensitive(gui->to_entry, humanTurn);
+        gtk_widget_set_sensitive(gui->to_entry, canUseHumanControls);
     }
     if (GTK_IS_WIDGET(gui->submit_button)) {
-        gtk_widget_set_sensitive(gui->submit_button, humanTurn);
+        gtk_widget_set_sensitive(gui->submit_button, canUseHumanControls);
     }
     if (GTK_IS_WIDGET(gui->undo_button)) {
-        gtk_widget_set_sensitive(gui->undo_button, humanTurn);
+        gtk_widget_set_sensitive(gui->undo_button, canUseHumanControls);
     }
     if (GTK_IS_WIDGET(gui->hint_button)) {
-        gtk_widget_set_sensitive(gui->hint_button, humanTurn);
+        gtk_widget_set_sensitive(gui->hint_button,
+            canUseHumanControls && gui->hint_job == NULL);
     }
 }

@@ -52,6 +52,9 @@ int controllerSubmitMoveRequestDetailed(Controller *controller,
                                         MoveRequest request,
                                         ErrorCode *errorCode);
 int controllerSubmitMoveRequest(Controller *controller, MoveRequest request);
+int controllerSubmitAIMoveDetailed(Controller *controller,
+                                   Move move,
+                                   ErrorCode *errorCode);
 int controllerRequestUndo(Controller *controller);
 int controllerRequestLeaveGame(Controller *controller);
 int controllerGetHint(const Controller *controller, Move *move);

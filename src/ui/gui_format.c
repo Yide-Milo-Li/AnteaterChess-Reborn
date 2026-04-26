@@ -58,6 +58,7 @@ int gui_difficulty_index(AIDifficulty difficulty) {
         case DIFFICULTY_MEDIUM:
             return 1;
         case DIFFICULTY_HARD:
+        case DIFFICULTY_EXPERIMENTAL:
             return 2;
         case DIFFICULTY_EASY:
         case DIFFICULTY_NONE:

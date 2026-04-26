@@ -233,12 +233,14 @@ void gui_build_setup_menu(Gui *gui) {
     GtkWidget *backButton;
     GtkWidget *startButton;
 
-    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_FILL, 24);
+    gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 18);
 
     contentBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
     gtk_widget_set_halign(contentBox, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign(contentBox, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), contentBox, TRUE, TRUE, 0);
+    gtk_widget_set_valign(contentBox, GTK_ALIGN_CENTER);
+    gtk_widget_set_size_request(contentBox, 520, -1);
+    gtk_style_context_add_class(gtk_widget_get_style_context(contentBox), "menu-panel");
+    gtk_box_pack_start(GTK_BOX(gui->main_box), contentBox, TRUE, FALSE, 0);
 
     label = gtk_label_new(gui_game_mode_title(gui->pendingConfig.mode));
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
@@ -271,10 +273,11 @@ void gui_build_setup_menu(Gui *gui) {
 
     buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_set_halign(buttonBox, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), buttonBox, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(contentBox), buttonBox, FALSE, FALSE, 0);
 
-    backButton = gtk_button_new_with_label("Back");
-    startButton = gtk_button_new_with_label("Start");
+    backButton = gui_create_centered_button("Back");
+    startButton = gui_create_centered_button("Start");
+    gtk_style_context_add_class(gtk_widget_get_style_context(startButton), "primary-button");
     gtk_box_pack_start(GTK_BOX(buttonBox), backButton, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(buttonBox), startButton, FALSE, FALSE, 0);
 

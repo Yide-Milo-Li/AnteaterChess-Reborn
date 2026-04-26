@@ -197,6 +197,32 @@ static int path_clear(const Board *board, Position from, Position target) {
     return 1;
 }
 
+static int path_clear_ignoring_square(const Board *board,
+                                      Position from,
+                                      Position target,
+                                      Position ignored) {
+    int rowStep;
+    int colStep;
+    Position current;
+
+    rowStep = (target.row > from.row) ? 1 : ((target.row < from.row) ? -1 : 0);
+    colStep = (target.col > from.col) ? 1 : ((target.col < from.col) ? -1 : 0);
+    current = createPosition(from.row + rowStep, from.col + colStep);
+
+    while (!positionEqual(current, target)) {
+        if (!isValidPosition(current)) {
+            return 0;
+        }
+        if (!positionEqual(current, ignored)
+            && getPiece(board, current).type != EMPTY_PIECE) {
+            return 0;
+        }
+        current.row += rowStep;
+        current.col += colStep;
+    }
+    return 1;
+}
+
 static int attacks_square(const Board *board, Position from, Piece piece, Position target) {
     int rowDistance;
     int colDistance;
@@ -218,6 +244,43 @@ static int attacks_square(const Board *board, Position from, Piece piece, Positi
             return ((from.row == target.row || from.col == target.col)
                     || rowDistance == colDistance)
                 && path_clear(board, from, target);
+        case KING:
+            return rowDistance <= 1 && colDistance <= 1 && !positionEqual(from, target);
+        case ANTEATER:
+        case EMPTY_PIECE:
+        default:
+            return 0;
+    }
+}
+
+static int attacks_square_after_vacating(const Board *board,
+                                         Position vacated,
+                                         Position from,
+                                         Piece piece,
+                                         Position target) {
+    int rowDistance;
+    int colDistance;
+    int direction;
+
+    rowDistance = abs_int(target.row - from.row);
+    colDistance = abs_int(target.col - from.col);
+    switch (piece.type) {
+        case ANT:
+            direction = (piece.color == WHITE) ? -1 : 1;
+            return (target.row - from.row) == direction && colDistance == 1;
+        case KNIGHT:
+            return (rowDistance == 2 && colDistance == 1)
+                || (rowDistance == 1 && colDistance == 2);
+        case BISHOP:
+            return rowDistance == colDistance
+                && path_clear_ignoring_square(board, from, target, vacated);
+        case ROOK:
+            return (from.row == target.row || from.col == target.col)
+                && path_clear_ignoring_square(board, from, target, vacated);
+        case QUEEN:
+            return ((from.row == target.row || from.col == target.col)
+                    || rowDistance == colDistance)
+                && path_clear_ignoring_square(board, from, target, vacated);
         case KING:
             return rowDistance <= 1 && colDistance <= 1 && !positionEqual(from, target);
         case ANTEATER:
@@ -275,6 +338,124 @@ static int local_attacker_weight(PieceType type) {
         default:
             return 0;
     }
+}
+
+static int quiet_check_threat_value(PieceType type) {
+    switch (type) {
+        case QUEEN:
+            return 300;
+        case ROOK:
+            return 230;
+        case BISHOP:
+            return 190;
+        case KNIGHT:
+            return 170;
+        case ANT:
+        case ANTEATER:
+        case KING:
+        case EMPTY_PIECE:
+        default:
+            return 0;
+    }
+}
+
+static int piece_can_relocate_to_quiet_check(const Board *board,
+                                             Position from,
+                                             Piece piece,
+                                             Position target,
+                                             Position kingPos) {
+    if (board == NULL
+        || !isValidPosition(from)
+        || !isValidPosition(target)
+        || !isValidPosition(kingPos)
+        || positionEqual(from, target)
+        || positionEqual(target, kingPos)
+        || getPiece(board, target).type != EMPTY_PIECE) {
+        return 0;
+    }
+    if (piece.type != QUEEN && piece.type != ROOK
+        && piece.type != BISHOP && piece.type != KNIGHT) {
+        return 0;
+    }
+    if (!attacks_square(board, from, piece, target)) {
+        return 0;
+    }
+    return attacks_square_after_vacating(board, from, target, piece, kingPos);
+}
+
+static int quiet_check_threat_pressure_for(const GameState *state, Color color) {
+    const Board *board;
+    Position kingPos;
+    Color enemy;
+    int pressure;
+    int row;
+    int col;
+
+    if (state == NULL) {
+        return 0;
+    }
+
+    board = &state->board;
+    kingPos = find_king_position(board, color);
+    if (!isValidPosition(kingPos)) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    pressure = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position from = createPosition(row, col);
+            Piece piece = getPiece(board, from);
+            int targetRow;
+            int targetCol;
+            int bestThreat;
+
+            if (piece.color != enemy || quiet_check_threat_value(piece.type) == 0) {
+                continue;
+            }
+
+            bestThreat = 0;
+            for (targetRow = 0; targetRow < ROWS; ++targetRow) {
+                for (targetCol = 0; targetCol < COLS; ++targetCol) {
+                    Position target = createPosition(targetRow, targetCol);
+                    int distance;
+                    int threat;
+
+                    if (!piece_can_relocate_to_quiet_check(board,
+                            from,
+                            piece,
+                            target,
+                            kingPos)) {
+                        continue;
+                    }
+
+                    distance = abs_int(target.row - kingPos.row)
+                        + abs_int(target.col - kingPos.col);
+                    threat = quiet_check_threat_value(piece.type);
+                    if (distance <= 1) {
+                        threat += 130;
+                    } else if (distance == 2) {
+                        threat += 90;
+                    } else if (distance == 3) {
+                        threat += 45;
+                    }
+                    if (square_attacked_by(board, target, enemy)) {
+                        threat += 65;
+                    }
+                    if (square_attacked_by(board, target, color)) {
+                        threat -= 35;
+                    }
+                    if (piece.type == QUEEN && distance <= 3) {
+                        threat += 80;
+                    }
+                    bestThreat = max_int_local(bestThreat, threat);
+                }
+            }
+            pressure += max_int_local(bestThreat, 0);
+        }
+    }
+    return pressure;
 }
 
 static int king_ring_pressure(const Board *board, Color color) {
@@ -658,6 +839,7 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
 
     score -= king_ring_pressure(&state->board, color) * ((phase >= 12) ? 12 : 7);
     score -= king_zone_pressure(&state->board, color) * ((phase >= 12) ? 2 : 3);
+    score -= quiet_check_threat_pressure_for(state, color) / 3;
     score -= knight_check_jump_pressure_for(&state->board, color);
     score -= knight_check_staging_pressure_for(&state->board, color) / 2;
     score -= blocked_knight_landing_escape_penalty_for(&state->board, color);
@@ -801,6 +983,7 @@ static int king_crisis_score_for(const GameState *state, Color color) {
 
     score = king_ring_pressure(&state->board, color) * 32;
     score += king_zone_pressure(&state->board, color) * 4;
+    score += quiet_check_threat_pressure_for(state, color);
     score += knight_check_jump_pressure_for(&state->board, color);
     score += knight_check_staging_pressure_for(&state->board, color) / 2;
     score += blocked_knight_landing_escape_penalty_for(&state->board, color);

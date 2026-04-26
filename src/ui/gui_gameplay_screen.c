@@ -496,26 +496,55 @@ void gui_update_turn_display(Gui *gui, Color turn) {
 }
 
 void gui_update_gameplay_controls(Gui *gui, const GameState *state) {
+    GtkStyleContext *submitContext;
+    gboolean gameplayState;
+    gboolean aiTurn;
     gboolean humanTurn;
     gboolean canUseHumanControls;
+    const char *submitText;
 
     if (gui == NULL || state == NULL) {
         return;
     }
 
-    humanTurn = state->systemState == GAMEPLAY_STATE && !gui_current_turn_is_ai(state);
+    gameplayState = state->systemState == GAMEPLAY_STATE;
+    aiTurn = gameplayState && gui_current_turn_is_ai(state);
+    humanTurn = gameplayState && !aiTurn;
     canUseHumanControls = humanTurn && gui->ai_job == NULL;
     if (GTK_IS_WIDGET(gui->from_entry)) {
         gtk_widget_set_sensitive(gui->from_entry, canUseHumanControls);
+        if (GTK_IS_ENTRY(gui->from_entry)) {
+            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->from_entry),
+                aiTurn ? "AI turn" : "From");
+        }
     }
     if (GTK_IS_WIDGET(gui->to_entry)) {
         gtk_widget_set_sensitive(gui->to_entry, canUseHumanControls);
+        if (GTK_IS_ENTRY(gui->to_entry)) {
+            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->to_entry),
+                aiTurn ? "AI turn" : "To");
+        }
     }
     if (GTK_IS_WIDGET(gui->submit_button)) {
+        submitContext = gtk_widget_get_style_context(gui->submit_button);
+        gtk_style_context_remove_class(submitContext, "primary-button");
+        gtk_style_context_remove_class(submitContext, "ai-status-button");
+        submitText = "Submit";
+        if (aiTurn) {
+            submitText = gui->ai_job == NULL ? "AI Playing" : "AI Thinking...";
+            gtk_style_context_add_class(submitContext, "ai-status-button");
+        } else if (canUseHumanControls) {
+            gtk_style_context_add_class(submitContext, "primary-button");
+        }
+        if (GTK_IS_BUTTON(gui->submit_button)) {
+            gtk_button_set_label(GTK_BUTTON(gui->submit_button), submitText);
+        }
         gtk_widget_set_sensitive(gui->submit_button, canUseHumanControls);
     }
     if (GTK_IS_WIDGET(gui->undo_button)) {
         gtk_widget_set_sensitive(gui->undo_button, canUseHumanControls);
+        gtk_widget_set_tooltip_text(gui->undo_button,
+            aiTurn ? "Undo is available on human turns only." : "Undo the previous move.");
     }
     if (GTK_IS_WIDGET(gui->hint_button)) {
         gtk_widget_set_sensitive(gui->hint_button,

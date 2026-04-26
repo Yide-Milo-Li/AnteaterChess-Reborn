@@ -92,7 +92,6 @@ OPTIONAL_AI_SRCS := $(wildcard src/ai/tournament_ai.c)
 
 AI_SRCS := \
 	src/ai/ai.c \
-	src/ai/book.c \
 	$(OPTIONAL_AI_SRCS)
 
 GUI_SRCS := \

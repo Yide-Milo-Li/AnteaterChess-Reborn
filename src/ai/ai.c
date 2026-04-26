@@ -12,7 +12,6 @@
 #endif
 
 #include "ai/ai.h"
-#include "ai/book.h"
 #include "ai_search_internal.h"
 
 #if defined(__has_include)

@@ -1,6 +1,12 @@
 #include "gui_internal.h"
 
+#include <pthread.h>
 #include <stdio.h>
+
+/* AI search keeps multiple GameState locals on the stack (each ~200KB due to
+ * MoveList[MAX_MOVES]). macOS worker threads default to ~512KB, which is too
+ * small — we spawn AI/hint workers on a pthread with an 8MB stack instead. */
+#define GUI_ASYNC_THREAD_STACK_BYTES (8 * 1024 * 1024)
 
 typedef enum {
     GUI_ASYNC_AI_MOVE,
@@ -18,7 +24,8 @@ struct GuiAsyncJob {
     int result;
     unsigned int generation;
     guint idleSourceId;
-    GThread *thread;
+    pthread_t thread;
+    int threadStarted;
 };
 
 static int state_matches_job_snapshot(const GuiAsyncJob *job) {
@@ -76,7 +83,7 @@ static void free_job(GuiAsyncJob *job) {
     g_free(job);
 }
 
-static gpointer run_async_job(gpointer userData) {
+static void *run_async_job(void *userData) {
     GuiAsyncJob *job = (GuiAsyncJob *)userData;
 
     if (job == NULL) {
@@ -91,6 +98,27 @@ static gpointer run_async_job(gpointer userData) {
 
     job->idleSourceId = g_idle_add(gui_on_async_job_finished, job);
     return NULL;
+}
+
+static int spawn_async_thread(GuiAsyncJob *job, const char *name) {
+    pthread_attr_t attr;
+    int rc;
+
+    (void)name;
+    if (pthread_attr_init(&attr) != 0) {
+        return 1;
+    }
+    if (pthread_attr_setstacksize(&attr, GUI_ASYNC_THREAD_STACK_BYTES) != 0) {
+        pthread_attr_destroy(&attr);
+        return 1;
+    }
+    rc = pthread_create(&job->thread, &attr, run_async_job, job);
+    pthread_attr_destroy(&attr);
+    if (rc != 0) {
+        return 1;
+    }
+    job->threadStarted = 1;
+    return 0;
 }
 
 static void detach_completed_job(GuiAsyncJob *job) {
@@ -176,9 +204,9 @@ gboolean gui_on_async_job_finished(gpointer userData) {
         return G_SOURCE_REMOVE;
     }
 
-    if (job->thread != NULL) {
-        g_thread_join(job->thread);
-        job->thread = NULL;
+    if (job->threadStarted) {
+        pthread_join(job->thread, NULL);
+        job->threadStarted = 0;
     }
 
     job->idleSourceId = 0;
@@ -211,9 +239,9 @@ static void cancel_job(GuiAsyncJob **jobSlot) {
 
     job = *jobSlot;
     *jobSlot = NULL;
-    if (job->thread != NULL) {
-        g_thread_join(job->thread);
-        job->thread = NULL;
+    if (job->threadStarted) {
+        pthread_join(job->thread, NULL);
+        job->threadStarted = 0;
     }
     if (job->idleSourceId != 0) {
         g_source_remove(job->idleSourceId);
@@ -284,7 +312,11 @@ void gui_maybe_start_ai_job(Gui *gui, const GameState *state) {
         state->currentTurn == WHITE ? "White" : "Black");
     gui_set_status(gui, GUI_STATUS_BUSY, statusText);
     gui_update_gameplay_controls(gui, state);
-    job->thread = g_thread_new("gui-ai-move", run_async_job, job);
+    if (spawn_async_thread(job, "gui-ai-move") != 0) {
+        gui->ai_job = NULL;
+        free_job(job);
+        gui_set_error(gui, ERR_FATAL);
+    }
 }
 
 int gui_start_hint_job(Gui *gui) {
@@ -310,6 +342,10 @@ int gui_start_hint_job(Gui *gui) {
     gui->hint_job = job;
     gui_set_status(gui, GUI_STATUS_BUSY, "Hint thinking...");
     gui_update_gameplay_controls(gui, state);
-    job->thread = g_thread_new("gui-hint", run_async_job, job);
+    if (spawn_async_thread(job, "gui-hint") != 0) {
+        gui->hint_job = NULL;
+        free_job(job);
+        return 1;
+    }
     return 0;
 }

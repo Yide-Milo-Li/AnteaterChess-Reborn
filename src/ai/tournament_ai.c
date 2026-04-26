@@ -323,6 +323,47 @@ static int square_attacked_by(const Board *board, Position target, Color attacki
     return 0;
 }
 
+static int anteater_can_capture_ant_square(Position from, Position target) {
+    int rowDistance;
+    int colDistance;
+
+    rowDistance = abs_int(target.row - from.row);
+    colDistance = abs_int(target.col - from.col);
+    return rowDistance <= 1 && colDistance <= 1 && !positionEqual(from, target);
+}
+
+static int ant_capture_square_attacked_by(const Board *board,
+                                          Position target,
+                                          Color attackingColor) {
+    int row;
+    int col;
+
+    if (board == NULL || !isValidPosition(target)) {
+        return 0;
+    }
+
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position from = createPosition(row, col);
+            Piece piece = getPiece(board, from);
+
+            if (piece.type == EMPTY_PIECE || piece.color != attackingColor) {
+                continue;
+            }
+            if (piece.type == ANTEATER) {
+                if (anteater_can_capture_ant_square(from, target)) {
+                    return 1;
+                }
+                continue;
+            }
+            if (attacks_square(board, from, piece, target)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 static int local_attacker_weight(PieceType type) {
     switch (type) {
         case QUEEN:
@@ -793,6 +834,63 @@ static int board_phase(const Board *board) {
     return clamp_int_local(phase, 0, 28);
 }
 
+static int promotion_lane_control_penalty(const Board *board,
+                                          Position pos,
+                                          Color color) {
+    Color enemy;
+    Position cursor;
+    int distance;
+    int penalty;
+    int step;
+
+    if (board == NULL || !isValidPosition(pos)) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    distance = ant_promotion_distance(pos, color);
+    penalty = 0;
+
+    if (ant_capture_square_attacked_by(board, pos, enemy)) {
+        if (ant_capture_square_attacked_by(board, pos, color)) {
+            penalty += 170;
+        } else {
+            penalty += 340;
+        }
+    }
+
+    cursor = pos;
+    for (step = 1;
+         step <= distance && step <= TOURNAMENT_PASSED_PROMOTION_DISTANCE;
+         ++step) {
+        Piece occupant;
+        int pathPenalty;
+
+        cursor = ant_forward_position(cursor, color);
+        if (!isValidPosition(cursor)) {
+            break;
+        }
+
+        occupant = getPiece(board, cursor);
+        if (occupant.type != EMPTY_PIECE) {
+            penalty += 220;
+            break;
+        }
+
+        if (!ant_capture_square_attacked_by(board, cursor, enemy)) {
+            continue;
+        }
+
+        pathPenalty = 310 - step * 45;
+        if (pathPenalty < 90) {
+            pathPenalty = 90;
+        }
+        penalty += pathPenalty;
+    }
+
+    return penalty;
+}
+
 static int king_safety_adjustment_for(const GameState *state, Color color, int phase) {
     Position kingPos;
     int homeRow;
@@ -874,21 +972,21 @@ static int promotion_pressure_for(const GameState *state, Color color, int phase
 
             distance = ant_promotion_distance(pos, color);
             if (distance <= 1) {
-                advanceScore = 760;
+                advanceScore = 920;
             } else if (distance == 2) {
-                advanceScore = 530;
+                advanceScore = 650;
             } else if (distance == 3) {
-                advanceScore = 360;
+                advanceScore = 460;
             } else if (distance == 4) {
-                advanceScore = 230;
+                advanceScore = 320;
             } else if (distance == 5) {
-                advanceScore = 130;
+                advanceScore = 220;
             } else {
                 advanceScore = 10 * (ROWS - 1 - distance);
             }
 
             if (ant_has_clear_promotion_lane(&state->board, pos, color)) {
-                advanceScore += 560 - 70 * distance;
+                advanceScore += 720 - 95 * distance;
             }
             if (is_edge_file(pos)) {
                 advanceScore += 35;
@@ -896,12 +994,17 @@ static int promotion_pressure_for(const GameState *state, Color color, int phase
             if (distance >= 3 && phase >= 18) {
                 advanceScore /= 2;
             }
-            if (distance >= 3 && square_attacked_by(&state->board, pos, enemy)) {
-                if (square_attacked_by(&state->board, pos, color)) {
-                    advanceScore -= 70;
-                } else {
-                    advanceScore -= 150;
+            if (distance <= TOURNAMENT_PASSED_PROMOTION_DISTANCE) {
+                advanceScore -= promotion_lane_control_penalty(&state->board,
+                    pos,
+                    color);
+                if (advanceScore < 0) {
+                    advanceScore = 0;
                 }
+            } else if (square_attacked_by(&state->board, pos, enemy)) {
+                advanceScore -= square_attacked_by(&state->board, pos, color)
+                    ? 70
+                    : 150;
             }
             score += advanceScore;
         }
@@ -1301,7 +1404,7 @@ static int tournament_soft_limit_ms(const GameState *state,
         return 0;
     }
 
-    percent = 32;
+    percent = 42;
     noisyCount = 0;
     for (index = 0; index < rootMoves->count; ++index) {
         if (is_local_noisy(&rootMoves->moves[index])) {
@@ -1328,7 +1431,7 @@ static int tournament_soft_limit_ms(const GameState *state,
     if (side_has_urgent_promotion_threat(state, state->currentTurn)) {
         percent += 25;
     }
-    percent = clamp_int_local(percent, 22, 88);
+    percent = clamp_int_local(percent, 34, 92);
     return clamp_int_local((maxTimeMs * percent) / 100,
         TOURNAMENT_MIN_MOVE_BUDGET_MS / 2,
         maxTimeMs);
@@ -1386,10 +1489,10 @@ static int tournament_should_stop_after_depth(int elapsedMs,
     if (stableDepths >= 2 && rootScoreGap >= 220) {
         return 1;
     }
-    if (rootScoreGap <= 35 && elapsedMs < (timeLimitMs * 7) / 10) {
+    if (rootScoreGap <= 35 && elapsedMs < (timeLimitMs * 8) / 10) {
         return 0;
     }
-    return elapsedMs >= (timeLimitMs * 7) / 10;
+    return elapsedMs >= (timeLimitMs * 8) / 10;
 }
 
 int generateTournamentAIMoveWithBudget(const GameState *state,

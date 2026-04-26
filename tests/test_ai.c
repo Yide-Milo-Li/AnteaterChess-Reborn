@@ -252,6 +252,36 @@ static void setup_tournament_log_142053_after_move_14(GameState *state) {
     replay_tournament_log_142053_prefix(state, 14);
 }
 
+static void setup_tournament_log_153600_after_move_140(GameState *state) {
+    clear_board(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 140;
+    state->currentTurn = WHITE;
+    state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state->config.aiDifficultyBlack = DIFFICULTY_HARD;
+    state->config.aiTimeLimit = 0;
+
+    setPiece(&state->board, createPosition(0, 2), createPiece(KING, BLACK));
+    setPiece(&state->board, createPosition(2, 0), createPiece(ANT, BLACK));
+    setPiece(&state->board, createPosition(3, 1), createPiece(ANT, BLACK));
+    setPiece(&state->board, createPosition(3, 5), createPiece(ANT, BLACK));
+    setPiece(&state->board, createPosition(3, 6), createPiece(ANT, BLACK));
+    setPiece(&state->board, createPosition(4, 5), createPiece(ANTEATER, BLACK));
+
+    setPiece(&state->board, createPosition(3, 8), createPiece(ANTEATER, WHITE));
+    setPiece(&state->board, createPosition(4, 3), createPiece(BISHOP, WHITE));
+    setPiece(&state->board, createPosition(5, 0), createPiece(KING, WHITE));
+    setPiece(&state->board, createPosition(5, 4), createPiece(ANTEATER, WHITE));
+    setPiece(&state->board, createPosition(6, 4), createPiece(ANT, WHITE));
+}
+
+static int move_intercepts_logged_g_runner(Move move) {
+    return (positionEqual(move.from, createPosition(5, 4)) == 1
+            && positionEqual(move.to, createPosition(5, 5)) == 1)
+        || (positionEqual(move.from, createPosition(3, 8)) == 1
+            && positionEqual(move.to, createPosition(2, 7)) == 1);
+}
+
 /* Public API should reject invalid output/input pointers. */
 static void test_ai_rejects_null_arguments(void) {
     GameState state = create_ai_ready_state();
@@ -494,6 +524,20 @@ static void test_tournament_ai_avoids_logged_h2_mate(void) {
         && positionEqual(move.to, createPosition(3, 8)) == 1));
 }
 
+static void test_tournament_ai_intercepts_logged_g_runner(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    setup_tournament_log_153600_after_move_140(&state);
+    before = state;
+
+    assert(generateAIMoveWithBudget(&state, &move, 1200) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(move_intercepts_logged_g_runner(move) == 1);
+}
+
 static void test_tournament_time_manager_rolls_saved_time_forward(void) {
     AITimeManager manager;
     int firstBudget;
@@ -505,24 +549,24 @@ static void test_tournament_time_manager_rolls_saved_time_forward(void) {
     assert(isAITournamentTimeExpired(&manager, WHITE) == 0);
 
     firstBudget = getAITournamentBudgetMs(&manager, WHITE);
-    assert(firstBudget == 7000);
+    assert(firstBudget == 8500);
 
     updateAITournamentTime(&manager, WHITE, firstBudget, 100);
     assert(manager.remainingMs[WHITE] == 600899);
-    assert(manager.poolMs[WHITE] == 6900);
+    assert(manager.poolMs[WHITE] == 8400);
 
     secondBudget = getAITournamentBudgetMs(&manager, WHITE);
-    assert(secondBudget == 10450);
+    assert(secondBudget == 12700);
 
     updateAITournamentTime(&manager, WHITE, secondBudget, 11000);
-    assert(manager.poolMs[WHITE] == 6350);
+    assert(manager.poolMs[WHITE] == 10100);
 
-    updateAITournamentTime(&manager, WHITE, 7000, 0);
-    updateAITournamentTime(&manager, WHITE, 7000, 0);
-    updateAITournamentTime(&manager, WHITE, 7000, 0);
+    updateAITournamentTime(&manager, WHITE, 8500, 0);
+    updateAITournamentTime(&manager, WHITE, 8500, 0);
+    updateAITournamentTime(&manager, WHITE, 8500, 0);
     cappedBudget = getAITournamentBudgetMs(&manager, WHITE);
     assert(cappedBudget == 14000);
-    assert(cappedBudget >= 7000);
+    assert(cappedBudget >= 8500);
 
     manager.remainingMs[WHITE] = 100;
     assert(getAITournamentBudgetMs(&manager, WHITE) == 300);
@@ -608,6 +652,7 @@ int main(void) {
     test_tournament_ai_captures_loose_checker_from_logged_game();
     test_tournament_ai_does_not_ignore_logged_bishop_check_threat();
     test_tournament_ai_avoids_logged_h2_mate();
+    test_tournament_ai_intercepts_logged_g_runner();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();
     test_ai_can_choose_promotion_move();

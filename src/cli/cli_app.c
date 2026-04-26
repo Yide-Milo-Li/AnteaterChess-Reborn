@@ -68,8 +68,10 @@ static int cli_move_provider(const GameState *state, Move *move, void *context) 
 
 /* Start a CLI gameplay session and attach the legacy AI provider afterwards
  * because controllerStartConfiguredGame() rebuilds controller runtime state. */
-static int start_cli_configured_game(Controller *controller, const GameConfig *config) {
-    if (controllerStartConfiguredGame(controller, config) != 0) {
+static int start_cli_configured_game(Controller *controller,
+                                     const GameConfig *config,
+                                     ErrorCode *errorCode) {
+    if (controllerStartConfiguredGameDetailed(controller, config, errorCode) != 0) {
         return 1;
     }
 
@@ -292,6 +294,7 @@ static int enqueue_timer_expiry_if_needed(Controller *controller) {
 /* Collect setup fields, rebuild the controller, and continue into gameplay. */
 static int collect_setup_event(Controller *controller, GameConfig *pendingConfig) {
     GameConfig config;
+    ErrorCode errorCode = ERR_FATAL;
 
     if (pendingConfig == NULL) {
         return 1;
@@ -302,8 +305,13 @@ static int collect_setup_event(Controller *controller, GameConfig *pendingConfig
         return 1;
     }
 
+    if (start_cli_configured_game(controller, &config, &errorCode) != 0) {
+        cliShowErrorMessage(errorCode);
+        return (errorCode == ERR_INVALID_AI_TIMER_SETTING) ? 0 : 1;
+    }
+
     *pendingConfig = config;
-    return start_cli_configured_game(controller, pendingConfig);
+    return 0;
 }
 
 /* Collect one gameplay action and map it to the next CLI event if any. */

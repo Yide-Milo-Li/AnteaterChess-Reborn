@@ -28,6 +28,8 @@ const char *getErrorMessage(ErrorCode code) {
             return "Move leaves king in check.";
         case ERR_INVALID_TIMER_SETTING:
             return "Enter a time from 1 to 3600.";
+        case ERR_INVALID_AI_TIMER_SETTING:
+            return "AI difficulty requires a longer turn timer.";
         case ERR_UNDO_UNAVAILABLE:
             return "Undo unavailable.";
         case ERR_HINT_UNAVAILABLE:

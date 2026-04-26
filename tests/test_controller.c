@@ -190,6 +190,72 @@ static void test_controller_start_configured_game_enters_gameplay(void) {
     assert(state->moveHistory.count == 0);
 }
 
+/* Check that configured-game startup rejects AI games whose turn timer is
+ * shorter than the selected AI thinking budget. */
+static void test_controller_start_rejects_ai_timer_below_budget(void) {
+    Controller controller = fresh_controller();
+    GameConfig config;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_HUMAN_VS_COMPUTER;
+    config.playerColor = WHITE;
+    config.aiDifficultyWhite = DIFFICULTY_NONE;
+    config.aiDifficultyBlack = DIFFICULTY_MEDIUM;
+    config.timerEnabled = 1;
+    config.initialTimeSeconds = 2;
+
+    config.aiDifficultyBlack = DIFFICULTY_EASY;
+    config.initialTimeSeconds = 1;
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+
+    config.aiDifficultyBlack = DIFFICULTY_MEDIUM;
+    config.initialTimeSeconds = 2;
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) != 0);
+    assert(errorCode == ERR_INVALID_AI_TIMER_SETTING);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+
+    config.initialTimeSeconds = 3;
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+}
+
+/* Check that the validation uses the highest AI budget in computer-vs-computer
+ * games and ignores human-vs-human games. */
+static void test_controller_start_ai_timer_policy_by_mode(void) {
+    Controller controller;
+    GameConfig config;
+    ErrorCode errorCode;
+
+    initDefaultGameConfig(&config);
+    config.mode = MODE_COMPUTER_VS_COMPUTER;
+    config.playerColor = EMPTY_COLOR;
+    config.aiDifficultyWhite = DIFFICULTY_HARD;
+    config.aiDifficultyBlack = DIFFICULTY_MEDIUM;
+    config.timerEnabled = 1;
+    config.initialTimeSeconds = 7;
+
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) != 0);
+    assert(errorCode == ERR_INVALID_AI_TIMER_SETTING);
+
+    config.initialTimeSeconds = 8;
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+
+    initDefaultGameConfig(&config);
+    config.timerEnabled = 1;
+    config.initialTimeSeconds = 1;
+    errorCode = ERR_FATAL;
+    assert(controllerStartConfiguredGameDetailed(&controller, &config, &errorCode) == 0);
+    assert(controller.state.systemState == GAMEPLAY_STATE);
+}
+
 /* Check that gameplay background work is controller-owned: run-until-idle
  * schedules and applies the opening AI move after configured startup. */
 static void test_controller_run_until_idle_auto_plays_ai_turn(void) {
@@ -579,6 +645,8 @@ int main(void) {
     test_controller_sync_bootstraps_init_state();
     test_controller_run_until_idle_completes_termination_handshake();
     test_controller_start_configured_game_enters_gameplay();
+    test_controller_start_rejects_ai_timer_below_budget();
+    test_controller_start_ai_timer_policy_by_mode();
     test_controller_run_until_idle_auto_plays_ai_turn();
     test_controller_run_until_idle_leaves_ai_turn_idle_without_provider();
     test_controller_submit_ai_move_applies_one_move();

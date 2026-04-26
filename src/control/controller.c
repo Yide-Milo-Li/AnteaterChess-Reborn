@@ -450,18 +450,36 @@ static int drive_setup_to_gameplay(Controller *controller) {
 
 /* Rebuild a controller from configuration and drive only the setup-to-gameplay
  * bootstrap path, leaving the first gameplay tick to the caller. */
-int controllerStartConfiguredGame(Controller *controller, const GameConfig *config) {
+int controllerStartConfiguredGameDetailed(Controller *controller,
+                                          const GameConfig *config,
+                                          ErrorCode *errorCode) {
     if (controller == NULL) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    if (!isAITurnTimerSettingValid(config)) {
+        set_controller_error(errorCode, ERR_INVALID_AI_TIMER_SETTING);
         return 1;
     }
 
     initController(controller, config);
 
     if (drive_to_configured_game_setup(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
         return 1;
     }
 
-    return drive_setup_to_gameplay(controller);
+    if (drive_setup_to_gameplay(controller) != 0) {
+        set_controller_error(errorCode, ERR_FATAL);
+        return 1;
+    }
+
+    return 0;
+}
+
+int controllerStartConfiguredGame(Controller *controller, const GameConfig *config) {
+    return controllerStartConfiguredGameDetailed(controller, config, NULL);
 }
 
 /* Advance one controller along the public "new game" flow until it next goes

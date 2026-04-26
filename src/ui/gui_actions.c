@@ -277,8 +277,9 @@ void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
     }
 
     gui_invalidate_async_results(gui);
-    if (controllerStartConfiguredGame(&gui->controller, &config) != 0) {
-        gui_set_error(gui, ERR_FATAL);
+    errorCode = ERR_FATAL;
+    if (controllerStartConfiguredGameDetailed(&gui->controller, &config, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
         return;
     }
 

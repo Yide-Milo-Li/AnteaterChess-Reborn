@@ -18,6 +18,8 @@ static void test_known_error_messages(void) {
     assert(strcmp(getErrorMessage(ERR_ILLEGAL_MOVE), "Illegal move.") == 0);
     assert(strcmp(getErrorMessage(ERR_UNRESOLVED_CHECK), "Move leaves king in check.") == 0);
     assert(strcmp(getErrorMessage(ERR_INVALID_TIMER_SETTING), "Enter a time from 1 to 3600.") == 0);
+    assert(strcmp(getErrorMessage(ERR_INVALID_AI_TIMER_SETTING),
+        "AI difficulty requires a longer turn timer.") == 0);
     assert(strcmp(getErrorMessage(ERR_UNDO_UNAVAILABLE), "Undo unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_HINT_UNAVAILABLE), "Hint unavailable.") == 0);
     assert(strcmp(getErrorMessage(ERR_AI_UNAVAILABLE), "AI move unavailable.") == 0);

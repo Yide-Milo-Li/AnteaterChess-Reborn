@@ -213,6 +213,13 @@ int gui_collect_setup_config(Gui *gui, GameConfig *config, ErrorCode *errorCode)
             return 1;
     }
 
+    if (!isAITurnTimerSettingValid(config)) {
+        if (errorCode != NULL) {
+            *errorCode = ERR_INVALID_AI_TIMER_SETTING;
+        }
+        return 1;
+    }
+
     if (errorCode != NULL) {
         *errorCode = ERR_FATAL;
     }

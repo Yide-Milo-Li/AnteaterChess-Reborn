@@ -19,6 +19,7 @@ typedef enum {
     /* Header change: setup flows validate turn-length input separately from
      * generic menu parsing, so the public enum needs a timer-specific code. */
     ERR_INVALID_TIMER_SETTING,
+    ERR_INVALID_AI_TIMER_SETTING,
     ERR_UNDO_UNAVAILABLE,
     ERR_HINT_UNAVAILABLE,
     ERR_AI_UNAVAILABLE,

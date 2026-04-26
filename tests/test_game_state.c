@@ -107,6 +107,32 @@ static void test_ai_time_budget_helpers(void) {
     config.aiTimeLimit = 2;
     assert(getAITimeBudgetMs(&config, DIFFICULTY_EASY) == 2000);
     assert(getAITimeBudgetMs(NULL, DIFFICULTY_MEDIUM) == 2200);
+
+    config.aiTimeLimit = 0;
+    config.timerEnabled = 1;
+    config.initialTimeSeconds = 1;
+    assert(getRequiredAITurnTimerSeconds(&config) == 1);
+    assert(isAITurnTimerSettingValid(&config) == 1);
+
+    config.aiDifficultyBlack = DIFFICULTY_MEDIUM;
+    assert(getRequiredAITurnTimerSeconds(&config) == 3);
+    assert(isAITurnTimerSettingValid(&config) == 0);
+    config.initialTimeSeconds = 3;
+    assert(isAITurnTimerSettingValid(&config) == 1);
+
+    config.mode = MODE_COMPUTER_VS_COMPUTER;
+    config.aiDifficultyWhite = DIFFICULTY_HARD;
+    config.aiDifficultyBlack = DIFFICULTY_MEDIUM;
+    config.initialTimeSeconds = 7;
+    assert(getRequiredAITurnTimerSeconds(&config) == 8);
+    assert(isAITurnTimerSettingValid(&config) == 0);
+    config.initialTimeSeconds = 8;
+    assert(isAITurnTimerSettingValid(&config) == 1);
+
+    config.mode = MODE_HUMAN_VS_HUMAN;
+    config.initialTimeSeconds = 1;
+    assert(getRequiredAITurnTimerSeconds(&config) == 0);
+    assert(isAITurnTimerSettingValid(&config) == 1);
 }
 
 /* Check history bookkeeping and result/gameOver consistency helpers. */

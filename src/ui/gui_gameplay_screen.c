@@ -11,25 +11,59 @@
 static const char *gui_special_move_text(SpecialMove type) {
     switch (type) {
         case CASTLING_KINGSIDE:
-            return " castle kingside";
+            return "Castling Kingside";
         case CASTLING_QUEENSIDE:
-            return " castle queenside";
+            return "Castling Queenside";
         case EN_PASSANT:
-            return " en passant";
+            return "En Passant";
         case PROMOTION_QUEEN:
-            return " promote queen";
+            return "Promotion to Queen";
         case PROMOTION_ROOK:
-            return " promote rook";
+            return "Promotion to Rook";
         case PROMOTION_BISHOP:
-            return " promote bishop";
+            return "Promotion to Bishop";
         case PROMOTION_KNIGHT:
-            return " promote knight";
+            return "Promotion to Knight";
         case ANTEATER_CAPTURE:
-            return " anteater capture";
+            return "Anteater Capture";
         case NO_SPECIAL_MOVE:
         default:
-            return "";
+            return "None";
     }
+}
+
+static const char *gui_piece_type_text(PieceType type) {
+    switch (type) {
+        case ANT:
+            return "Ant";
+        case ROOK:
+            return "Rook";
+        case KNIGHT:
+            return "Knight";
+        case BISHOP:
+            return "Bishop";
+        case QUEEN:
+            return "Queen";
+        case KING:
+            return "King";
+        case ANTEATER:
+            return "Anteater";
+        case EMPTY_PIECE:
+        default:
+            return "Unknown";
+    }
+}
+
+static void gui_format_history_player(const GameState *state, Color color, char buffer[32]) {
+    const char *colorText = (color == BLACK) ? "Black" : "White";
+
+    if (state != NULL && (color == WHITE || color == BLACK)
+        && state->players[color].type == AI) {
+        snprintf(buffer, 32, "%s (AI)", colorText);
+        return;
+    }
+
+    snprintf(buffer, 32, "%s", colorText);
 }
 
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
@@ -69,6 +103,12 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gui->history_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(gui->history_view), FALSE);
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(gui->history_view), FALSE);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(gui->history_view), GTK_WRAP_WORD_CHAR);
+    gtk_text_view_set_monospace(GTK_TEXT_VIEW(gui->history_view), TRUE);
+    gtk_text_view_set_left_margin(GTK_TEXT_VIEW(gui->history_view), 8);
+    gtk_text_view_set_right_margin(GTK_TEXT_VIEW(gui->history_view), 8);
+    gtk_text_view_set_top_margin(GTK_TEXT_VIEW(gui->history_view), 8);
+    gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(gui->history_view), 8);
     gtk_style_context_add_class(gtk_widget_get_style_context(gui->history_view), "history-view");
     scrolledWindow = gtk_scrolled_window_new(NULL, NULL);
     gtk_style_context_add_class(gtk_widget_get_style_context(scrolledWindow), "history-panel");
@@ -234,6 +274,7 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     gtk_style_context_add_class(gtk_widget_get_style_context(turnLabel), "turn-banner");
     gtk_box_pack_start(GTK_BOX(gui->main_box), turnLabel, FALSE, FALSE, 0);
     gui->turn_label = turnLabel;
+    gui->last_move_count = -1;
 
     middleBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_pack_start(GTK_BOX(gui->main_box), middleBox, TRUE, TRUE, 0);
@@ -248,7 +289,6 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     build_gameplay_board(gui, rightBox, state);
 
     leaveButton = gtk_button_new_with_label("Leave Game");
-    gui_set_button_icon(leaveButton, "alert-triangle-svgrepo-com.svg", GUI_UI_ICON_SIZE);
     gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
     gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
     gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
@@ -334,28 +374,25 @@ void gui_update_movelist(Gui *gui, const GameState *state) {
         Move move = state->moveHistory.moves[index];
         char fromText[8];
         char toText[8];
+        char playerText[32];
 
         gui_format_position_text(move.from, fromText);
         gui_format_position_text(move.to, toText);
-        g_string_append_printf(text, "%d. %s-%s", index + 1, fromText, toText);
+        gui_format_history_player(state, move.movedPiece.color, playerText);
+        g_string_append_printf(text,
+            "[Move %03d] %s | %s %s -> %s",
+            index + 1,
+            playerText,
+            gui_piece_type_text(move.movedPiece.type),
+            fromText,
+            toText);
         if (move.captureCount > 0) {
-            int captureIndex;
-
-            g_string_append(text, " captures ");
-            for (captureIndex = 0; captureIndex < move.captureCount; ++captureIndex) {
-                char captureText[8];
-
-                gui_format_position_text(move.captures[captureIndex].pos, captureText);
-                g_string_append_printf(text,
-                    "%c@%s",
-                    getPieceSymbol(move.captures[captureIndex].piece),
-                    captureText);
-                if (captureIndex + 1 < move.captureCount) {
-                    g_string_append(text, ", ");
-                }
-            }
+            g_string_append_printf(text, " | Captures: %d", move.captureCount);
         }
-        g_string_append_printf(text, "%s\n", gui_special_move_text(move.specialType));
+        if (move.specialType != NO_SPECIAL_MOVE) {
+            g_string_append_printf(text, " | Special: %s", gui_special_move_text(move.specialType));
+        }
+        g_string_append_c(text, '\n');
     }
 
     gtk_text_buffer_set_text(buffer, text->str, -1);
@@ -382,8 +419,12 @@ void gui_update_movelist(Gui *gui, const GameState *state) {
     }
     gtk_text_buffer_get_end_iter(buffer, &endIter);
     gtk_text_buffer_place_cursor(buffer, &endIter);
-    gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(gui->history_view),
-        gtk_text_buffer_get_insert(buffer));
+    gtk_text_view_scroll_to_mark(GTK_TEXT_VIEW(gui->history_view),
+        gtk_text_buffer_get_insert(buffer),
+        0.05,
+        FALSE,
+        0.0,
+        1.0);
     g_string_free(text, TRUE);
 }
 

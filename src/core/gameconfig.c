@@ -64,3 +64,61 @@ int getAITimeBudgetMs(const GameConfig *config, AIDifficulty difficulty) {
 
     return getDefaultAITimeBudgetMs(difficulty);
 }
+
+static int max_int(int left, int right) {
+    return (left > right) ? left : right;
+}
+
+static int required_seconds_for_budget_ms(int budgetMs) {
+    int paddedBudgetMs;
+
+    if (budgetMs <= 0) {
+        return 0;
+    }
+
+    if (budgetMs > INT_MAX - 1499) {
+        return INT_MAX / 1000;
+    }
+
+    paddedBudgetMs = budgetMs + 500;
+    return (paddedBudgetMs + 999) / 1000;
+}
+
+int getRequiredAITurnTimerSeconds(const GameConfig *config) {
+    int maxBudgetMs = 0;
+
+    if (config == NULL || config->mode == MODE_HUMAN_VS_HUMAN) {
+        return 0;
+    }
+
+    switch (config->mode) {
+        case MODE_HUMAN_VS_COMPUTER:
+            if (config->playerColor == WHITE) {
+                maxBudgetMs = getAITimeBudgetMs(config, config->aiDifficultyBlack);
+            } else {
+                maxBudgetMs = getAITimeBudgetMs(config, config->aiDifficultyWhite);
+            }
+            break;
+        case MODE_COMPUTER_VS_COMPUTER:
+            maxBudgetMs = max_int(
+                getAITimeBudgetMs(config, config->aiDifficultyWhite),
+                getAITimeBudgetMs(config, config->aiDifficultyBlack));
+            break;
+        case MODE_HUMAN_VS_HUMAN:
+        default:
+            break;
+    }
+
+    return required_seconds_for_budget_ms(maxBudgetMs);
+}
+
+int isAITurnTimerSettingValid(const GameConfig *config) {
+    int requiredSeconds;
+
+    if (config == NULL || !config->timerEnabled) {
+        return 1;
+    }
+
+    requiredSeconds = getRequiredAITurnTimerSeconds(config);
+    return requiredSeconds <= 0 || config->initialTimeSeconds >= requiredSeconds;
+}

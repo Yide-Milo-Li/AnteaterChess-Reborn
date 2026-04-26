@@ -31,8 +31,8 @@ Gui *gui_create(int *argc, char ***argv) {
         ".panel { background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; } "
         ".panel-title { color: #0f172a; font-weight: bold; } "
         ".clock-text { color: #475569; font-weight: bold; } "
-        ".history-panel { background-color: #ffffff; border: 1px solid #e2e8f0; } "
-        ".history-view, textview, textview text { color: #0f172a; background-color: #ffffff; } "
+        ".history-panel { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; } "
+        ".history-view, textview, textview text { color: #0f172a; background-color: #ffffff; font-size: 12px; } "
         ".status-normal { color: #334155; } "
         ".status-error { color: #991b1b; background-color: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; padding: 6px; } "
         ".hint-button { background-color: #fff7cc; border-color: #facc15; } "
@@ -174,7 +174,9 @@ void gui_sync_from_controller(Gui *gui) {
             gui_set_error(gui, ERR_TIME_UP);
         }
         gui_update_board(gui, state);
-        gui_update_movelist(gui, state);
+        if (gui->last_move_count != state->moveHistory.count) {
+            gui_update_movelist(gui, state);
+        }
         gui_update_clock(gui);
         gui_update_timers(gui, state);
         gui_update_turn_display(gui, state->currentTurn);

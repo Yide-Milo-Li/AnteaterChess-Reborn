@@ -111,6 +111,7 @@ APP_SRCS := \
 
 GUI_APP_SRCS := \
 	$(APP_SRCS) \
+	$(AI_SRCS) \
 	$(GUI_SRCS)
 
 CLI_APP_SRCS := \
@@ -285,4 +286,6 @@ $(CLI_BIN): $(BIN_DIR) $(LOG_DIR) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS)
 $(TEST_BIN_DIR)/%$(EXEEXT): $(TEST_BIN_DIR) $(OBJ_DIR)/tests/%.o $(TEST_APP_OBJS)
 	$(CC) $(LDFLAGS) $(OBJ_DIR)/tests/$*.o $(TEST_APP_OBJS) $(LDLIBS) -o $@
 
+ifneq ($(filter clean,$(MAKECMDGOALS)),clean)
 -include $(DEP_FILES)
+endif

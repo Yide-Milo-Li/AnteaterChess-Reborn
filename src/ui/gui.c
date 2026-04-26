@@ -20,7 +20,12 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_css_provider_load_from_data(provider,
         "GtkWindow { background-color: #2c3e50; } "
         ".light-square { background-color: #f0d9b5; } "
-        ".dark-square { background-color: #b58863; }",
+        ".dark-square { background-color: #b58863; } "
+        ".highlight-from { background-color: #4f83cc; } "
+        ".highlight-destination { background-color: #6abf69; } "
+        ".highlight-selected { background-color: #f4d35e; } "
+        ".move-input-valid { box-shadow: inset 0 0 0 2px #2e7d32; } "
+        ".move-input-invalid { box-shadow: inset 0 0 0 2px #b00020; }",
         -1,
         NULL);
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
@@ -31,7 +36,11 @@ Gui *gui_create(int *argc, char ***argv) {
     initDefaultGameConfig(&gui->pendingConfig);
     initController(&gui->controller, &gui->pendingConfig);
     gui->last_rendered_state = EXIT_STATE;
+    gui->last_turn = EMPTY_COLOR;
+    gui->last_move_count = 0;
     gui->has_rendered_state = 0;
+    gui->has_highlight_from = 0;
+    gui->endgame_dialog_shown = 0;
     gui->sync_source_id = 0;
     gui->should_quit = 0;
 
@@ -56,6 +65,35 @@ void gui_destroy(Gui *gui) {
     g_free(gui);
 }
 
+void gui_set_move_provider(Gui *gui, GuiMoveProvider provider, void *context) {
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->move_provider = provider;
+    gui->move_provider_context = context;
+    gui_attach_move_provider(gui);
+}
+
+void gui_set_hint_provider(Gui *gui, GuiHintProvider provider, void *context) {
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->hint_provider = provider;
+    gui->hint_provider_context = context;
+}
+
+void gui_attach_move_provider(Gui *gui) {
+    if (gui == NULL) {
+        return;
+    }
+
+    controllerSetMoveProvider(&gui->controller,
+        (ControllerMoveProvider)gui->move_provider,
+        gui->move_provider_context);
+}
+
 void gui_run(Gui *gui) {
     if (!gui_window_is_valid(gui)) {
         return;
@@ -75,11 +113,22 @@ void gui_run(Gui *gui) {
 }
 
 void gui_sync_from_controller(Gui *gui) {
+    const GameState *previousState;
     const GameState *state;
+    SystemState previousSystemState;
+    Color previousTurn;
+    int previousMoveCount;
+    int previousTimerEnabled;
 
     if (!gui_window_is_valid(gui)) {
         return;
     }
+
+    previousState = controllerGetState(&gui->controller);
+    previousSystemState = previousState != NULL ? previousState->systemState : EXIT_STATE;
+    previousTurn = previousState != NULL ? previousState->currentTurn : EMPTY_COLOR;
+    previousMoveCount = previousState != NULL ? previousState->moveHistory.count : 0;
+    previousTimerEnabled = previousState != NULL ? previousState->config.timerEnabled : 0;
 
     if (controllerSync(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -99,12 +148,24 @@ void gui_sync_from_controller(Gui *gui) {
     }
 
     if (state->systemState == GAMEPLAY_STATE) {
+        if (previousTimerEnabled
+            && previousSystemState == GAMEPLAY_STATE
+            && previousMoveCount == state->moveHistory.count
+            && previousTurn != EMPTY_COLOR
+            && previousTurn != state->currentTurn) {
+            gui_set_error(gui, ERR_TIME_UP);
+        }
         gui_update_board(gui, state);
         gui_update_movelist(gui, state);
         gui_update_clock(gui);
         gui_update_timers(gui, state);
         gui_update_turn_display(gui, state->currentTurn);
+        gui_update_gameplay_controls(gui, state);
+        gui_refresh_move_highlights(gui);
     }
+
+    gui->last_turn = state->currentTurn;
+    gui->last_move_count = state->moveHistory.count;
 }
 
 int gui_render_snapshot(Gui *gui, const GameState *state) {

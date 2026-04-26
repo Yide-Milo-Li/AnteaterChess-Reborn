@@ -1,6 +1,7 @@
 #include "core/hash.h"
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include "core/board.h"
 #include "core/movelist.h"

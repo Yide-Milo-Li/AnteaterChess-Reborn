@@ -1,5 +1,41 @@
 #include "gui_internal.h"
 
+#include "time/clock.h"
+
+static void gui_show_endgame_dialog(Gui *gui, const GameState *state) {
+    GtkWidget *dialog;
+    GtkWidget *content;
+    GtkWidget *result;
+    GtkWidget *clock;
+    char timeText[32];
+
+    if (!gui_window_is_valid(gui) || state == NULL || gui->endgame_dialog_shown) {
+        return;
+    }
+
+    dialog = gtk_dialog_new_with_buttons("Game Over",
+        GTK_WINDOW(gui->window),
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        "New Game",
+        GTK_RESPONSE_ACCEPT,
+        "Main Menu",
+        GTK_RESPONSE_APPLY,
+        "Exit",
+        GTK_RESPONSE_CLOSE,
+        NULL);
+
+    content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    result = gtk_label_new(gui_game_result_text(state->result));
+    gui_format_elapsed_text(timeText, getElapsedTimeSeconds());
+    clock = gtk_label_new(timeText);
+    gtk_box_pack_start(GTK_BOX(content), result, FALSE, FALSE, 8);
+    gtk_box_pack_start(GTK_BOX(content), clock, FALSE, FALSE, 8);
+
+    gui->endgame_dialog_shown = 1;
+    g_signal_connect(dialog, "response", G_CALLBACK(gui_on_endgame_dialog_response), gui);
+    gtk_widget_show_all(dialog);
+}
+
 void gui_build_main_menu(Gui *gui) {
     GtkWidget *title;
 
@@ -29,7 +65,9 @@ void gui_build_mode_menu(Gui *gui) {
         const char *label;
         GameMode mode;
     } modes[] = {
-        {"Human vs. Human", MODE_HUMAN_VS_HUMAN}
+        {"Human vs. Human", MODE_HUMAN_VS_HUMAN},
+        {"Human vs. Computer", MODE_HUMAN_VS_COMPUTER},
+        {"Computer vs. Computer", MODE_COMPUTER_VS_COMPUTER}
     };
 
     gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
@@ -54,9 +92,11 @@ void gui_build_mode_menu(Gui *gui) {
 void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     GtkWidget *title;
     GtkWidget *result;
+    GtkWidget *clock;
     GtkWidget *newGameButton;
     GtkWidget *mainMenuButton;
     GtkWidget *exitButton;
+    char timeText[32];
 
     gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
 
@@ -69,6 +109,11 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     result = gtk_label_new(gui_game_result_text(state->result));
     gtk_widget_set_halign(result, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(gui->main_box), result, FALSE, FALSE, 0);
+
+    gui_format_elapsed_text(timeText, getElapsedTimeSeconds());
+    clock = gtk_label_new(timeText);
+    gtk_widget_set_halign(clock, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), clock, FALSE, FALSE, 0);
 
     newGameButton = gui_create_centered_button("New Game");
     mainMenuButton = gui_create_centered_button("Main Menu");
@@ -99,10 +144,15 @@ void gui_build_screen_for_state(Gui *gui, const GameState *state) {
             gui_build_setup_menu(gui);
             break;
         case GAMEPLAY_STATE:
+            gui->endgame_dialog_shown = 0;
             gui_build_gameplay_ui(gui, state);
             break;
         case END_GAME_MENU_STATE:
-            gui_build_endgame_menu(gui, state);
+            if (gui->last_rendered_state == GAMEPLAY_STATE && GTK_IS_WIDGET(gui->main_box)) {
+                gui_show_endgame_dialog(gui, state);
+            } else {
+                gui_build_endgame_menu(gui, state);
+            }
             break;
         case EXIT_STATE:
             gui->should_quit = 1;

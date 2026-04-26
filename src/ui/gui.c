@@ -97,6 +97,7 @@ Gui *gui_create(int *argc, char ***argv) {
         ".clock-text { color: #475569; font-weight: bold; } "
         ".history-panel { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; } "
         ".history-view, textview, textview text { color: #0f172a; background-color: #ffffff; font-size: 12px; } "
+        ".ai-summary { color: #475569; font-size: 12px; } "
         ".status-normal, .status-busy, .status-error, .status-success { border-radius: 6px; padding: 6px; } "
         ".status-normal { color: #334155; background-color: transparent; border: 1px solid transparent; } "
         ".status-busy { color: #1e3a8a; background-color: #dbeafe; border: 1px solid #93c5fd; } "

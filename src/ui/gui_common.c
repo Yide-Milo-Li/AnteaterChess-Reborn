@@ -19,6 +19,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->turn_label = NULL;
     gui->time_display = NULL;
     gui->history_view = NULL;
+    gui->history_ai_summary_label = NULL;
     gui->black_timer_label = NULL;
     gui->white_timer_label = NULL;
     gui->status_label = NULL;

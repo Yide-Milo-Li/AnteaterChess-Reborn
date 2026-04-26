@@ -34,6 +34,7 @@ struct Gui {
     GtkWidget *turn_label;
     GtkWidget *time_display;
     GtkWidget *history_view;
+    GtkWidget *history_ai_summary_label;
     GtkWidget *black_timer_label;
     GtkWidget *white_timer_label;
     GtkWidget *status_label;

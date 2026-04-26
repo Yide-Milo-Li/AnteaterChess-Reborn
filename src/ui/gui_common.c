@@ -55,17 +55,38 @@ void gui_clear_view_refs(Gui *gui) {
     }
 }
 
-void gui_set_status_text(Gui *gui, const char *text) {
+void gui_set_status(Gui *gui, GuiStatusKind kind, const char *text) {
     GtkStyleContext *context;
+    const char *className;
 
     if (gui == NULL || !GTK_IS_WIDGET(gui->status_label) || !GTK_IS_LABEL(gui->status_label)) {
         return;
     }
 
+    switch (kind) {
+        case GUI_STATUS_BUSY:
+            className = "status-busy";
+            break;
+        case GUI_STATUS_ERROR:
+            className = "status-error";
+            break;
+        case GUI_STATUS_NORMAL:
+        default:
+            className = "status-normal";
+            break;
+    }
+
     context = gtk_widget_get_style_context(gui->status_label);
     gtk_style_context_remove_class(context, "status-error");
-    gtk_style_context_add_class(context, "status-normal");
+    gtk_style_context_remove_class(context, "status-busy");
+    gtk_style_context_remove_class(context, "status-normal");
+    gtk_style_context_remove_class(context, "status-success");
+    gtk_style_context_add_class(context, className);
     gtk_label_set_text(GTK_LABEL(gui->status_label), (text != NULL) ? text : "");
+}
+
+void gui_set_status_text(Gui *gui, const char *text) {
+    gui_set_status(gui, GUI_STATUS_NORMAL, text);
 }
 
 void gui_show_message_dialog(Gui *gui, GtkMessageType type,
@@ -144,13 +165,10 @@ void gui_set_error(Gui *gui, ErrorCode code) {
     }
 
     if (gui != NULL && GTK_IS_WIDGET(gui->status_label) && GTK_IS_LABEL(gui->status_label)) {
-        GtkStyleContext *context = gtk_widget_get_style_context(gui->status_label);
         char errorText[160];
 
-        gtk_style_context_remove_class(context, "status-normal");
-        gtk_style_context_add_class(context, "status-error");
         snprintf(errorText, sizeof(errorText), "Error: %s", message);
-        gtk_label_set_text(GTK_LABEL(gui->status_label), errorText);
+        gui_set_status(gui, GUI_STATUS_ERROR, errorText);
         return;
     }
 

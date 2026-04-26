@@ -12,6 +12,12 @@
 
 typedef struct GuiAsyncJob GuiAsyncJob;
 
+typedef enum {
+    GUI_STATUS_NORMAL,
+    GUI_STATUS_BUSY,
+    GUI_STATUS_ERROR
+} GuiStatusKind;
+
 struct Gui {
     GtkWidget *window;
     GtkWidget *main_box;
@@ -62,12 +68,15 @@ struct Gui {
     int has_rendered_state;
     int has_highlight_from;
     int endgame_dialog_shown;
+    int is_fullscreen;
+    int fullscreen_transition_pending;
     int should_quit;
 };
 
 void gui_clear_view_refs(Gui *gui);
 void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacing);
 GtkWidget *gui_create_centered_button(const char *label);
+void gui_set_status(Gui *gui, GuiStatusKind kind, const char *text);
 void gui_set_status_text(Gui *gui, const char *text);
 void gui_show_message_dialog(Gui *gui, GtkMessageType type,
                              GtkButtonsType buttons,

@@ -282,7 +282,7 @@ void gui_maybe_start_ai_job(Gui *gui, const GameState *state) {
     gui->ai_job = job;
     snprintf(statusText, sizeof(statusText), "%s AI thinking...",
         state->currentTurn == WHITE ? "White" : "Black");
-    gui_set_status_text(gui, statusText);
+    gui_set_status(gui, GUI_STATUS_BUSY, statusText);
     gui_update_gameplay_controls(gui, state);
     job->thread = g_thread_new("gui-ai-move", run_async_job, job);
 }
@@ -308,7 +308,7 @@ int gui_start_hint_job(Gui *gui) {
     }
 
     gui->hint_job = job;
-    gui_set_status_text(gui, "Hint thinking...");
+    gui_set_status(gui, GUI_STATUS_BUSY, "Hint thinking...");
     gui_update_gameplay_controls(gui, state);
     job->thread = g_thread_new("gui-hint", run_async_job, job);
     return 0;

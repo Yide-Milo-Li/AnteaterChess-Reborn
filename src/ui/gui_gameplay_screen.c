@@ -83,7 +83,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
     historyPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_style_context_add_class(gtk_widget_get_style_context(historyPanel), "panel");
-    gtk_box_pack_start(GTK_BOX(parent), historyPanel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(parent), historyPanel, TRUE, TRUE, 0);
 
     historyHeader = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(historyPanel), historyHeader, FALSE, FALSE, 0);
@@ -115,9 +115,9 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_style_context_add_class(gtk_widget_get_style_context(scrolledWindow), "history-panel");
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledWindow),
         GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_widget_set_size_request(scrolledWindow, -1, 430);
+    gtk_widget_set_size_request(scrolledWindow, -1, 260);
     gtk_container_add(GTK_CONTAINER(scrolledWindow), gui->history_view);
-    gtk_box_pack_start(GTK_BOX(historyPanel), scrolledWindow, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(historyPanel), scrolledWindow, TRUE, TRUE, 0);
 
     gui->status_label = gtk_label_new("");
     gtk_label_set_xalign(GTK_LABEL(gui->status_label), 0.0f);
@@ -179,7 +179,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_box_pack_start(GTK_BOX(buttonBox), undoButton, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(buttonBox), hintButton, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(parent), buttonBox, TRUE, FALSE, 20);
+    gtk_box_pack_end(GTK_BOX(parent), buttonBox, FALSE, FALSE, 0);
 }
 
 static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *state) {
@@ -196,6 +196,8 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     gtk_box_pack_start(GTK_BOX(parent), gui->black_timer_label, FALSE, FALSE, 0);
 
     boardBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_hexpand(boardBox, TRUE);
+    gtk_widget_set_vexpand(boardBox, TRUE);
     gtk_box_pack_start(GTK_BOX(parent), boardBox, TRUE, TRUE, 0);
 
     rankGrid = gtk_grid_new();
@@ -213,6 +215,8 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     boardGrid = gtk_grid_new();
     gtk_grid_set_row_homogeneous(GTK_GRID(boardGrid), TRUE);
     gtk_grid_set_column_homogeneous(GTK_GRID(boardGrid), TRUE);
+    gtk_widget_set_hexpand(boardGrid, TRUE);
+    gtk_widget_set_vexpand(boardGrid, TRUE);
     gtk_box_pack_start(GTK_BOX(boardBox), boardGrid, TRUE, TRUE, 0);
 
     for (row = 0; row < 8; ++row) {
@@ -234,6 +238,8 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
             gui->board_images[row][col] = image;
             gui->board_piece_labels[row][col] = pieceLabel;
             gui->board_cells[row][col] = eventBox;
+            gtk_widget_set_hexpand(eventBox, TRUE);
+            gtk_widget_set_vexpand(eventBox, TRUE);
             g_object_set_data(G_OBJECT(eventBox), "board-row", GINT_TO_POINTER(row));
             g_object_set_data(G_OBJECT(eventBox), "board-col", GINT_TO_POINTER(col));
             gtk_widget_add_events(eventBox, GDK_BUTTON_PRESS_MASK);
@@ -286,14 +292,19 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     gui->last_move_count = -1;
 
     middleBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_hexpand(middleBox, TRUE);
+    gtk_widget_set_vexpand(middleBox, TRUE);
     gtk_box_pack_start(GTK_BOX(gui->main_box), middleBox, TRUE, TRUE, 0);
 
     leftBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    gtk_widget_set_size_request(leftBox, 400, -1);
-    gtk_box_pack_start(GTK_BOX(middleBox), leftBox, FALSE, FALSE, 0);
+    gtk_widget_set_size_request(leftBox, 360, -1);
+    gtk_widget_set_vexpand(leftBox, TRUE);
+    gtk_box_pack_start(GTK_BOX(middleBox), leftBox, FALSE, TRUE, 0);
     build_gameplay_sidebar(gui, leftBox);
 
     rightBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_widget_set_hexpand(rightBox, TRUE);
+    gtk_widget_set_vexpand(rightBox, TRUE);
     gtk_box_pack_start(GTK_BOX(middleBox), rightBox, TRUE, TRUE, 0);
     build_gameplay_board(gui, rightBox, state);
 

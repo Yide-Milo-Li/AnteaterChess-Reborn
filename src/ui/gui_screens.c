@@ -2,6 +2,16 @@
 
 #include "time/clock.h"
 
+static GtkWidget *gui_create_menu_panel(void) {
+    GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 16);
+
+    gtk_widget_set_halign(panel, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(panel, GTK_ALIGN_CENTER);
+    gtk_widget_set_size_request(panel, 360, -1);
+    gtk_style_context_add_class(gtk_widget_get_style_context(panel), "menu-panel");
+    return panel;
+}
+
 static void gui_show_endgame_dialog(Gui *gui, const GameState *state) {
     GtkWidget *dialog;
     GtkWidget *content;
@@ -37,21 +47,24 @@ static void gui_show_endgame_dialog(Gui *gui, const GameState *state) {
 }
 
 void gui_build_main_menu(Gui *gui) {
+    GtkWidget *panel;
     GtkWidget *title;
 
-    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+    gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 0);
+    panel = gui_create_menu_panel();
+    gtk_box_pack_start(GTK_BOX(gui->main_box), panel, TRUE, FALSE, 0);
 
     title = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(title),
         "<span size='xx-large' weight='bold'>Anteater Chess</span>");
     gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), title, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), title, FALSE, FALSE, 0);
 
     gui->new_game_button = gui_create_centered_button("New Game");
     gui->quit_game_button = gui_create_centered_button("Quit Game");
     gtk_style_context_add_class(gtk_widget_get_style_context(gui->quit_game_button), "destructive-button");
-    gtk_box_pack_start(GTK_BOX(gui->main_box), gui->new_game_button, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), gui->quit_game_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), gui->new_game_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), gui->quit_game_button, FALSE, FALSE, 0);
 
     g_signal_connect(gui->new_game_button, "clicked", G_CALLBACK(gui_on_new_game_clicked), gui);
     g_signal_connect(gui->quit_game_button, "clicked", G_CALLBACK(gui_on_quit_game_clicked), gui);
@@ -59,6 +72,7 @@ void gui_build_main_menu(Gui *gui) {
 }
 
 void gui_build_mode_menu(Gui *gui) {
+    GtkWidget *panel;
     GtkWidget *label;
     GtkWidget *button;
     int index;
@@ -71,26 +85,31 @@ void gui_build_mode_menu(Gui *gui) {
         {"Computer vs. Computer", MODE_COMPUTER_VS_COMPUTER}
     };
 
-    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+    gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 0);
+    panel = gui_create_menu_panel();
+    gtk_widget_set_size_request(panel, 420, -1);
+    gtk_box_pack_start(GTK_BOX(gui->main_box), panel, TRUE, FALSE, 0);
 
     label = gtk_label_new("Game Mode Selection");
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), label, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), "panel-title");
+    gtk_box_pack_start(GTK_BOX(panel), label, FALSE, FALSE, 0);
 
     for (index = 0; index < (int)(sizeof(modes) / sizeof(modes[0])); ++index) {
         button = gui_create_centered_button(modes[index].label);
         g_object_set_data(G_OBJECT(button), "game-mode", GINT_TO_POINTER(modes[index].mode));
         g_signal_connect(button, "clicked", G_CALLBACK(gui_on_mode_selected), gui);
-        gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(panel), button, FALSE, FALSE, 0);
     }
 
     button = gui_create_centered_button("Back");
     g_signal_connect(button, "clicked", G_CALLBACK(gui_on_back_clicked), gui);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), button, FALSE, FALSE, 0);
     gtk_widget_show_all(gui->window);
 }
 
 void gui_build_endgame_menu(Gui *gui, const GameState *state) {
+    GtkWidget *panel;
     GtkWidget *title;
     GtkWidget *result;
     GtkWidget *clock;
@@ -99,31 +118,33 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     GtkWidget *exitButton;
     char timeText[32];
 
-    gui_rebuild_root_box(gui, GTK_ALIGN_CENTER, GTK_ALIGN_CENTER, 24);
+    gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 0);
+    panel = gui_create_menu_panel();
+    gtk_box_pack_start(GTK_BOX(gui->main_box), panel, TRUE, FALSE, 0);
 
     title = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(title),
         "<span size='x-large' weight='bold'>Game Over</span>");
     gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), title, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), title, FALSE, FALSE, 0);
 
     result = gtk_label_new(gui_game_result_text(state->result));
     gtk_widget_set_halign(result, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), result, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), result, FALSE, FALSE, 0);
 
     gui_format_elapsed_text(timeText, getElapsedTimeSeconds());
     clock = gtk_label_new(timeText);
     gtk_widget_set_halign(clock, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), clock, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), clock, FALSE, FALSE, 0);
 
     newGameButton = gui_create_centered_button("New Game");
     mainMenuButton = gui_create_centered_button("Main Menu");
     exitButton = gui_create_centered_button("Exit");
     gui_set_button_icon(exitButton, "alert-triangle-svgrepo-com.svg", 18);
     gtk_style_context_add_class(gtk_widget_get_style_context(exitButton), "destructive-button");
-    gtk_box_pack_start(GTK_BOX(gui->main_box), newGameButton, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), mainMenuButton, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(gui->main_box), exitButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), newGameButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), mainMenuButton, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(panel), exitButton, FALSE, FALSE, 0);
 
     g_signal_connect(newGameButton, "clicked", G_CALLBACK(gui_on_endgame_new_game_clicked), gui);
     g_signal_connect(mainMenuButton, "clicked", G_CALLBACK(gui_on_endgame_main_menu_clicked), gui);

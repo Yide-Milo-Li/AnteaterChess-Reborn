@@ -3,17 +3,14 @@
 
 #include "core/piece.h"
 
-typedef enum {
-    MODE_HUMAN_VS_HUMAN,
-    MODE_HUMAN_VS_COMPUTER,
-    MODE_COMPUTER_VS_COMPUTER
-} GameMode;
+typedef enum { MODE_HUMAN_VS_HUMAN, MODE_HUMAN_VS_COMPUTER, MODE_COMPUTER_VS_COMPUTER } GameMode;
 
 typedef enum {
     DIFFICULTY_NONE,
     DIFFICULTY_EASY,
     DIFFICULTY_MEDIUM,
-    DIFFICULTY_HARD
+    DIFFICULTY_HARD,
+    DIFFICULTY_EXPERIMENTAL
 } AIDifficulty;
 
 typedef struct {

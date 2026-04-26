@@ -19,16 +19,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "core/board.h"
-#include "core/gameconfig.h"
 #include "core/hash.h"
 #include "core/movelist.h"
 #include "core/piece.h"
 #include "gameplay/endgame.h"
 #include "gameplay/execution.h"
 #include "gameplay/movegen.h"
-#include "time/clock.h"
 
 // AI Constants
 #define AI_INF 100000000       // Infinity
@@ -53,7 +52,7 @@ typedef struct {
 } TTEntry;
 
 typedef struct {
-    int64_t searchStartMs;
+    clock_t searchStart;
     int timeLimitMs;
     int softTimeLimitMs;
     int stopSearch;
@@ -1381,20 +1380,10 @@ static int evaluate_relative(const GameState *state) {
 }
 
 static int elapsed_ms(const SearchContext *ctx) {
-    int64_t now;
+    clock_t now;
 
-    if (ctx == NULL || getMonotonicMilliseconds(&now) != 0) {
-        return INT_MAX;
-    }
-
-    if (now < ctx->searchStartMs) {
-        return 0;
-    }
-    if (now - ctx->searchStartMs > INT_MAX) {
-        return INT_MAX;
-    }
-
-    return (int)(now - ctx->searchStartMs);
+    now = clock();
+    return (int)(((now - ctx->searchStart) * 1000) / CLOCKS_PER_SEC);
 }
 
 static int time_is_up(SearchContext *ctx) {
@@ -1402,7 +1391,8 @@ static int time_is_up(SearchContext *ctx) {
         return 0;
     }
 
-    if ((ctx->nodes & 63) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
+    // equal to % 2048, every 2048 nodes, check time
+    if ((ctx->nodes & 2047) == 0 && elapsed_ms(ctx) >= ctx->timeLimitMs) {
         ctx->stopSearch = 1;
     }
 
@@ -1449,14 +1439,9 @@ static int init_search_context(SearchContext *ctx, int timeLimitMs) {
         return 1;
     }
 
-    if (getMonotonicMilliseconds(&ctx->searchStartMs) != 0) {
-        ctx->searchStartMs = 0;
-        ctx->stopSearch = 1;
-    }
     ctx->timeLimitMs = timeLimitMs;
-    ctx->softTimeLimitMs = (timeLimitMs > 0 && timeLimitMs <= INT_MAX / 4)
-        ? (timeLimitMs * 4) / 5
-        : timeLimitMs;
+    ctx->softTimeLimitMs = (timeLimitMs > 0) ? (timeLimitMs * 4) / 5 : 0;
+    ctx->searchStart = clock();
     ++g_ttGeneration;
     if (g_ttGeneration == 0) {
         ++g_ttGeneration;
@@ -2292,14 +2277,21 @@ static int depth_for_difficulty(AIDifficulty difficulty) {
 }
 
 static int time_budget_for_state(const GameState *state, AIDifficulty difficulty) {
-    int budget;
-
-    budget = getAITimeBudgetMs((state != NULL) ? &state->config : NULL, difficulty);
-    if (budget <= 0) {
-        return getDefaultAITimeBudgetMs(DIFFICULTY_MEDIUM);
+    if (state->config.aiTimeLimit > 0) {
+        return state->config.aiTimeLimit * 1000;
     }
 
-    return budget;
+    switch (difficulty) {
+    case DIFFICULTY_EASY:
+        return 350;
+    case DIFFICULTY_MEDIUM:
+        return 2200;
+    case DIFFICULTY_HARD:
+        return 7000;
+    case DIFFICULTY_NONE:
+    default:
+        return 2200;
+    }
 }
 
 static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs, Move *bestMove) {
@@ -2368,10 +2360,6 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
         int betaBase;
         int attempt;
 
-        if (time_is_up(&ctx)) {
-            break;
-        }
-
         iterationBest = currentBest;
         iterationBestScore = -AI_INF;
         aspiration = ASPIRATION_WINDOW;
@@ -2398,10 +2386,6 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
             for (index = 0; index < rootMoves->count; ++index) {
                 Move move = rootMoves->moves[index];
                 int score;
-
-                if (time_is_up(&ctx)) {
-                    break;
-                }
 
                 if (applyMove(&searchState, move) != 0) {
                     rootScores[index] = -AI_INF;

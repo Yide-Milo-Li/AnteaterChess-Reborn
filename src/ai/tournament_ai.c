@@ -130,6 +130,10 @@ static int ant_has_clear_promotion_lane(const Board *board, Position pos, Color 
     return 1;
 }
 
+static int is_edge_file(Position pos) {
+    return isValidPosition(pos) && (pos.col <= 1 || pos.col >= COLS - 2);
+}
+
 static int move_ant_promotion_distance(const Move *move) {
     if (move == NULL || move->movedPiece.type != ANT) {
         return 99;
@@ -323,6 +327,35 @@ static int king_zone_pressure(const Board *board, Color color) {
     return pressure;
 }
 
+static int enemy_major_count(const Board *board, Color color) {
+    Color enemy;
+    int count;
+    int row;
+    int col;
+
+    if (board == NULL) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    count = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Piece piece = getPiece(board, createPosition(row, col));
+
+            if (piece.color != enemy) {
+                continue;
+            }
+            if (piece.type == QUEEN) {
+                count += 2;
+            } else if (piece.type == ROOK) {
+                ++count;
+            }
+        }
+    }
+    return count;
+}
+
 static int board_phase(const Board *board) {
     int phase;
     int row;
@@ -355,6 +388,9 @@ static int king_safety_adjustment_for(const GameState *state, Color color, int p
     score = 0;
     if (phase >= 12 && homeDistance > 1) {
         score -= 18 * homeDistance;
+    }
+    if (homeDistance > 2) {
+        score -= enemy_major_count(&state->board, color) * 18 * (homeDistance - 2);
     }
 
     shieldRow = kingPos.row + ((color == WHITE) ? -1 : 1);
@@ -399,24 +435,24 @@ static int promotion_pressure_for(const GameState *state, Color color) {
 
             distance = ant_promotion_distance(pos, color);
             if (distance <= 1) {
-                advanceScore = 520;
+                advanceScore = 760;
             } else if (distance == 2) {
-                advanceScore = 320;
+                advanceScore = 530;
             } else if (distance == 3) {
-                advanceScore = 190;
+                advanceScore = 360;
             } else if (distance == 4) {
-                advanceScore = 105;
+                advanceScore = 230;
             } else if (distance == 5) {
-                advanceScore = 55;
+                advanceScore = 130;
             } else {
                 advanceScore = 10 * (ROWS - 1 - distance);
             }
 
             if (ant_has_clear_promotion_lane(&state->board, pos, color)) {
-                advanceScore += 300 - 38 * distance;
+                advanceScore += 560 - 70 * distance;
             }
-            if (col <= 1 || col >= COLS - 2) {
-                advanceScore -= 6;
+            if (is_edge_file(pos)) {
+                advanceScore += 35;
             }
             score += advanceScore;
         }

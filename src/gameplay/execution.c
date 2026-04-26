@@ -73,6 +73,8 @@ int applyMove(GameState *state, Move move) {
         pieceToPlace = createPiece(BISHOP, move.movedPiece.color);
     } else if (move.specialType == PROMOTION_KNIGHT) {
         pieceToPlace = createPiece(KNIGHT, move.movedPiece.color);
+    } else if (move.specialType == PROMOTION_ANTEATER) {
+        pieceToPlace = createPiece(ANTEATER, move.movedPiece.color);
     }
 
     /* Handle Castling */

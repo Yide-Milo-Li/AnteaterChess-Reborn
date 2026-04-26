@@ -89,7 +89,8 @@ CLI_SRCS := \
 	src/cli/cli_app.c
 
 AI_SRCS := \
-	src/ai/ai.c
+	src/ai/ai.c \
+	src/ai/book.c
 
 GUI_SRCS := \
 	src/ui/gui.c \

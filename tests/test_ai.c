@@ -81,10 +81,7 @@ static GameState create_ai_ready_state(void) {
 }
 
 static int is_promotion_move(SpecialMove type) {
-    return type == PROMOTION_QUEEN
-        || type == PROMOTION_ROOK
-        || type == PROMOTION_BISHOP
-        || type == PROMOTION_KNIGHT;
+    return isPromotionSpecialMove(type);
 }
 
 static void assert_move_is_playable_and_safe(const GameState *state,

@@ -13,7 +13,8 @@ typedef enum {
     DIFFICULTY_NONE,
     DIFFICULTY_EASY,
     DIFFICULTY_MEDIUM,
-    DIFFICULTY_HARD
+    DIFFICULTY_HARD,
+    DIFFICULTY_EXPERIMENTAL
 } AIDifficulty;
 
 typedef struct {

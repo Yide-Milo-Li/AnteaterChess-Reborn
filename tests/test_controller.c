@@ -7,6 +7,7 @@
 #include "core/piece.h"
 #include "gameplay/validation.h"
 #include "system/controller.h"
+#include "system/controller_driver.h"
 #include "system/event.h"
 #include "system/system_state.h"
 #include "input/move_request.h"
@@ -120,6 +121,15 @@ static void test_controller_run_until_idle_bootstraps_init_state(void) {
     Controller controller = fresh_controller();
 
     assert(controllerRunUntilIdle(&controller) == 0);
+    assert(controller.state.systemState == MAIN_MENU_STATE);
+}
+
+/* Check that the frontend sync facade drains controller-owned lifecycle work
+ * without exposing driver APIs to GUI code. */
+static void test_controller_sync_bootstraps_init_state(void) {
+    Controller controller = fresh_controller();
+
+    assert(controllerSync(&controller) == 0);
     assert(controller.state.systemState == MAIN_MENU_STATE);
 }
 
@@ -468,6 +478,7 @@ int main(void) {
     test_controller_tick_processes_one_queued_event();
     test_controller_tick_returns_none_when_idle();
     test_controller_run_until_idle_bootstraps_init_state();
+    test_controller_sync_bootstraps_init_state();
     test_controller_run_until_idle_completes_termination_handshake();
     test_controller_start_configured_game_enters_gameplay();
     test_controller_run_until_idle_auto_plays_ai_turn();

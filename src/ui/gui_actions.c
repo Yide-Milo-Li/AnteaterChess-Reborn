@@ -1,7 +1,6 @@
 #include "gui_internal.h"
 
-#include "input/command_parser.h"
-#include "input/move_request.h"
+#include "input/move_request_parser.h"
 
 static int gui_select_promotion_choice(Gui *gui, PromotionChoice *choice) {
     GtkWidget *dialog;
@@ -147,7 +146,6 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
     const char *fromText;
     const char *toText;
-    Command command;
     MoveRequest request;
     ErrorCode errorCode;
     int needsPromotion;
@@ -160,12 +158,8 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
 
     fromText = gtk_entry_get_text(GTK_ENTRY(gui->from_entry));
     toText = gtk_entry_get_text(GTK_ENTRY(gui->to_entry));
-    if (parseMoveCommand(fromText, toText, &command) != 0) {
-        gui_set_error(gui, ERR_INVALID_MOVE_FORMAT);
-        return;
-    }
-
-    if (createMoveRequestFromCommand(&request, command) != 0) {
+    if (parseMoveRequestFields(fromText, toText,
+        PROMOTION_CHOICE_QUEEN, &request) != 0) {
         gui_set_error(gui, ERR_INVALID_MOVE_FORMAT);
         return;
     }

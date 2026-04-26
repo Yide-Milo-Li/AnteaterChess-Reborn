@@ -10,8 +10,8 @@
  * Interface alignment notes for Phase F:
  * - Treat input.h as the only public contract for this file.
  * - This file is the CLI/test adapter layer, not the canonical GUI move path.
- * - GUI move fields should call parseMoveCommand(fromText, toText, &cmd)
- *   directly instead of routing through whole-line token splitting here.
+ * - GUI move fields should use move_request_parser.h instead of routing
+ *   through whole-line token splitting or legacy Command values here.
  * - This layer reads raw user input and emits Command-or-primitive input data;
  *   it must not construct gameplay Move objects or wrap events directly.
  * - Any fuzzy compatibility for move fields belongs in parsePosition(), not in

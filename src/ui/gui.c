@@ -81,7 +81,7 @@ void gui_sync_from_controller(Gui *gui) {
         return;
     }
 
-    if (controllerRunUntilIdle(&gui->controller) != 0) {
+    if (controllerSync(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
         return;
     }
@@ -126,14 +126,6 @@ const GameState *gui_get_state(const Gui *gui) {
     }
 
     return controllerGetState(&gui->controller);
-}
-
-Controller *gui_get_controller(Gui *gui) {
-    if (gui == NULL) {
-        return NULL;
-    }
-
-    return &gui->controller;
 }
 
 int gui_process_events(void) {

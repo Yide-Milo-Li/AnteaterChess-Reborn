@@ -9,6 +9,7 @@
 #include "core/piece.h"
 #include "input/command.h"
 #include "system/controller.h"
+#include "system/controller_driver.h"
 #include "system/event.h"
 #include "system/system_state.h"
 

@@ -16,6 +16,7 @@
 #include "core/position.h"
 #include "gameplay/validation.h"
 #include "system/controller.h"
+#include "system/controller_driver.h"
 #include "system/event.h"
 #include "turn/turn_timer.h"
 

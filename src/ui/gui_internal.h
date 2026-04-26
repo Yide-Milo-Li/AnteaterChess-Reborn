@@ -84,7 +84,6 @@ void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
 void gui_sync_from_controller(Gui *gui);
 int gui_render_snapshot(Gui *gui, const GameState *state);
 const GameState *gui_get_state(const Gui *gui);
-Controller *gui_get_controller(Gui *gui);
 int gui_process_events(void);
 int gui_window_is_valid(const Gui *gui);
 

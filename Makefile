@@ -59,6 +59,7 @@ INPUT_SRCS := \
 	src/input/command.c \
 	src/input/command_parser.c \
 	src/input/move_request.c \
+	src/input/move_request_parser.c \
 	src/input/input.c
 
 SYSTEM_SRCS := \
@@ -113,7 +114,8 @@ CORE_TEST_NAMES := \
 	test_command \
 	test_input \
 	test_timer \
-	test_error
+	test_error \
+	test_move_request_parser
 
 SYSTEM_TEST_NAMES := \
 	test_event \

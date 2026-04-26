@@ -6,6 +6,7 @@
 #include "gameplay/move_resolver.h"
 #include "gameplay/validation.h"
 #include "input/move_request.h"
+#include "system/controller_driver.h"
 #include "system/fsm.h"
 #include "turn/turn_timer.h"
 
@@ -393,6 +394,12 @@ int controllerRunUntilIdle(Controller *controller) {
     }
 
     return 0;
+}
+
+/* Frontend-facing sync hook for GUI/timer refreshes. Driver callers that need
+ * individual processed events should include controller_driver.h directly. */
+int controllerSync(Controller *controller) {
+    return controllerRunUntilIdle(controller);
 }
 
 /* Process one explicit system event and verify that the FSM reached the

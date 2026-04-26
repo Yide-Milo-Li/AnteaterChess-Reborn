@@ -49,6 +49,8 @@ void gui_build_main_menu(Gui *gui) {
 
     gui->new_game_button = gui_create_centered_button("New Game");
     gui->quit_game_button = gui_create_centered_button("Quit Game");
+    gui_set_button_icon(gui->quit_game_button, "alert-triangle-svgrepo-com.svg", 18);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->quit_game_button), "destructive-button");
     gtk_box_pack_start(GTK_BOX(gui->main_box), gui->new_game_button, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(gui->main_box), gui->quit_game_button, FALSE, FALSE, 0);
 
@@ -118,6 +120,8 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     newGameButton = gui_create_centered_button("New Game");
     mainMenuButton = gui_create_centered_button("Main Menu");
     exitButton = gui_create_centered_button("Exit");
+    gui_set_button_icon(exitButton, "alert-triangle-svgrepo-com.svg", 18);
+    gtk_style_context_add_class(gtk_widget_get_style_context(exitButton), "destructive-button");
     gtk_box_pack_start(GTK_BOX(gui->main_box), newGameButton, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(gui->main_box), mainMenuButton, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(gui->main_box), exitButton, FALSE, FALSE, 0);

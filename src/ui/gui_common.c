@@ -1,5 +1,7 @@
 #include "gui_internal.h"
 
+#include <stdio.h>
+
 #include "error/error.h"
 
 void gui_clear_view_refs(Gui *gui) {
@@ -54,10 +56,15 @@ void gui_clear_view_refs(Gui *gui) {
 }
 
 void gui_set_status_text(Gui *gui, const char *text) {
+    GtkStyleContext *context;
+
     if (gui == NULL || !GTK_IS_WIDGET(gui->status_label) || !GTK_IS_LABEL(gui->status_label)) {
         return;
     }
 
+    context = gtk_widget_get_style_context(gui->status_label);
+    gtk_style_context_remove_class(context, "status-error");
+    gtk_style_context_add_class(context, "status-normal");
     gtk_label_set_text(GTK_LABEL(gui->status_label), (text != NULL) ? text : "");
 }
 
@@ -105,7 +112,7 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
 
     dialog = gtk_message_dialog_new(parent,
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-        GTK_MESSAGE_QUESTION,
+        GTK_MESSAGE_WARNING,
         GTK_BUTTONS_YES_NO,
         "%s",
         message);
@@ -113,6 +120,7 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
         gtk_window_set_title(GTK_WINDOW(dialog), title);
     }
 
+    gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     return response == GTK_RESPONSE_YES;
@@ -136,7 +144,13 @@ void gui_set_error(Gui *gui, ErrorCode code) {
     }
 
     if (gui != NULL && GTK_IS_WIDGET(gui->status_label) && GTK_IS_LABEL(gui->status_label)) {
-        gui_set_status_text(gui, message);
+        GtkStyleContext *context = gtk_widget_get_style_context(gui->status_label);
+        char errorText[160];
+
+        gtk_style_context_remove_class(context, "status-normal");
+        gtk_style_context_add_class(context, "status-error");
+        snprintf(errorText, sizeof(errorText), "Error: %s", message);
+        gtk_label_set_text(GTK_LABEL(gui->status_label), errorText);
         return;
     }
 

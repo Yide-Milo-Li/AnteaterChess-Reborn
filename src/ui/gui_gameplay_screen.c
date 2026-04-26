@@ -6,6 +6,7 @@
 #include "turn/turn_timer.h"
 
 #define GUI_PIECE_IMAGE_SIZE 56
+#define GUI_UI_ICON_SIZE 18
 
 static const char *gui_special_move_text(SpecialMove type) {
     switch (type) {
@@ -32,7 +33,9 @@ static const char *gui_special_move_text(SpecialMove type) {
 }
 
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
-    GtkWidget *timeBox;
+    GtkWidget *historyPanel;
+    GtkWidget *historyHeader;
+    GtkWidget *historyIcon;
     GtkWidget *historyLabel;
     GtkWidget *scrolledWindow;
     GtkWidget *enterBox;
@@ -43,28 +46,42 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *hintButton;
     GtkWidget *buttonBox;
 
-    timeBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-    gtk_box_pack_start(GTK_BOX(parent), timeBox, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(timeBox), gtk_label_new("Time Elapsed:"), FALSE, FALSE, 0);
-    gui->time_display = gtk_label_new("00:00:00");
-    gtk_box_pack_start(GTK_BOX(timeBox), gui->time_display, FALSE, FALSE, 0);
+    historyPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_style_context_add_class(gtk_widget_get_style_context(historyPanel), "panel");
+    gtk_box_pack_start(GTK_BOX(parent), historyPanel, FALSE, FALSE, 0);
 
+    historyHeader = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_box_pack_start(GTK_BOX(historyPanel), historyHeader, FALSE, FALSE, 0);
+    historyIcon = gui_create_ui_icon("history-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    if (historyIcon != NULL) {
+        gtk_box_pack_start(GTK_BOX(historyHeader), historyIcon, FALSE, FALSE, 0);
+    }
     historyLabel = gtk_label_new("Move History");
+    gtk_style_context_add_class(gtk_widget_get_style_context(historyLabel), "panel-title");
     gtk_widget_set_halign(historyLabel, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(parent), historyLabel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(historyHeader), historyLabel, FALSE, FALSE, 0);
+    gui->time_display = gtk_label_new("00:00:00");
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->time_display), "clock-text");
+    gtk_widget_set_hexpand(gui->time_display, TRUE);
+    gtk_widget_set_halign(gui->time_display, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(historyHeader), gui->time_display, TRUE, TRUE, 0);
 
     gui->history_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(gui->history_view), FALSE);
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(gui->history_view), FALSE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->history_view), "history-view");
     scrolledWindow = gtk_scrolled_window_new(NULL, NULL);
+    gtk_style_context_add_class(gtk_widget_get_style_context(scrolledWindow), "history-panel");
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledWindow),
         GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_widget_set_size_request(scrolledWindow, -1, 450);
+    gtk_widget_set_size_request(scrolledWindow, -1, 430);
     gtk_container_add(GTK_CONTAINER(scrolledWindow), gui->history_view);
-    gtk_box_pack_start(GTK_BOX(parent), scrolledWindow, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(historyPanel), scrolledWindow, FALSE, FALSE, 0);
 
     gui->status_label = gtk_label_new("");
     gtk_label_set_xalign(GTK_LABEL(gui->status_label), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(gui->status_label), TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->status_label), "status-normal");
     gtk_box_pack_start(GTK_BOX(parent), gui->status_label, FALSE, FALSE, 0);
 
     enterBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
@@ -84,7 +101,8 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(moveBox), gui->from_entry, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(moveBox), gui->to_entry, TRUE, TRUE, 0);
 
-    formatButton = gtk_button_new_with_label("?");
+    formatButton = gtk_button_new_with_label("Format");
+    gui_set_button_icon(formatButton, "info-icon-svgrepo-com.svg", GUI_UI_ICON_SIZE);
     gtk_widget_set_tooltip_text(formatButton,
         "Enter moves by square, for example E2 to E4. Promotion is selected after submit.");
     gtk_box_pack_start(GTK_BOX(moveBox), formatButton, FALSE, FALSE, 0);
@@ -96,20 +114,15 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
     undoButton = gtk_button_new_with_label("Undo");
     gui->undo_button = undoButton;
-    gtk_button_set_image(GTK_BUTTON(undoButton),
-        gtk_image_new_from_icon_name("gtk-undo", GTK_ICON_SIZE_BUTTON));
-    gtk_button_set_image_position(GTK_BUTTON(undoButton), GTK_POS_LEFT);
-    gtk_button_set_always_show_image(GTK_BUTTON(undoButton), TRUE);
     gtk_widget_set_size_request(undoButton, 92, 44);
     gtk_widget_set_tooltip_text(undoButton, "Undo the previous move.");
     g_signal_connect(undoButton, "clicked", G_CALLBACK(gui_on_undo_clicked), gui);
 
     hintButton = gtk_button_new_with_label("Hint");
     gui->hint_button = hintButton;
-    gtk_button_set_image(GTK_BUTTON(hintButton),
-        gtk_image_new_from_icon_name("gtk-info", GTK_ICON_SIZE_BUTTON));
-    gtk_button_set_image_position(GTK_BUTTON(hintButton), GTK_POS_LEFT);
-    gtk_button_set_always_show_image(GTK_BUTTON(hintButton), TRUE);
+    gui_set_button_icon(hintButton, "bulb-on-svgrepo-com (1).svg", GUI_UI_ICON_SIZE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-button");
+    gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-glow");
     gtk_widget_set_size_request(hintButton, 92, 44);
     gtk_widget_set_tooltip_text(hintButton, "Show a suggested move.");
     g_signal_connect(hintButton, "clicked", G_CALLBACK(gui_on_hint_clicked), gui);
@@ -218,6 +231,7 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
 
     turnLabel = gtk_label_new("");
     gtk_widget_set_halign(turnLabel, GTK_ALIGN_CENTER);
+    gtk_style_context_add_class(gtk_widget_get_style_context(turnLabel), "turn-banner");
     gtk_box_pack_start(GTK_BOX(gui->main_box), turnLabel, FALSE, FALSE, 0);
     gui->turn_label = turnLabel;
 
@@ -234,6 +248,8 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     build_gameplay_board(gui, rightBox, state);
 
     leaveButton = gtk_button_new_with_label("Leave Game");
+    gui_set_button_icon(leaveButton, "alert-triangle-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
     gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
     gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
     g_signal_connect(leaveButton, "clicked", G_CALLBACK(gui_on_leave_game_clicked), gui);
@@ -303,6 +319,7 @@ void gui_update_board(Gui *gui, const GameState *state) {
 void gui_update_movelist(Gui *gui, const GameState *state) {
     GString *text;
     GtkTextBuffer *buffer;
+    GtkTextIter endIter;
     int index;
 
     if (gui == NULL || state == NULL
@@ -342,6 +359,31 @@ void gui_update_movelist(Gui *gui, const GameState *state) {
     }
 
     gtk_text_buffer_set_text(buffer, text->str, -1);
+    if (state->moveHistory.count > 0) {
+        GtkTextTagTable *tagTable;
+        GtkTextTag *latestTag;
+        GtkTextIter lineStart;
+        GtkTextIter lineEnd;
+
+        tagTable = gtk_text_buffer_get_tag_table(buffer);
+        latestTag = gtk_text_tag_table_lookup(tagTable, "latest-move");
+        if (latestTag == NULL) {
+            latestTag = gtk_text_buffer_create_tag(buffer,
+                "latest-move",
+                "background", "#e0f2fe",
+                "foreground", "#0f172a",
+                NULL);
+        }
+
+        gtk_text_buffer_get_iter_at_line(buffer, &lineStart, state->moveHistory.count - 1);
+        lineEnd = lineStart;
+        gtk_text_iter_forward_to_line_end(&lineEnd);
+        gtk_text_buffer_apply_tag(buffer, latestTag, &lineStart, &lineEnd);
+    }
+    gtk_text_buffer_get_end_iter(buffer, &endIter);
+    gtk_text_buffer_place_cursor(buffer, &endIter);
+    gtk_text_view_scroll_mark_onscreen(GTK_TEXT_VIEW(gui->history_view),
+        gtk_text_buffer_get_insert(buffer));
     g_string_free(text, TRUE);
 }
 

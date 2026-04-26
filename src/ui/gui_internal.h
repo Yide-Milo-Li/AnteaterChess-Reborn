@@ -92,6 +92,9 @@ void gui_format_position_text(Position pos, char buffer[8]);
 void gui_format_hint_text(Move move, char buffer[64]);
 const char *gui_get_piece_asset_path(Piece piece);
 GdkPixbuf *gui_get_piece_pixbuf(Piece piece, int size);
+GdkPixbuf *gui_get_ui_icon_pixbuf(const char *filename, int size);
+GtkWidget *gui_create_ui_icon(const char *filename, int size);
+void gui_set_button_icon(GtkWidget *button, const char *filename, int size);
 void gui_format_piece_fallback_text(Piece piece, char buffer[4]);
 
 void gui_build_main_menu(Gui *gui);

@@ -199,7 +199,7 @@ const char *gui_get_piece_asset_path(Piece piece) {
     return paths[colorIndex][typeIndex];
 }
 
-static GdkPixbuf *gui_load_piece_pixbuf(const char *assetPath, int size) {
+static GdkPixbuf *gui_load_asset_pixbuf(const char *assetPath, int size) {
     static const char *prefixes[] = {"", "../", "../../"};
     GdkPixbuf *pixbuf;
     GError *error;
@@ -257,10 +257,52 @@ GdkPixbuf *gui_get_piece_pixbuf(Piece piece, int size) {
 
     if (cache[colorIndex][typeIndex] == NULL) {
         assetPath = gui_get_piece_asset_path(piece);
-        cache[colorIndex][typeIndex] = gui_load_piece_pixbuf(assetPath, size);
+        cache[colorIndex][typeIndex] = gui_load_asset_pixbuf(assetPath, size);
     }
 
     return cache[colorIndex][typeIndex];
+}
+
+GdkPixbuf *gui_get_ui_icon_pixbuf(const char *filename, int size) {
+    char assetPath[128];
+
+    if (filename == NULL || size <= 0) {
+        return NULL;
+    }
+
+    snprintf(assetPath, sizeof(assetPath), "assets/%s", filename);
+    return gui_load_asset_pixbuf(assetPath, size);
+}
+
+GtkWidget *gui_create_ui_icon(const char *filename, int size) {
+    GdkPixbuf *pixbuf;
+    GtkWidget *image;
+
+    pixbuf = gui_get_ui_icon_pixbuf(filename, size);
+    if (pixbuf == NULL) {
+        return NULL;
+    }
+
+    image = gtk_image_new_from_pixbuf(pixbuf);
+    g_object_unref(pixbuf);
+    return image;
+}
+
+void gui_set_button_icon(GtkWidget *button, const char *filename, int size) {
+    GtkWidget *image;
+
+    if (!GTK_IS_BUTTON(button)) {
+        return;
+    }
+
+    image = gui_create_ui_icon(filename, size);
+    if (image == NULL) {
+        return;
+    }
+
+    gtk_button_set_image(GTK_BUTTON(button), image);
+    gtk_button_set_image_position(GTK_BUTTON(button), GTK_POS_LEFT);
+    gtk_button_set_always_show_image(GTK_BUTTON(button), TRUE);
 }
 
 void gui_format_piece_fallback_text(Piece piece, char buffer[4]) {

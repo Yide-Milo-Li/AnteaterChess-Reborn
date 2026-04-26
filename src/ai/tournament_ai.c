@@ -9,7 +9,8 @@
 #include <stddef.h>
 
 #define TOURNAMENT_MIN_MOVE_BUDGET_MS 300
-#define TOURNAMENT_URGENT_PROMOTION_DISTANCE 2
+#define TOURNAMENT_URGENT_PROMOTION_DISTANCE 3
+#define TOURNAMENT_PASSED_PROMOTION_DISTANCE 5
 
 static int clamp_int_local(int value, int minValue, int maxValue) {
     if (value < minValue) {
@@ -98,11 +99,54 @@ static int ant_promotion_distance(Position pos, Color color) {
     return (color == WHITE) ? pos.row : (ROWS - 1 - pos.row);
 }
 
+static Position ant_forward_position(Position pos, Color color) {
+    int rowStep;
+
+    rowStep = (color == WHITE) ? -1 : 1;
+    return createPosition(pos.row + rowStep, pos.col);
+}
+
+static int ant_has_clear_promotion_lane(const Board *board, Position pos, Color color) {
+    Position cursor;
+    int distance;
+    int step;
+
+    if (board == NULL || !isValidPosition(pos)) {
+        return 0;
+    }
+
+    distance = ant_promotion_distance(pos, color);
+    if (distance <= 0 || distance > TOURNAMENT_PASSED_PROMOTION_DISTANCE) {
+        return 0;
+    }
+
+    cursor = pos;
+    for (step = 0; step < distance; ++step) {
+        cursor = ant_forward_position(cursor, color);
+        if (!isValidPosition(cursor) || getPiece(board, cursor).type != EMPTY_PIECE) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int move_ant_promotion_distance(const Move *move) {
     if (move == NULL || move->movedPiece.type != ANT) {
         return 99;
     }
     return ant_promotion_distance(move->to, move->movedPiece.color);
+}
+
+static int move_creates_passed_promotion_threat(const GameState *stateAfterMove,
+                                                const Move *move) {
+    if (stateAfterMove == NULL || move == NULL || move->movedPiece.type != ANT) {
+        return 0;
+    }
+    return ant_promotion_distance(move->to, move->movedPiece.color)
+        <= TOURNAMENT_PASSED_PROMOTION_DISTANCE
+        && ant_has_clear_promotion_lane(&stateAfterMove->board,
+            move->to,
+            move->movedPiece.color);
 }
 
 static Position find_king_position(const Board *board, Color color) {
@@ -355,17 +399,24 @@ static int promotion_pressure_for(const GameState *state, Color color) {
 
             distance = ant_promotion_distance(pos, color);
             if (distance <= 1) {
-                advanceScore = 360;
+                advanceScore = 520;
             } else if (distance == 2) {
-                advanceScore = 165;
+                advanceScore = 320;
             } else if (distance == 3) {
-                advanceScore = 70;
+                advanceScore = 190;
+            } else if (distance == 4) {
+                advanceScore = 105;
+            } else if (distance == 5) {
+                advanceScore = 55;
             } else {
-                advanceScore = 12 * (ROWS - 1 - distance);
+                advanceScore = 10 * (ROWS - 1 - distance);
             }
 
+            if (ant_has_clear_promotion_lane(&state->board, pos, color)) {
+                advanceScore += 300 - 38 * distance;
+            }
             if (col <= 1 || col >= COLS - 2) {
-                advanceScore -= 10;
+                advanceScore -= 6;
             }
             score += advanceScore;
         }
@@ -446,7 +497,8 @@ static int side_has_urgent_promotion_threat(const GameState *state, Color color)
 
             if (piece.type == ANT
                 && piece.color == enemy
-                && ant_promotion_distance(pos, enemy) <= TOURNAMENT_URGENT_PROMOTION_DISTANCE) {
+                && (ant_promotion_distance(pos, enemy) <= TOURNAMENT_URGENT_PROMOTION_DISTANCE
+                    || ant_has_clear_promotion_lane(&state->board, pos, enemy))) {
                 return 1;
             }
         }
@@ -535,6 +587,7 @@ static int tournament_extend_move(const GameState *stateAfterMove,
     }
     if (is_local_promotion(move)
         || move_ant_promotion_distance(move) <= TOURNAMENT_URGENT_PROMOTION_DISTANCE
+        || move_creates_passed_promotion_threat(stateAfterMove, move)
         || (move->specialType == ANTEATER_CAPTURE && move->captureCount >= 2)) {
         return 1;
     }

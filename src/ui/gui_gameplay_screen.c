@@ -397,6 +397,7 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     GtkWidget *middleBox;
     GtkWidget *leftBox;
     GtkWidget *rightBox;
+    GtkWidget *fullscreenButton;
     GtkWidget *leaveButton;
 
     gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 12);
@@ -418,6 +419,18 @@ void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
     gtk_box_pack_start(GTK_BOX(topBar), turnLabel, TRUE, TRUE, 0);
     gui->turn_label = turnLabel;
     gui->last_move_count = -1;
+
+    fullscreenButton = gtk_button_new_with_label("Fullscreen");
+    gui->fullscreen_button = fullscreenButton;
+    gtk_style_context_add_class(gtk_widget_get_style_context(fullscreenButton),
+        "fullscreen-button");
+    gtk_widget_set_size_request(fullscreenButton, 122, 40);
+    gtk_widget_set_halign(fullscreenButton, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(topBar), fullscreenButton, FALSE, FALSE, 0);
+    g_signal_connect(fullscreenButton, "clicked",
+        G_CALLBACK(gui_on_fullscreen_clicked),
+        gui);
+    gui_update_fullscreen_button(gui);
 
     leaveButton = gtk_button_new_with_label("Leave Game");
     gui->leave_game_button = leaveButton;
@@ -552,8 +565,8 @@ static GtkTextTag *gui_get_latest_move_tag(GtkTextBuffer *buffer) {
     if (latestTag == NULL) {
         latestTag = gtk_text_buffer_create_tag(buffer,
             "latest-move",
-            "background", "#e8f1fb",
-            "foreground", "#0f172a",
+            "background", "#4f3718",
+            "foreground", "#fff7e6",
             NULL);
     }
     return latestTag;

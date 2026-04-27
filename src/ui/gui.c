@@ -14,26 +14,12 @@ static gboolean gui_on_window_key_press(GtkWidget *widget, GdkEventKey *event, g
     }
 
     if (event->keyval == GDK_KEY_F11) {
-        if (gui->fullscreen_transition_pending) {
-            return TRUE;
-        }
-
-        gui->fullscreen_transition_pending = 1;
-        if (gui->is_fullscreen) {
-            gtk_window_unfullscreen(GTK_WINDOW(gui->window));
-        } else {
-            gtk_window_fullscreen(GTK_WINDOW(gui->window));
-        }
+        gui_toggle_fullscreen(gui);
         return TRUE;
     }
 
     if (event->keyval == GDK_KEY_Escape && gui->is_fullscreen) {
-        if (gui->fullscreen_transition_pending) {
-            return TRUE;
-        }
-
-        gui->fullscreen_transition_pending = 1;
-        gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+        gui_toggle_fullscreen(gui);
         return TRUE;
     }
 
@@ -54,8 +40,41 @@ static gboolean gui_on_window_state_event(GtkWidget *widget,
         gui->is_fullscreen =
             (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) ? 1 : 0;
         gui->fullscreen_transition_pending = 0;
+        gui_update_fullscreen_button(gui);
     }
     return FALSE;
+}
+
+void gui_toggle_fullscreen(Gui *gui) {
+    if (gui == NULL || !GTK_IS_WINDOW(gui->window)) {
+        return;
+    }
+    if (gui->fullscreen_transition_pending) {
+        return;
+    }
+
+    gui->fullscreen_transition_pending = 1;
+    if (gui->is_fullscreen) {
+        gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+    } else {
+        gtk_window_fullscreen(GTK_WINDOW(gui->window));
+    }
+}
+
+void gui_update_fullscreen_button(Gui *gui) {
+    const char *label;
+    const char *tooltip;
+
+    if (gui == NULL || !GTK_IS_BUTTON(gui->fullscreen_button)) {
+        return;
+    }
+
+    label = gui->is_fullscreen ? "Windowed" : "Fullscreen";
+    tooltip = gui->is_fullscreen
+        ? "Exit fullscreen mode."
+        : "Enter fullscreen mode.";
+    gtk_button_set_label(GTK_BUTTON(gui->fullscreen_button), label);
+    gtk_widget_set_tooltip_text(gui->fullscreen_button, tooltip);
 }
 
 static void gui_update_endgame_turn_display(Gui *gui, const GameState *state) {

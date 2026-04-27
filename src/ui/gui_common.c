@@ -28,6 +28,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->submit_button = NULL;
     gui->undo_button = NULL;
     gui->hint_button = NULL;
+    gui->fullscreen_button = NULL;
     gui->leave_game_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;

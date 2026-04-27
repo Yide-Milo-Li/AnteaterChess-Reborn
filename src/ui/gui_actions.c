@@ -472,6 +472,13 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
     gui_set_status_text(gui, hintText);
 }
 
+void gui_on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)button;
+    gui_toggle_fullscreen(gui);
+}
+
 void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 

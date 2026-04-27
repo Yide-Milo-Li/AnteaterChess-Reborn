@@ -38,7 +38,7 @@ void controllerSetMoveProvider(Controller *controller,
                                ControllerMoveProvider provider,
                                void *context);
 
-/* Preferred frontend APIs. These methods accept UI/CLI intent, drive the
+/* Preferred frontend APIs. These methods accept frontend intent, drive the
  * controller to the next stable state, and avoid direct FSM coupling. */
 int controllerSync(Controller *controller);
 int controllerStartConfiguredGameDetailed(Controller *controller,

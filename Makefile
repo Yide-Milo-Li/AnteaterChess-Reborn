@@ -24,7 +24,6 @@ BIN_DIR := bin
 LOG_DIR := $(BIN_DIR)/logs
 TEST_BIN_DIR := $(BIN_DIR)/tests
 CHESS_BIN := $(BIN_DIR)/chess$(EXEEXT)
-CLI_BIN := $(BIN_DIR)/chess_cli$(EXEEXT)
 
 BUILD_DIR := build
 OBJ_DIR := $(BUILD_DIR)/obj
@@ -81,13 +80,6 @@ SERVICE_SRCS := \
 	src/turn/turn.c \
 	src/turn/turn_timer.c
 
-CLI_SRCS := \
-	src/cli/cli_feedback.c \
-	src/cli/cli_renderer.c \
-	src/cli/cli_menu.c \
-	src/cli/cli_gameplay.c \
-	src/cli/cli_app.c
-
 AI_SRCS := \
 	src/ai/ai.c
 
@@ -103,7 +95,6 @@ GUI_SRCS := \
 	src/ui/gui_setup_screen.c
 
 GUI_MAIN_SRC := src/main.c
-CLI_MAIN_SRC := src/main_cli.c
 
 APP_SRCS := \
 	$(CORE_SRCS) \
@@ -117,19 +108,14 @@ GUI_APP_SRCS := \
 	$(AI_SRCS) \
 	$(GUI_SRCS)
 
-CLI_APP_SRCS := \
+TEST_APP_SRCS := \
 	$(APP_SRCS) \
 	$(LEGACY_INPUT_SRCS) \
-	$(CLI_SRCS) \
 	$(AI_SRCS)
 
-TEST_APP_SRCS := $(CLI_APP_SRCS)
-
 GUI_APP_OBJS := $(GUI_APP_SRCS:src/%.c=$(OBJ_DIR)/%.o)
-CLI_APP_OBJS := $(CLI_APP_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 TEST_APP_OBJS := $(TEST_APP_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 GUI_MAIN_OBJ := $(GUI_MAIN_SRC:src/%.c=$(OBJ_DIR)/%.o)
-CLI_MAIN_OBJ := $(CLI_MAIN_SRC:src/%.c=$(OBJ_DIR)/%.o)
 
 CORE_TEST_NAMES := \
 	test_board \
@@ -155,19 +141,12 @@ SYSTEM_TEST_NAMES := \
 	test_controller \
 	test_control_flow
 
-CLI_TEST_NAMES := \
-	test_cli_menu \
-	test_cli_renderer \
-	test_cli_gameplay \
-	test_cli_app
-
 AI_TEST_NAMES := \
 	test_ai
 
 TEST_NAMES := \
 	$(CORE_TEST_NAMES) \
 	$(SYSTEM_TEST_NAMES) \
-	$(CLI_TEST_NAMES) \
 	$(AI_TEST_NAMES)
 
 TEST_OBJS := $(TEST_NAMES:%=$(OBJ_DIR)/tests/%.o)
@@ -175,25 +154,22 @@ TEST_BINS := $(TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT))
 
 DEP_FILES := \
 	$(GUI_APP_OBJS:.o=.d) \
-	$(CLI_APP_OBJS:.o=.d) \
+	$(TEST_APP_OBJS:.o=.d) \
 	$(GUI_MAIN_OBJ:.o=.d) \
-	$(CLI_MAIN_OBJ:.o=.d) \
 	$(TEST_OBJS:.o=.d)
 
 ARCHIVE_SRC_DEPS := \
-	$(GUI_APP_SRCS) $(CLI_APP_SRCS) $(GUI_MAIN_SRC) $(CLI_MAIN_SRC) \
+	$(GUI_APP_SRCS) $(TEST_APP_SRCS) $(GUI_MAIN_SRC) \
 	$(wildcard tests/*.c) \
 	$(ASSET_FILES) \
 	$(shell find include -name '*.h' 2>/dev/null)
 
-.PHONY: all gui cli tests test test-core test-system test-cli test-ai \
+.PHONY: all gui tests test test-core test-system test-ai \
 	list-tests run clean tar tar-user help
 
 all: gui
 
 gui: $(CHESS_BIN) $(LOG_DIR)
-
-cli: $(CLI_BIN) $(LOG_DIR)
 
 tests: $(TEST_BINS)
 
@@ -206,9 +182,6 @@ test-core: $(CORE_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT))
 test-system: $(SYSTEM_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT))
 	@set -e; for test_bin in $(SYSTEM_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT)); do "./$$test_bin"; done
 
-test-cli: $(CLI_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT))
-	@set -e; for test_bin in $(CLI_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT)); do "./$$test_bin"; done
-
 test-ai: $(AI_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT))
 	@set -e; for test_bin in $(AI_TEST_NAMES:%=$(TEST_BIN_DIR)/%$(EXEEXT)); do "./$$test_bin"; done
 
@@ -220,7 +193,7 @@ run: $(CHESS_BIN)
 
 clean:
 	$(RMDIR) $(BUILD_DIR)
-	$(RM) $(SRC_ARCHIVE) $(USER_ARCHIVE) $(CHESS_BIN) $(CLI_BIN) $(TEST_BINS) $(wildcard *.o) $(wildcard *.d)
+	$(RM) $(SRC_ARCHIVE) $(USER_ARCHIVE) $(CHESS_BIN) $(TEST_BINS) $(wildcard *.o) $(wildcard *.d)
 	$(RM) $(wildcard $(LOG_DIR)/*) $(wildcard $(TEST_BIN_DIR)/*)
 	$(MKDIR_P) $(BIN_DIR) $(LOG_DIR) $(TEST_BIN_DIR)
 
@@ -285,9 +258,6 @@ $(OBJ_DIR)/tests/%.o: tests/%.c
 
 $(CHESS_BIN): $(BIN_DIR) $(LOG_DIR) $(GUI_MAIN_OBJ) $(GUI_APP_OBJS)
 	$(CC) $(LDFLAGS) $(GUI_MAIN_OBJ) $(GUI_APP_OBJS) $(LDLIBS) $(GTK_LIBS) -pthread -o $@
-
-$(CLI_BIN): $(BIN_DIR) $(LOG_DIR) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS)
-	$(CC) $(LDFLAGS) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS) $(LDLIBS) -o $@
 
 $(TEST_BIN_DIR)/%$(EXEEXT): $(TEST_BIN_DIR) $(OBJ_DIR)/tests/%.o $(TEST_APP_OBJS)
 	$(CC) $(LDFLAGS) $(OBJ_DIR)/tests/$*.o $(TEST_APP_OBJS) $(LDLIBS) -o $@

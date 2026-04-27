@@ -3,7 +3,7 @@
 
 typedef enum {
     ERR_INVALID_INPUT,
-    /* Header change: CLI flows need a separate code for a parsed number that
+    /* Header change: menu flows need a separate code for a parsed number that
      * does not match any visible menu choice. */
     ERR_INVALID_MENU_SELECTION,
     /* Header change: move-entry callers need one stable code for malformed

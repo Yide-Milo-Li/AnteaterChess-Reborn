@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 /*
- * Legacy CLI alignment notes:
+ * Legacy command alignment notes:
  * - Treat command.h as the contract for Command compatibility only.
  * - New GUI-facing input should use MoveRequest instead of Command.
  * - Input code constructs Command values, not gameplay Move objects.

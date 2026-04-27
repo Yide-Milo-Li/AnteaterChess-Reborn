@@ -9,7 +9,7 @@
 /*
  * Interface alignment notes for Phase F:
  * - Treat input.h as the only public contract for this file.
- * - This file is the CLI/test adapter layer, not the canonical GUI move path.
+ * - This file is the text-input/test adapter layer, not the canonical GUI move path.
  * - GUI move fields should use move_request_parser.h instead of routing
  *   through whole-line token splitting or legacy Command values here.
  * - This layer reads raw user input and emits Command-or-primitive input data;
@@ -41,8 +41,8 @@ static int readInputLine(char *buffer, size_t size) {
     return 1;
 }
 
-/* Extract exactly two CLI move tokens before forwarding them to the parser. */
-static int extractCliMoveTokens(const char *line, char fromToken[INPUT_TOKEN_SIZE], char toToken[INPUT_TOKEN_SIZE]) {
+/* Extract exactly two move tokens before forwarding them to the parser. */
+static int extractMoveTokens(const char *line, char fromToken[INPUT_TOKEN_SIZE], char toToken[INPUT_TOKEN_SIZE]) {
     char extraToken[INPUT_TOKEN_SIZE];
 
     if (line == NULL) {
@@ -69,7 +69,7 @@ static int parseBoardToken(const char *line, char token[INPUT_TOKEN_SIZE]) {
     return sscanf(line, " %31s %31s", token, extraToken) == 1;
 }
 
-/* Read one CLI move command and forward the two tokens to the shared parser. */
+/* Read one text move command and forward the two tokens to the shared parser. */
 int getMoveInput(Command *cmd) {
     char line[INPUT_BUFFER_SIZE];
     char fromToken[INPUT_TOKEN_SIZE];
@@ -79,7 +79,7 @@ int getMoveInput(Command *cmd) {
         return 1;
     }
 
-    if (!readInputLine(line, sizeof(line)) || !extractCliMoveTokens(line, fromToken, toToken)) {
+    if (!readInputLine(line, sizeof(line)) || !extractMoveTokens(line, fromToken, toToken)) {
         markInvalidCommand(cmd);
         return 1;
     }

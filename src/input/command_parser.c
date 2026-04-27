@@ -5,7 +5,7 @@
 #include "core/position.h"
 
 /*
- * Legacy CLI alignment notes:
+ * Legacy command alignment notes:
  * - Treat command_parser.h as the contract for Command compatibility only.
  * - New GUI-facing input should use move_request_parser.h instead.
  * - This parser is a thin coordinate-to-Command adapter and must not take on

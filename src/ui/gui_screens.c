@@ -134,7 +134,7 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     newGameButton = gui_create_centered_button("New Game");
     mainMenuButton = gui_create_centered_button("Main Menu");
     exitButton = gui_create_centered_button("Exit");
-    gui_set_button_icon(exitButton, "alert-triangle-svgrepo-com.svg", 18);
+    gui_set_button_icon(exitButton, "icon-alert-dark.svg", 18);
     gtk_style_context_add_class(gtk_widget_get_style_context(exitButton), "destructive-button");
     gtk_box_pack_start(GTK_BOX(panel), newGameButton, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(panel), mainMenuButton, FALSE, FALSE, 0);

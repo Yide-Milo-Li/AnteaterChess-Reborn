@@ -152,7 +152,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
     historyHeader = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(historyPanel), historyHeader, FALSE, FALSE, 0);
-    historyIcon = gui_create_ui_icon("history-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    historyIcon = gui_create_ui_icon("icon-history-dark.svg", GUI_UI_ICON_SIZE);
     if (historyIcon != NULL) {
         gtk_box_pack_start(GTK_BOX(historyHeader), historyIcon, FALSE, FALSE, 0);
     }
@@ -234,7 +234,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_widget_set_tooltip_text(formatHelp,
         "Move format: E2 to E4. Castling uses king start/end squares. Promotion is selected after submit.");
     gtk_style_context_add_class(gtk_widget_get_style_context(formatHelp), "format-help");
-    formatIcon = gui_create_ui_icon("info-icon-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    formatIcon = gui_create_ui_icon("icon-info-dark.svg", GUI_UI_ICON_SIZE);
     if (formatIcon == NULL) {
         formatIcon = gtk_label_new("i");
         gtk_style_context_add_class(gtk_widget_get_style_context(formatIcon), "info-icon");
@@ -257,7 +257,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
     hintButton = gtk_button_new_with_label("Hint");
     gui->hint_button = hintButton;
-    gui_set_button_icon(hintButton, "bulb-on-svgrepo-com (1).svg", GUI_UI_ICON_SIZE);
+    gui_set_button_icon(hintButton, "icon-hint-dark.svg", GUI_UI_ICON_SIZE);
     gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-button");
     gtk_widget_set_size_request(hintButton, 92, 44);
     gtk_widget_set_tooltip_text(hintButton, "Show a suggested move.");

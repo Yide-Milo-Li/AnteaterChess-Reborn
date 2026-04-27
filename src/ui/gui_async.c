@@ -189,6 +189,7 @@ static void complete_ai_job(GuiAsyncJob *job) {
     }
 
     gui->ai_failure_active = 0;
+    gui_clear_hint_highlight(gui);
     gui_set_status_text(gui, "");
     gui_sync_from_controller(gui);
 }
@@ -209,6 +210,7 @@ static void complete_hint_job(GuiAsyncJob *job) {
 
     gui_format_hint_text(job->move, hintText);
     gui_set_status_text(gui, hintText);
+    gui_show_hint_move(gui, job->move);
     gui_update_gameplay_controls(gui, controllerGetState(&gui->controller));
 }
 
@@ -243,6 +245,7 @@ void gui_invalidate_async_results(Gui *gui) {
 
     ++gui->async_generation;
     gui->ai_failure_active = 0;
+    gui_clear_hint_highlight(gui);
 }
 
 static void cancel_job(GuiAsyncJob **jobSlot) {

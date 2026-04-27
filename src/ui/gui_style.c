@@ -74,6 +74,8 @@ void gui_install_style(void) {
         ".highlight-from { box-shadow: inset 0 0 0 3px rgba(255, 208, 113, 0.98), inset 0 0 14px rgba(255, 208, 113, 0.42); } "
         ".highlight-destination { box-shadow: inset 0 0 0 3px rgba(120, 218, 106, 0.98), inset 0 0 14px rgba(120, 218, 106, 0.42); } "
         ".highlight-selected { box-shadow: inset 0 0 0 4px rgba(255, 247, 230, 0.98), inset 0 0 16px rgba(255, 208, 113, 0.52); } "
+        ".hint-from { box-shadow: inset 0 0 0 4px rgba(56, 189, 248, 0.98), inset 0 0 18px rgba(56, 189, 248, 0.46); } "
+        ".hint-destination { box-shadow: inset 0 0 0 4px rgba(250, 204, 21, 0.98), inset 0 0 18px rgba(250, 204, 21, 0.48); } "
         ".move-input-valid { box-shadow: inset 0 0 0 2px #82c66d; } "
         ".move-input-invalid { box-shadow: inset 0 0 0 2px #ff8b80; } ";
 

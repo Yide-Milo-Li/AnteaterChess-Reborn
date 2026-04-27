@@ -75,9 +75,14 @@ struct Gui {
     Color ai_failure_turn;
     int highlight_destinations[8][10];
     Position highlight_from;
+    Position hint_from;
+    Position hint_to;
+    Color hint_turn;
+    int hint_move_count;
     guint sync_source_id;
     int has_rendered_state;
     int has_highlight_from;
+    int has_hint_highlight;
     int is_fullscreen;
     int fullscreen_transition_pending;
     int should_quit;
@@ -140,6 +145,9 @@ void gui_update_gameplay_controls(Gui *gui, const GameState *state);
 void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf);
 void gui_clear_move_highlights(Gui *gui);
 void gui_refresh_move_highlights(Gui *gui);
+void gui_clear_hint_highlight(Gui *gui);
+void gui_show_hint_move(Gui *gui, Move move);
+void gui_refresh_hint_highlight(Gui *gui);
 
 void gui_sync_from_controller(Gui *gui);
 int gui_render_snapshot(Gui *gui, const GameState *state);

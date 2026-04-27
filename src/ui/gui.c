@@ -117,6 +117,11 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->last_move_count = 0;
     gui->has_rendered_state = 0;
     gui->has_highlight_from = 0;
+    gui->has_hint_highlight = 0;
+    gui->hint_from = createPosition(-1, -1);
+    gui->hint_to = createPosition(-1, -1);
+    gui->hint_turn = EMPTY_COLOR;
+    gui->hint_move_count = -1;
     gui->sync_source_id = 0;
     gui->is_fullscreen = 0;
     gui->fullscreen_transition_pending = 0;
@@ -243,6 +248,7 @@ void gui_sync_from_controller(Gui *gui) {
             gui_set_error(gui, ERR_TIME_UP);
         }
         gui_update_board(gui, state);
+        gui_refresh_hint_highlight(gui);
         if (gui->last_move_count != state->moveHistory.count) {
             gui_update_movelist(gui, state);
         }

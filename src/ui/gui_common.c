@@ -37,6 +37,11 @@ void gui_clear_view_refs(Gui *gui) {
     gui->setup_side_white = NULL;
     gui->setup_side_black = NULL;
     gui->has_highlight_from = 0;
+    gui->has_hint_highlight = 0;
+    gui->hint_from = createPosition(-1, -1);
+    gui->hint_to = createPosition(-1, -1);
+    gui->hint_turn = EMPTY_COLOR;
+    gui->hint_move_count = -1;
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {

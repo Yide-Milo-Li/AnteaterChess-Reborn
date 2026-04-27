@@ -1,17 +1,22 @@
-Anteater Chess Alpha Release
+Anteater Chess V1.0 User Release
 Installation Instructions
 
+Prerequisites (Linux):
+- GTK+ 3 runtime libraries (e.g. libgtk-3-0 on Debian/Ubuntu)
+- A graphical desktop session (X11 or Wayland)
+
 1. Extract the package:
-   gtar xvzf Chess_Alpha.tar.gz
+   gtar xvzf Chess_V1.0.tar.gz
 
 2. Change to the project directory:
-   cd Chess_Alpha
+   cd Chess_V1.0
 
 3. Run the program:
    ./bin/chess
 
 Notes:
 - No compilation is required for the user package.
-- This alpha release is intended for a Linux environment.
+- Launch the program from the unpacked Chess_V1.0/ directory so
+  the SVG assets in assets/ are found at startup.
 - Runtime logs are written to bin/logs/.
-- For detailed usage instructions, please refer to doc/Chess_UserManual.pdf.
+- For detailed usage instructions, see doc/Chess_UserManual.pdf.

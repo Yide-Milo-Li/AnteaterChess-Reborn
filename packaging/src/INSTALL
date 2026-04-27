@@ -1,11 +1,18 @@
-Anteater Chess Alpha Source Release
+Anteater Chess V1.0 Source Release
 Installation Instructions
 
+Prerequisites (Linux):
+- GNU Make
+- A C11-compatible compiler (gcc 9+ or clang 10+)
+- pkg-config
+- GTK+ 3 development headers (only required for the GUI build,
+  e.g. libgtk-3-dev on Debian/Ubuntu)
+
 1. Extract the source package:
-   gtar xvzf Chess_Alpha_src.tar.gz
+   gtar xvzf Chess_V1.0_src.tar.gz
 
 2. Change to the project directory:
-   cd Chess_Alpha_src
+   cd Chess_V1.0_src
 
 3. Build the program:
    make
@@ -13,7 +20,7 @@ Installation Instructions
 4. Run the program:
    ./bin/chess
 
-5. Run the maintained test suite:
+5. Run the test suite:
    make test
 
 Recommended verification command:
@@ -22,15 +29,16 @@ Recommended verification command:
 
 Optional commands:
 - make clean
-  Remove generated build files while preserving bin/, bin/logs/, and bin/tests/
+  Remove generated build files while preserving bin/, bin/logs/, bin/tests/
 - make tar
-  Regenerate Chess_Alpha_src.tar.gz
-
-This source package is intended for a Linux environment with GNU Make
-and a standard C toolchain installed.
+  Regenerate Chess_V1.0_src.tar.gz
+- make tar-user
+  Generate the user/customer package Chess_V1.0.tar.gz
+  (requires bin/chess to have been built first and
+  doc/Chess_UserManual.pdf to be present)
 
 Runtime logs are written to:
 - bin/logs/
 
-For more details, please refer to the files placed in doc/ when they are
-included in the release package.
+For more details see doc/Chess_UserManual.pdf and
+doc/Chess_SoftwareSpec.pdf.

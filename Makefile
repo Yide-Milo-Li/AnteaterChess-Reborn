@@ -29,10 +29,10 @@ CLI_BIN := $(BIN_DIR)/chess_cli$(EXEEXT)
 BUILD_DIR := build
 OBJ_DIR := $(BUILD_DIR)/obj
 PKG_DIR := $(BUILD_DIR)/package
-SRC_STAGE_DIR := $(PKG_DIR)/Chess_Alpha_src
-SRC_ARCHIVE := Chess_Alpha_src.tar.gz
-USER_STAGE_DIR := $(PKG_DIR)/Chess_Alpha
-USER_ARCHIVE := Chess_Alpha.tar.gz
+SRC_STAGE_DIR := $(PKG_DIR)/Chess_V1.0_src
+SRC_ARCHIVE := Chess_V1.0_src.tar.gz
+USER_STAGE_DIR := $(PKG_DIR)/Chess_V1.0
+USER_ARCHIVE := Chess_V1.0.tar.gz
 
 README_SRC := $(firstword $(wildcard packaging/src/README README))
 INSTALL_SRC := $(firstword $(wildcard packaging/src/INSTALL INSTALL))
@@ -229,15 +229,15 @@ tar-user: $(USER_ARCHIVE)
 
 help:
 	@echo "Targets:"
-	@echo "  make / make all   Build GUI bin/chess and create bin/logs"
-	@echo "  make cli          Build legacy/debug CLI bin/chess_cli"
-	@echo "  make test         Build and run the maintained test suite"
-	@echo "  make clean        Remove generated binaries, objects, logs, and tarball while preserving bin/"
-	@echo "  make tar          Create Chess_Alpha_src.tar.gz (source package)"
+	@echo "  make / make all   Build GUI bin/chess (requires GTK+ 3) and create bin/logs"
+	@echo "  make test         Build and run the full test suite"
+	@echo "  make clean        Remove generated binaries, objects, logs, and tarballs while preserving bin/"
+	@echo "  make tar          Create Chess_V1.0_src.tar.gz (source package)"
 	@if [ -f packaging/user/README ] && [ -f packaging/user/INSTALL ]; then \
-		echo "  make tar-user     Create Chess_Alpha.tar.gz (user package, requires doc/Chess_UserManual.pdf)"; \
+		echo "  make tar-user     Create Chess_V1.0.tar.gz (user package, requires doc/Chess_UserManual.pdf)"; \
 	fi
 	@echo "  make list-tests   Print the maintained test binary names"
+	@echo "  make run          Build and launch the GUI (./bin/chess)"
 
 $(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT $(ARCHIVE_SRC_DEPS)
 	$(RMDIR) $(SRC_STAGE_DIR)
@@ -251,7 +251,7 @@ $(SRC_ARCHIVE): Makefile $(README_SRC) $(INSTALL_SRC) COPYRIGHT $(ARCHIVE_SRC_DE
 	$(CP) tests $(SRC_STAGE_DIR)/
 	$(CP) assets $(SRC_STAGE_DIR)/
 	@if [ -d doc ]; then $(CP) doc/. $(SRC_STAGE_DIR)/doc/; fi
-	$(TAR) -czf $(SRC_ARCHIVE) -C $(PKG_DIR) Chess_Alpha_src
+	$(TAR) -czf $(SRC_ARCHIVE) -C $(PKG_DIR) Chess_V1.0_src
 
 $(USER_ARCHIVE): $(CHESS_BIN) $(USER_README_SRC) $(USER_INSTALL_SRC) COPYRIGHT $(ASSET_FILES)
 	$(RMDIR) $(USER_STAGE_DIR)
@@ -266,7 +266,7 @@ $(USER_ARCHIVE): $(CHESS_BIN) $(USER_README_SRC) $(USER_INSTALL_SRC) COPYRIGHT $
 	else \
 		echo "WARNING: $(USER_MANUAL_PDF) not found; user package will ship without the user manual."; \
 	fi
-	$(TAR) -czf $(USER_ARCHIVE) -C $(PKG_DIR) Chess_Alpha
+	$(TAR) -czf $(USER_ARCHIVE) -C $(PKG_DIR) Chess_V1.0
 
 $(LOG_DIR):
 	$(MKDIR_P) $@

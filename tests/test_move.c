@@ -86,7 +86,6 @@ static void test_promotion_special_move_detection(void) {
     assert(isPromotionSpecialMove(PROMOTION_ROOK) == 1);
     assert(isPromotionSpecialMove(PROMOTION_BISHOP) == 1);
     assert(isPromotionSpecialMove(PROMOTION_KNIGHT) == 1);
-    assert(isPromotionSpecialMove(PROMOTION_ANTEATER) == 1);
 
     assert(isPromotionSpecialMove(NO_SPECIAL_MOVE) == 0);
     assert(isPromotionSpecialMove(CASTLING_KINGSIDE) == 0);

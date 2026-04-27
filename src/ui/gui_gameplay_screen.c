@@ -162,7 +162,7 @@ static GtkWidget *gui_create_format_help_popover(GtkWidget *relativeTo) {
     gtk_style_context_add_class(gtk_widget_get_style_context(content),
         "format-popover");
 
-    title = gtk_label_new("Command Format");
+    title = gtk_label_new("Move Format");
     gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
     gtk_style_context_add_class(gtk_widget_get_style_context(title),
         "format-popover-title");

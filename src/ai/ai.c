@@ -538,8 +538,6 @@ static void apply_move_to_board_for_see(Board *board, Move move) {
         placedPiece = createPiece(BISHOP, move.movedPiece.color);
     } else if (move.specialType == PROMOTION_KNIGHT) {
         placedPiece = createPiece(KNIGHT, move.movedPiece.color);
-    } else if (move.specialType == PROMOTION_ANTEATER) {
-        placedPiece = createPiece(ANTEATER, move.movedPiece.color);
     }
 
     setPiece(board, move.to, placedPiece);

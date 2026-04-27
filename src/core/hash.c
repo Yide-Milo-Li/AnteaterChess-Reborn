@@ -205,8 +205,6 @@ static int promotion_piece_type(SpecialMove type) {
         return BISHOP;
     case PROMOTION_KNIGHT:
         return KNIGHT;
-    case PROMOTION_ANTEATER:
-        return ANTEATER;
     case NO_SPECIAL_MOVE:
     case CASTLING_KINGSIDE:
     case CASTLING_QUEENSIDE:

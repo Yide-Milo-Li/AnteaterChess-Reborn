@@ -283,7 +283,7 @@ $(OBJ_DIR)/tests/%.o: tests/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(CHESS_BIN): $(BIN_DIR) $(LOG_DIR) $(GUI_MAIN_OBJ) $(GUI_APP_OBJS)
-	$(CC) $(LDFLAGS) $(GUI_MAIN_OBJ) $(GUI_APP_OBJS) $(LDLIBS) $(GTK_LIBS) -o $@
+	$(CC) $(LDFLAGS) $(GUI_MAIN_OBJ) $(GUI_APP_OBJS) $(LDLIBS) $(GTK_LIBS) -pthread -o $@
 
 $(CLI_BIN): $(BIN_DIR) $(LOG_DIR) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS)
 	$(CC) $(LDFLAGS) $(CLI_MAIN_OBJ) $(CLI_APP_OBJS) $(LDLIBS) -o $@

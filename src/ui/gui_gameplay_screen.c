@@ -7,6 +7,10 @@
 
 #define GUI_PIECE_IMAGE_SIZE 56
 #define GUI_UI_ICON_SIZE 18
+#define GUI_FORMAT_HELP_TEXT \
+    "Type source and destination squares, for example E2 to E4.\n" \
+    "Castling uses the king start and end squares, for example F1 to H1.\n" \
+    "Promotion choices are selected after Submit."
 
 static const char *gui_special_move_text(SpecialMove type) {
     switch (type) {
@@ -129,6 +133,62 @@ static void gui_update_history_ai_summary(Gui *gui, const GameState *state) {
     gtk_widget_show(gui->history_ai_summary_label);
 }
 
+static void gui_show_format_help_popover(GtkWidget *popover) {
+    if (!GTK_IS_POPOVER(popover)) {
+        return;
+    }
+
+    gtk_widget_show_all(popover);
+}
+
+static void gui_on_format_help_clicked(GtkButton *button, gpointer user_data) {
+    (void)button;
+    gui_show_format_help_popover(GTK_WIDGET(user_data));
+}
+
+static gboolean gui_on_format_help_enter(GtkWidget *widget,
+                                         GdkEventCrossing *event,
+                                         gpointer user_data) {
+    (void)widget;
+    (void)event;
+    gui_show_format_help_popover(GTK_WIDGET(user_data));
+    return FALSE;
+}
+
+static GtkWidget *gui_create_format_help_popover(GtkWidget *relativeTo) {
+    GtkWidget *popover;
+    GtkWidget *content;
+    GtkWidget *title;
+    GtkWidget *body;
+
+    popover = gtk_popover_new(relativeTo);
+    gtk_popover_set_position(GTK_POPOVER(popover), GTK_POS_BOTTOM);
+    gtk_style_context_add_class(gtk_widget_get_style_context(popover),
+        "format-popover-shell");
+
+    content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_container_set_border_width(GTK_CONTAINER(content), 10);
+    gtk_style_context_add_class(gtk_widget_get_style_context(content),
+        "format-popover");
+
+    title = gtk_label_new("Command Format");
+    gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(title),
+        "format-popover-title");
+    gtk_box_pack_start(GTK_BOX(content), title, FALSE, FALSE, 0);
+
+    body = gtk_label_new(GUI_FORMAT_HELP_TEXT);
+    gtk_label_set_xalign(GTK_LABEL(body), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(body), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(body), 48);
+    gtk_style_context_add_class(gtk_widget_get_style_context(body),
+        "format-popover-body");
+    gtk_box_pack_start(GTK_BOX(content), body, FALSE, FALSE, 0);
+
+    gtk_container_add(GTK_CONTAINER(popover), content);
+    return popover;
+}
+
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *historyPanel;
     GtkWidget *historyHeader;
@@ -140,6 +200,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *moveBox;
     GtkWidget *formatHelp;
     GtkWidget *formatIcon;
+    GtkWidget *formatPopover;
     GtkWidget *submitButton;
     GtkWidget *undoButton;
     GtkWidget *hintButton;
@@ -228,18 +289,31 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(moveBox), gui->from_entry, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(moveBox), gui->to_entry, TRUE, TRUE, 0);
 
-    formatHelp = gtk_event_box_new();
-    gtk_event_box_set_visible_window(GTK_EVENT_BOX(formatHelp), TRUE);
+    formatHelp = gtk_button_new();
+    gtk_widget_set_can_focus(formatHelp, FALSE);
     gtk_widget_set_size_request(formatHelp, 32, 32);
-    gtk_widget_set_tooltip_text(formatHelp,
-        "Move format: E2 to E4. Castling uses king start/end squares. Promotion is selected after submit.");
     gtk_style_context_add_class(gtk_widget_get_style_context(formatHelp), "format-help");
     formatIcon = gui_create_ui_icon("icon-info-dark.svg", GUI_UI_ICON_SIZE);
     if (formatIcon == NULL) {
         formatIcon = gtk_label_new("i");
         gtk_style_context_add_class(gtk_widget_get_style_context(formatIcon), "info-icon");
     }
-    gtk_container_add(GTK_CONTAINER(formatHelp), formatIcon);
+    gtk_button_set_image(GTK_BUTTON(formatHelp), formatIcon);
+    gtk_button_set_always_show_image(GTK_BUTTON(formatHelp), TRUE);
+    formatPopover = gui_create_format_help_popover(formatHelp);
+    g_object_set_data_full(G_OBJECT(formatHelp),
+        "format-popover",
+        g_object_ref_sink(formatPopover),
+        (GDestroyNotify)gtk_widget_destroy);
+    gtk_widget_add_events(formatHelp, GDK_ENTER_NOTIFY_MASK);
+    g_signal_connect(formatHelp,
+        "enter-notify-event",
+        G_CALLBACK(gui_on_format_help_enter),
+        formatPopover);
+    g_signal_connect(formatHelp,
+        "clicked",
+        G_CALLBACK(gui_on_format_help_clicked),
+        formatPopover);
     gtk_box_pack_start(GTK_BOX(moveBox), formatHelp, FALSE, FALSE, 0);
 
     submitButton = gtk_button_new_with_label("Submit");

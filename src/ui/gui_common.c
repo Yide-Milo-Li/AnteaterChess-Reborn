@@ -162,6 +162,13 @@ void gui_destroy_endgame_dialog(Gui *gui) {
 
 int gui_confirm(Gui *gui, const char *title, const char *message) {
     GtkWidget *dialog;
+    GtkWidget *contentArea;
+    GtkWidget *body;
+    GtkWidget *icon;
+    GtkWidget *textBox;
+    GtkWidget *titleLabel;
+    GtkWidget *messageLabel;
+    GtkWidget *yesButton;
     GtkWindow *parent = NULL;
     int response;
 
@@ -173,18 +180,60 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
         parent = GTK_WINDOW(gui->window);
     }
 
-    dialog = gtk_message_dialog_new(parent,
+    dialog = gtk_dialog_new_with_buttons((title != NULL) ? title : "Confirm",
+        parent,
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-        GTK_MESSAGE_WARNING,
-        GTK_BUTTONS_YES_NO,
-        "%s",
-        message);
-    if (title != NULL) {
-        gtk_window_set_title(GTK_WINDOW(dialog), title);
-    }
+        "No",
+        GTK_RESPONSE_NO,
+        "Yes",
+        GTK_RESPONSE_YES,
+        NULL);
 
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
     gui_prepare_modal_dialog(gui, dialog);
+
+    contentArea = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_container_set_border_width(GTK_CONTAINER(body), 14);
+    gtk_style_context_add_class(gtk_widget_get_style_context(body),
+        "confirm-dialog-body");
+    gtk_box_pack_start(GTK_BOX(contentArea), body, TRUE, TRUE, 0);
+
+    icon = gui_create_ui_icon("icon-alert-dark.svg", 38);
+    if (icon == NULL) {
+        icon = gtk_label_new("!");
+        gtk_style_context_add_class(gtk_widget_get_style_context(icon),
+            "confirm-icon-fallback");
+    }
+    gtk_widget_set_size_request(icon, 42, 42);
+    gtk_widget_set_valign(icon, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(body), icon, FALSE, FALSE, 0);
+
+    textBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_box_pack_start(GTK_BOX(body), textBox, TRUE, TRUE, 0);
+
+    titleLabel = gtk_label_new((title != NULL) ? title : "Confirm Action");
+    gtk_label_set_xalign(GTK_LABEL(titleLabel), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(titleLabel),
+        "confirm-title");
+    gtk_box_pack_start(GTK_BOX(textBox), titleLabel, FALSE, FALSE, 0);
+
+    messageLabel = gtk_label_new(message);
+    gtk_label_set_xalign(GTK_LABEL(messageLabel), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(messageLabel), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(messageLabel), 42);
+    gtk_style_context_add_class(gtk_widget_get_style_context(messageLabel),
+        "confirm-message");
+    gtk_box_pack_start(GTK_BOX(textBox), messageLabel, FALSE, FALSE, 0);
+
+    yesButton = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+        GTK_RESPONSE_YES);
+    if (GTK_IS_WIDGET(yesButton)) {
+        gtk_style_context_add_class(gtk_widget_get_style_context(yesButton),
+            "destructive-button");
+    }
+
+    gtk_widget_show_all(dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     return response == GTK_RESPONSE_YES;

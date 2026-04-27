@@ -62,11 +62,6 @@ INPUT_SRCS := \
 	src/input/move_request.c \
 	src/input/move_request_parser.c
 
-LEGACY_INPUT_SRCS := \
-	src/input/command.c \
-	src/input/command_parser.c \
-	src/input/input.c
-
 SYSTEM_SRCS := \
 	src/event/event.c \
 	src/event/event_queue.c \
@@ -110,7 +105,6 @@ GUI_APP_SRCS := \
 
 TEST_APP_SRCS := \
 	$(APP_SRCS) \
-	$(LEGACY_INPUT_SRCS) \
 	$(AI_SRCS)
 
 GUI_APP_OBJS := $(GUI_APP_SRCS:src/%.c=$(OBJ_DIR)/%.o)
@@ -129,8 +123,6 @@ CORE_TEST_NAMES := \
 	test_endgame \
 	test_log \
 	test_clock \
-	test_command \
-	test_input \
 	test_timer \
 	test_error \
 	test_move_request_parser

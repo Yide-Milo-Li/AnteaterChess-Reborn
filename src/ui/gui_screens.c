@@ -3,11 +3,11 @@
 #include "time/clock.h"
 
 static GtkWidget *gui_create_menu_panel(void) {
-    GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 16);
+    GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
 
     gtk_widget_set_halign(panel, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(panel, GTK_ALIGN_CENTER);
-    gtk_widget_set_size_request(panel, 360, -1);
+    gtk_widget_set_size_request(panel, 400, -1);
     gtk_style_context_add_class(gtk_widget_get_style_context(panel), "menu-panel");
     return panel;
 }
@@ -24,9 +24,11 @@ void gui_build_main_menu(Gui *gui) {
     gtk_label_set_markup(GTK_LABEL(title),
         "<span size='xx-large' weight='bold'>Anteater Chess</span>");
     gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
+    gtk_style_context_add_class(gtk_widget_get_style_context(title), "app-title");
     gtk_box_pack_start(GTK_BOX(panel), title, FALSE, FALSE, 0);
 
     gui->new_game_button = gui_create_centered_button("New Game");
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->new_game_button), "primary-button");
     gui->quit_game_button = gui_create_centered_button("Quit Game");
     gtk_style_context_add_class(gtk_widget_get_style_context(gui->quit_game_button), "destructive-button");
     gtk_box_pack_start(GTK_BOX(panel), gui->new_game_button, FALSE, FALSE, 0);
@@ -56,9 +58,9 @@ void gui_build_mode_menu(Gui *gui) {
     gtk_widget_set_size_request(panel, 420, -1);
     gtk_box_pack_start(GTK_BOX(gui->main_box), panel, TRUE, FALSE, 0);
 
-    label = gtk_label_new("Game Mode Selection");
+    label = gtk_label_new("Game Mode");
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_style_context_add_class(gtk_widget_get_style_context(label), "panel-title");
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), "app-title");
     gtk_box_pack_start(GTK_BOX(panel), label, FALSE, FALSE, 0);
 
     for (index = 0; index < (int)(sizeof(modes) / sizeof(modes[0])); ++index) {
@@ -104,13 +106,10 @@ void gui_build_endgame_menu(Gui *gui, const GameState *state) {
     dialog = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gui->endgame_dialog = dialog;
     gtk_window_set_title(GTK_WINDOW(dialog), "Game Over");
-    gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(gui->window));
-    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
-    gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
-    gtk_window_set_modal(GTK_WINDOW(dialog), FALSE);
+    gui_prepare_modal_dialog(gui, dialog);
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
     gtk_window_set_deletable(GTK_WINDOW(dialog), FALSE);
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
-    gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
     gtk_container_set_border_width(GTK_CONTAINER(dialog), 18);
     g_signal_connect(dialog, "destroy", G_CALLBACK(gui_on_endgame_dialog_destroy), gui);
 

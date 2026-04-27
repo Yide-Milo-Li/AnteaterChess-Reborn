@@ -83,6 +83,7 @@ struct Gui {
 };
 
 void gui_clear_view_refs(Gui *gui);
+void gui_install_style(void);
 void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacing);
 GtkWidget *gui_create_centered_button(const char *label);
 void gui_set_status(Gui *gui, GuiStatusKind kind, const char *text);

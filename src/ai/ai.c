@@ -12,18 +12,6 @@
 #endif
 
 #include "ai/ai.h"
-#include "ai_search_internal.h"
-
-#if defined(__has_include)
-#if __has_include("tournament_ai.h")
-#include "tournament_ai.h"
-#define HAS_TOURNAMENT_AI 1
-#else
-#define HAS_TOURNAMENT_AI 0
-#endif
-#else
-#define HAS_TOURNAMENT_AI 0
-#endif
 
 #include <limits.h>
 #include <stddef.h>
@@ -51,11 +39,10 @@
 #define NULL_MOVE_R 2
 #define AI_TOURNAMENT_TOTAL_MS 600999
 #define AI_TOURNAMENT_RESERVE_MS 30000
-#define AI_TOURNAMENT_BASE_MS 8500
-#define AI_TOURNAMENT_MAX_MS 14000
-#define AI_TOURNAMENT_MAX_EXTRA_MS 7000
-#define AI_TOURNAMENT_BONUS_DIVISOR 2
-#define AI_TOURNAMENT_POOL_CAP_MS 240000
+#define AI_TOURNAMENT_BASE_MS 7000
+#define AI_TOURNAMENT_MAX_MS 10000
+#define AI_TOURNAMENT_MAX_EXTRA_MS 3000
+#define AI_TOURNAMENT_POOL_CAP_MS 180000
 #define AI_MIN_MOVE_BUDGET_MS 300
 
 enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
@@ -82,7 +69,6 @@ typedef struct {
     uint64_t gameHashes[MAX_MOVES + 1];
     int gameHashCount;
     int gameHistoryStart;
-    AISearchProfile profile;
     int repetitionLimit[AI_MAX_PLY + 1];
     unsigned char nullMoveActive[AI_MAX_PLY + 1];
 } SearchContext;
@@ -1399,19 +1385,6 @@ static int evaluate_relative(const GameState *state) {
     return -absoluteScore + 1;
 }
 
-static int evaluate_relative_for_search(const SearchContext *ctx, const GameState *state) {
-    int score;
-    int adjustment;
-
-    score = evaluate_relative(state);
-    if (ctx == NULL || ctx->profile.evaluateAdjustment == NULL) {
-        return score;
-    }
-
-    adjustment = ctx->profile.evaluateAdjustment(state);
-    return (state->currentTurn == WHITE) ? score + adjustment : score - adjustment;
-}
-
 static int clamp_int(int value, int minValue, int maxValue) {
     if (value < minValue) {
         return minValue;
@@ -1485,7 +1458,7 @@ int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
     availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS
         ? remainingMs - AI_TOURNAMENT_RESERVE_MS
         : remainingMs;
-    bonusMs = manager->poolMs[index] / AI_TOURNAMENT_BONUS_DIVISOR;
+    bonusMs = manager->poolMs[index] / 4;
     bonusMs = clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
 
     budgetMs = AI_TOURNAMENT_BASE_MS + bonusMs;
@@ -1569,49 +1542,10 @@ static void age_history_scores(void) {
     }
 }
 
-AISearchProfile aiSearchProfileForDifficulty(AIDifficulty difficulty) {
-    AISearchProfile profile;
-
-    profile.maxDepth = 8;
-    profile.softNumerator = 4;
-    profile.softDenominator = 5;
-    profile.lmrQuietStart = 4;
-    profile.lmrDepthStart = 4;
-    profile.lmrSecondStart = 8;
-    profile.lmrThirdStart = 12;
-    profile.nullDepthStart = 3;
-    profile.nullReductionBase = NULL_MOVE_R;
-    profile.nullReductionDeep = NULL_MOVE_R + 1;
-    profile.tacticalExtensionMaxDepth = 6;
-    profile.evaluateAdjustment = NULL;
-    profile.softLimitMs = NULL;
-    profile.allowNullMove = NULL;
-    profile.extendMove = NULL;
-    profile.shouldStopAfterDepth = NULL;
-
-    switch (difficulty) {
-    case DIFFICULTY_EASY:
-        profile.maxDepth = 2;
-        break;
-    case DIFFICULTY_MEDIUM:
-        profile.maxDepth = 10;
-        break;
-    case DIFFICULTY_HARD:
-    case DIFFICULTY_EXPERIMENTAL:
-    case DIFFICULTY_TOURNAMENT:
-        profile.maxDepth = 24;
-        break;
-    case DIFFICULTY_NONE:
-    default:
-        break;
-    }
-    return profile;
-}
-
-static int init_search_context(SearchContext *ctx, int timeLimitMs, const AISearchProfile *profile) {
+static int init_search_context(SearchContext *ctx, int timeLimitMs) {
     int64_t now;
 
-    if (ctx == NULL || profile == NULL) {
+    if (ctx == NULL) {
         return 1;
     }
 
@@ -1627,10 +1561,7 @@ static int init_search_context(SearchContext *ctx, int timeLimitMs, const AISear
     }
 
     ctx->timeLimitMs = timeLimitMs;
-    ctx->softTimeLimitMs = (timeLimitMs > 0)
-        ? (timeLimitMs * profile->softNumerator) / profile->softDenominator
-        : 0;
-    ctx->profile = *profile;
+    ctx->softTimeLimitMs = (timeLimitMs > 0) ? (timeLimitMs * 4) / 5 : 0;
     ctx->searchStartMs = now;
     ++g_ttGeneration;
     if (g_ttGeneration == 0) {
@@ -2078,9 +2009,9 @@ static int try_null_move(SearchContext *ctx, GameState *state, int depth, int be
     ctx->repetitionLimit[ply + 1] = ply + 1;
     ctx->nullMoveActive[ply + 1] = 1;
 
-    reduction = ctx->profile.nullReductionBase;
+    reduction = NULL_MOVE_R;
     if (depth >= 6) {
-        reduction = ctx->profile.nullReductionDeep;
+        ++reduction;
     }
     score = -alpha_beta(ctx, state, depth - 1 - reduction, -beta, -beta + 1, ply + 1, 0);
 
@@ -2106,11 +2037,11 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     Color movingSide;
 
     if (time_is_up(ctx)) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
 
     if (ply >= AI_MAX_PLY - 2) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
 
     ++ctx->nodes;
@@ -2151,11 +2082,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         return quiescence(ctx, state, alpha, beta, ply, 0);
     }
 
-    if (allowNull && !pvNode && !inCheck
-        && depth >= ctx->profile.nullDepthStart
-        && side_has_major_material(&state->board, state->currentTurn)
-        && (ctx->profile.allowNullMove == NULL
-            || ctx->profile.allowNullMove(state, depth))) {
+    if (allowNull && !pvNode && !inCheck && depth >= 3 && side_has_major_material(&state->board, state->currentTurn)) {
         int nullScore = try_null_move(ctx, state, depth, beta, ply);
 
         if (ctx->stopSearch) {
@@ -2171,7 +2098,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
 
     moves = &ctx->moveBuffers[ply];
     if (generate_search_moves(state, moves, 0) != 0) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
     if (moves->count == 0) {
         if (inCheck) {
@@ -2193,23 +2120,21 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         int childDepth;
         int reduction;
         int extension;
-        int givesCheck;
 
         if (applyMove(state, move) != 0) {
             continue;
         }
         if (isInCheck(state, movingSide) != 0) {
             if (undoMove(state) != 0) {
-                return evaluate_relative_for_search(ctx, state);
+                return evaluate_relative(state);
             }
             continue;
         }
-        givesCheck = isInCheck(state, state->currentTurn);
 
         ++legalCount;
         if (advanceHashState(state, move, &ctx->hashStack[ply], &ctx->hashStack[ply + 1]) != 0) {
             if (undoMove(state) != 0) {
-                return evaluate_relative_for_search(ctx, state);
+                return evaluate_relative(state);
             }
             continue;
         }
@@ -2217,31 +2142,22 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         ctx->nullMoveActive[ply + 1] = ctx->nullMoveActive[ply];
 
         extension = 0;
-        if (depth <= ctx->profile.tacticalExtensionMaxDepth) {
+        if (depth <= 6) {
             if (is_promotion_move(&move)) {
                 extension = 1;
             } else if (move.specialType == ANTEATER_CAPTURE && move.captureCount >= 2) {
                 extension = 1;
             }
         }
-        if (ctx->profile.extendMove != NULL
-            && ctx->profile.extendMove(state, &move, depth, givesCheck)) {
-            extension = 1;
-        }
         childDepth = depth - 1 + extension;
 
         reduction = 0;
-        if (legalCount >= ctx->profile.lmrQuietStart
-            && depth >= ctx->profile.lmrDepthStart
-            && !inCheck
-            && !givesCheck
-            && is_quiet_move(&move)
-            && !pvNode) {
+        if (legalCount >= 4 && depth >= 4 && !inCheck && is_quiet_move(&move) && !pvNode) {
             reduction = 1;
-            if (legalCount >= ctx->profile.lmrSecondStart && depth >= ctx->profile.lmrDepthStart + 1) {
+            if (legalCount >= 8 && depth >= 5) {
                 ++reduction;
             }
-            if (legalCount >= ctx->profile.lmrThirdStart && depth >= ctx->profile.lmrDepthStart + 4) {
+            if (legalCount >= 12 && depth >= 8) {
                 ++reduction;
             }
             if (reduction > childDepth - 1) {
@@ -2270,7 +2186,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         }
 
         if (undoMove(state) != 0) {
-            return evaluate_relative_for_search(ctx, state);
+            return evaluate_relative(state);
         }
         if (ctx->stopSearch) {
             return alpha;
@@ -2325,10 +2241,10 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
     Color movingSide;
 
     if (time_is_up(ctx)) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
     if (ply >= AI_MAX_PLY - 2) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
 
     ++ctx->nodes;
@@ -2355,7 +2271,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
     inCheck = isInCheck(state, state->currentTurn);
     standPat = alpha;
     if (!inCheck) {
-        standPat = evaluate_relative_for_search(ctx, state);
+        standPat = evaluate_relative(state);
         if (standPat >= beta) {
             tt_store(key, 0, ply, standPat, TT_FLAG_LOWER, NULL, ctx->generation);
             return standPat;
@@ -2369,7 +2285,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
             return alpha;
         }
     } else if (qDepth >= AI_Q_DEPTH + 2) {
-        return evaluate_relative_for_search(ctx, state);
+        return evaluate_relative(state);
     }
 
     moves = &ctx->moveBuffers[ply];
@@ -2467,6 +2383,22 @@ static AIDifficulty difficulty_for_turn(const GameState *state) {
     return difficulty;
 }
 
+static int depth_for_difficulty(AIDifficulty difficulty) {
+    switch (difficulty) {
+    case DIFFICULTY_EASY:
+        return 2;
+    case DIFFICULTY_MEDIUM:
+        return 10;
+    case DIFFICULTY_HARD:
+    case DIFFICULTY_EXPERIMENTAL:
+    case DIFFICULTY_TOURNAMENT:
+        return 24;
+    case DIFFICULTY_NONE:
+    default:
+        return 8;
+    }
+}
+
 static int time_budget_for_state(const GameState *state, AIDifficulty difficulty) {
     if (state->config.aiTimeLimit > 0) {
         return state->config.aiTimeLimit * 1000;
@@ -2488,50 +2420,14 @@ static int time_budget_for_state(const GameState *state, AIDifficulty difficulty
     }
 }
 
-static int root_score_gap(const int scores[MAX_MOVES], int count) {
-    if (count < 2) {
-        return AI_INF;
+static AIDifficulty search_difficulty_for(AIDifficulty difficulty) {
+    if (difficulty == DIFFICULTY_EXPERIMENTAL || difficulty == DIFFICULTY_TOURNAMENT) {
+        return DIFFICULTY_HARD;
     }
-    return scores[0] - scores[1];
+    return difficulty;
 }
 
-static int adaptive_soft_limit_ms(const AISearchProfile *profile,
-                                  const GameState *state,
-                                  const MoveList *rootMoves,
-                                  int maxTimeMs) {
-    if (maxTimeMs <= 0 || profile == NULL) {
-        return 0;
-    }
-    if (profile->softLimitMs != NULL) {
-        return profile->softLimitMs(state, rootMoves, maxTimeMs);
-    }
-    (void)state;
-    (void)rootMoves;
-    return (maxTimeMs * profile->softNumerator) / profile->softDenominator;
-}
-
-static int profile_should_stop_after_depth(const SearchContext *ctx,
-                                           const int rootScores[MAX_MOVES],
-                                           int rootCount,
-                                           int stableDepths) {
-    int elapsed;
-
-    if (ctx == NULL || ctx->profile.shouldStopAfterDepth == NULL || ctx->softTimeLimitMs <= 0) {
-        return 1;
-    }
-
-    elapsed = elapsed_ms(ctx);
-    return ctx->profile.shouldStopAfterDepth(elapsed,
-        ctx->timeLimitMs,
-        ctx->softTimeLimitMs,
-        root_score_gap(rootScores, rootCount),
-        stableDepths);
-}
-
-int aiSearchBestMoveWithProfile(const GameState *state,
-                                const AISearchProfile *profile,
-                                int maxTimeMs,
-                                Move *bestMove) {
+static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs, Move *bestMove) {
     SearchContext ctx;
     GameState searchState;
     MoveList *rootMoves;
@@ -2539,14 +2435,16 @@ int aiSearchBestMoveWithProfile(const GameState *state,
     int rootScores[MAX_MOVES];
     Move currentBest;
     int currentBestScore;
-    int stableDepths;
     int depth;
 
-    if (state == NULL || profile == NULL || bestMove == NULL) {
+    if (state == NULL || bestMove == NULL) {
         return 1;
     }
 
-    if (init_search_context(&ctx, maxTimeMs, profile) != 0) {
+    if (maxDepth > AI_MAX_PLY - 2) {
+        maxDepth = AI_MAX_PLY - 2;
+    }
+    if (init_search_context(&ctx, maxTimeMs) != 0) {
         return 1;
     }
     age_history_scores();
@@ -2577,7 +2475,6 @@ int aiSearchBestMoveWithProfile(const GameState *state,
     } else {
         sort_moves(&ctx, &searchState, rootMoves, 0, NULL);
     }
-    ctx.softTimeLimitMs = adaptive_soft_limit_ms(profile, &searchState, rootMoves, maxTimeMs);
 
     *bestMove = rootMoves->moves[0];
     if (rootMoves->count == 1) {
@@ -2587,9 +2484,8 @@ int aiSearchBestMoveWithProfile(const GameState *state,
 
     currentBest = rootMoves->moves[0];
     currentBestScore = -AI_INF;
-    stableDepths = 0;
 
-    for (depth = 1; depth <= profile->maxDepth && depth <= AI_MAX_PLY - 2; ++depth) {
+    for (depth = 1; depth <= maxDepth; ++depth) {
         Move iterationBest;
         int iterationBestScore;
         int aspiration;
@@ -2695,11 +2591,6 @@ int aiSearchBestMoveWithProfile(const GameState *state,
             break;
         }
 
-        if (move_equal_signature(&iterationBest, &currentBest)) {
-            ++stableDepths;
-        } else {
-            stableDepths = 1;
-        }
         currentBest = iterationBest;
         currentBestScore = iterationBestScore;
         *bestMove = currentBest;
@@ -2709,9 +2600,7 @@ int aiSearchBestMoveWithProfile(const GameState *state,
         if (currentBestScore >= AI_MATE - 1000 || currentBestScore <= -AI_MATE + 1000) {
             break;
         }
-        if (ctx.softTimeLimitMs > 0
-            && elapsed_ms(&ctx) >= ctx.softTimeLimitMs
-            && profile_should_stop_after_depth(&ctx, rootScores, rootMoves->count, stableDepths)) {
+        if (ctx.softTimeLimitMs > 0 && elapsed_ms(&ctx) >= ctx.softTimeLimitMs) {
             break;
         }
     }
@@ -2722,7 +2611,8 @@ int aiSearchBestMoveWithProfile(const GameState *state,
 
 int generateAIMove(const GameState *state, Move *move) {
     AIDifficulty difficulty;
-    AISearchProfile profile;
+    AIDifficulty effective;
+    int maxDepth;
     int maxTimeMs;
 
     if (state == NULL || move == NULL) {
@@ -2730,13 +2620,6 @@ int generateAIMove(const GameState *state, Move *move) {
     }
 
     difficulty = difficulty_for_turn(state);
-    maxTimeMs = time_budget_for_state(state, difficulty);
-
-#if HAS_TOURNAMENT_AI
-    if (difficulty == DIFFICULTY_TOURNAMENT) {
-        return generateTournamentAIMoveWithBudget(state, move, maxTimeMs);
-    }
-#endif
 
     if (difficulty == DIFFICULTY_EXPERIMENTAL) {
 #if HAS_ALIEN_PLUGIN
@@ -2746,12 +2629,14 @@ int generateAIMove(const GameState *state, Move *move) {
         }
         /* Plugin failed — degrade to HARD instead of forfeiting. */
 #endif
-        profile = aiSearchProfileForDifficulty(DIFFICULTY_HARD);
+        effective = DIFFICULTY_HARD;
     } else {
-        profile = aiSearchProfileForDifficulty(difficulty);
+        effective = search_difficulty_for(difficulty);
     }
 
-    if (aiSearchBestMoveWithProfile(state, &profile, maxTimeMs, move) != 0) {
+    maxDepth = depth_for_difficulty(effective);
+    maxTimeMs = time_budget_for_state(state, difficulty);
+    if (search_best_move(state, maxDepth, maxTimeMs, move) != 0) {
         return 1;
     }
     return 0;
@@ -2759,32 +2644,26 @@ int generateAIMove(const GameState *state, Move *move) {
 
 int generateAIMoveWithBudget(const GameState *state, Move *move, int budgetMs) {
     AIDifficulty difficulty;
-    AISearchProfile profile;
+    AIDifficulty effective;
+    int maxDepth;
 
     if (state == NULL || move == NULL || budgetMs <= 0) {
         return 1;
     }
 
     difficulty = difficulty_for_turn(state);
-#if HAS_TOURNAMENT_AI
-    if (difficulty == DIFFICULTY_TOURNAMENT) {
-        return generateTournamentAIMoveWithBudget(state, move, budgetMs);
-    }
-#endif
-    profile = aiSearchProfileForDifficulty(difficulty);
-    return aiSearchBestMoveWithProfile(state, &profile, budgetMs, move);
+    effective = search_difficulty_for(difficulty);
+    maxDepth = depth_for_difficulty(effective);
+    return search_best_move(state, maxDepth, budgetMs, move);
 }
 
 int generateHintMove(const GameState *state, Move *move) {
     int maxTimeMs;
-    AISearchProfile profile;
 
     if (state == NULL || move == NULL) {
         return 1;
     }
 
     maxTimeMs = time_budget_for_state(state, DIFFICULTY_MEDIUM);
-    profile = aiSearchProfileForDifficulty(DIFFICULTY_NONE);
-    profile.maxDepth = 8;
-    return aiSearchBestMoveWithProfile(state, &profile, maxTimeMs, move);
+    return search_best_move(state, 8, maxTimeMs, move);
 }

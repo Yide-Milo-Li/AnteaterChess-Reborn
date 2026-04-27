@@ -88,20 +88,8 @@ CLI_SRCS := \
 	src/cli/cli_gameplay.c \
 	src/cli/cli_app.c
 
-OPTIONAL_AI_SRCS := $(wildcard src/ai/tournament_ai.c)
-
-ALIEN_SRCS := \
-	src/ai/alien/alien_ai.c \
-	src/ai/alien/alien_board.c \
-	src/ai/alien/alien_book.c \
-	src/ai/alien/alien_engine.c \
-	src/ai/alien/alien_engine_native.c \
-	src/ai/alien/alien_movegen.c
-
 AI_SRCS := \
-	src/ai/ai.c \
-	$(OPTIONAL_AI_SRCS) \
-	$(ALIEN_SRCS)
+	src/ai/ai.c
 
 GUI_SRCS := \
 	src/ui/gui.c \

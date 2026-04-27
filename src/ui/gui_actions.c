@@ -62,6 +62,97 @@ static int gui_destination_is_highlighted(const Gui *gui, Position pos) {
     return gui->highlight_destinations[pos.row][pos.col] != 0;
 }
 
+static int gui_hint_matches_state(const Gui *gui, const GameState *state) {
+    if (gui == NULL || state == NULL || !gui->has_hint_highlight) {
+        return 0;
+    }
+
+    return state->systemState == GAMEPLAY_STATE
+        && state->currentTurn == gui->hint_turn
+        && state->moveHistory.count == gui->hint_move_count
+        && isValidPosition(gui->hint_from)
+        && isValidPosition(gui->hint_to);
+}
+
+static void gui_remove_hint_classes(Gui *gui) {
+    int row;
+    int col;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            if (!GTK_IS_WIDGET(gui->board_cells[row][col])) {
+                continue;
+            }
+            gui_set_style_class(gui->board_cells[row][col], "hint-from", 0);
+            gui_set_style_class(gui->board_cells[row][col], "hint-destination", 0);
+        }
+    }
+}
+
+void gui_clear_hint_highlight(Gui *gui) {
+    if (gui == NULL) {
+        return;
+    }
+
+    gui_remove_hint_classes(gui);
+    gui->has_hint_highlight = 0;
+    gui->hint_from = createPosition(-1, -1);
+    gui->hint_to = createPosition(-1, -1);
+    gui->hint_turn = EMPTY_COLOR;
+    gui->hint_move_count = -1;
+}
+
+void gui_refresh_hint_highlight(Gui *gui) {
+    const GameState *state;
+
+    if (gui == NULL || !gui->has_hint_highlight) {
+        return;
+    }
+
+    state = gui_get_state(gui);
+    if (!gui_hint_matches_state(gui, state)) {
+        gui_clear_hint_highlight(gui);
+        return;
+    }
+
+    gui_remove_hint_classes(gui);
+    if (GTK_IS_WIDGET(gui->board_cells[gui->hint_from.row][gui->hint_from.col])) {
+        gui_set_style_class(gui->board_cells[gui->hint_from.row][gui->hint_from.col],
+            "hint-from",
+            1);
+    }
+    if (GTK_IS_WIDGET(gui->board_cells[gui->hint_to.row][gui->hint_to.col])) {
+        gui_set_style_class(gui->board_cells[gui->hint_to.row][gui->hint_to.col],
+            "hint-destination",
+            1);
+    }
+}
+
+void gui_show_hint_move(Gui *gui, Move move) {
+    const GameState *state;
+
+    if (gui == NULL || !isValidPosition(move.from) || !isValidPosition(move.to)) {
+        return;
+    }
+
+    state = gui_get_state(gui);
+    if (state == NULL || state->systemState != GAMEPLAY_STATE) {
+        return;
+    }
+
+    gui_clear_hint_highlight(gui);
+    gui->hint_from = move.from;
+    gui->hint_to = move.to;
+    gui->hint_turn = state->currentTurn;
+    gui->hint_move_count = state->moveHistory.count;
+    gui->has_hint_highlight = 1;
+    gui_refresh_hint_highlight(gui);
+}
+
 void gui_clear_move_highlights(Gui *gui) {
     int row;
     int col;
@@ -213,6 +304,7 @@ void gui_on_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
@@ -231,6 +323,7 @@ void gui_on_quit_game_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -245,6 +338,7 @@ void gui_on_mode_selected(GtkButton *button, gpointer user_data) {
     GameMode mode = (GameMode) GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "game-mode"));
 
     initGameConfigForMode(&gui->pendingConfig, mode);
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -258,6 +352,7 @@ void gui_on_back_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
@@ -279,6 +374,7 @@ void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     errorCode = ERR_FATAL;
     if (controllerStartConfiguredGameDetailed(&gui->controller, &config, &errorCode) != 0) {
@@ -355,6 +451,7 @@ void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
     }
 
     errorCode = ERR_ILLEGAL_MOVE;
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     if (controllerSubmitMoveRequestDetailed(&gui->controller, request, &errorCode) != 0) {
         gui_set_error(gui, errorCode);
@@ -372,6 +469,7 @@ void gui_on_move_entry_changed(GtkEditable *editable, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)editable;
+    gui_clear_hint_highlight(gui);
     gui_refresh_move_highlights(gui);
 }
 
@@ -405,6 +503,7 @@ gboolean gui_on_board_cell_button_press(GtkWidget *widget, GdkEventButton *event
     }
 
     gui_format_position_text(pos, positionText);
+    gui_clear_hint_highlight(gui);
     if (event->button == 1) {
         gtk_entry_set_text(GTK_ENTRY(gui->from_entry), positionText);
         gtk_entry_set_text(GTK_ENTRY(gui->to_entry), "");
@@ -431,6 +530,7 @@ void gui_on_undo_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestUndo(&gui->controller) != 0) {
         gui_set_error(gui, ERR_UNDO_UNAVAILABLE);
@@ -452,6 +552,7 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_clear_hint_highlight(gui);
     if (gui_start_hint_job(gui) == 0) {
         return;
     }
@@ -470,6 +571,14 @@ void gui_on_hint_clicked(GtkButton *button, gpointer user_data) {
 
     gui_format_hint_text(move, hintText);
     gui_set_status_text(gui, hintText);
+    gui_show_hint_move(gui, move);
+}
+
+void gui_on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *) user_data;
+
+    (void)button;
+    gui_toggle_fullscreen(gui);
 }
 
 void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data) {
@@ -480,6 +589,7 @@ void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data) {
         return;
     }
 
+    gui_clear_hint_highlight(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestLeaveGame(&gui->controller) != 0) {
         gui_set_error(gui, ERR_FATAL);
@@ -493,6 +603,7 @@ void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestNewGame(&gui->controller) != 0) {
@@ -507,6 +618,7 @@ void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestBack(&gui->controller) != 0) {
@@ -521,6 +633,7 @@ void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
     Gui *gui = (Gui *) user_data;
 
     (void)button;
+    gui_clear_hint_highlight(gui);
     gui_destroy_endgame_dialog(gui);
     gui_invalidate_async_results(gui);
     if (controllerRequestExit(&gui->controller) != 0) {

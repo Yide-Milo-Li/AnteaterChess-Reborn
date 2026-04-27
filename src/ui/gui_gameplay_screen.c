@@ -7,6 +7,10 @@
 
 #define GUI_PIECE_IMAGE_SIZE 56
 #define GUI_UI_ICON_SIZE 18
+#define GUI_FORMAT_HELP_TEXT \
+    "Type source and destination squares, for example E2 to E4.\n" \
+    "Castling uses the king start and end squares, for example F1 to H1.\n" \
+    "Promotion choices are selected after Submit."
 
 static const char *gui_special_move_text(SpecialMove type) {
     switch (type) {
@@ -129,6 +133,53 @@ static void gui_update_history_ai_summary(Gui *gui, const GameState *state) {
     gtk_widget_show(gui->history_ai_summary_label);
 }
 
+static void gui_show_format_help_popover(GtkWidget *popover) {
+    if (!GTK_IS_POPOVER(popover)) {
+        return;
+    }
+
+    gtk_widget_show_all(popover);
+}
+
+static void gui_on_format_help_clicked(GtkButton *button, gpointer user_data) {
+    (void)button;
+    gui_show_format_help_popover(GTK_WIDGET(user_data));
+}
+
+static GtkWidget *gui_create_format_help_popover(GtkWidget *relativeTo) {
+    GtkWidget *popover;
+    GtkWidget *content;
+    GtkWidget *title;
+    GtkWidget *body;
+
+    popover = gtk_popover_new(relativeTo);
+    gtk_popover_set_position(GTK_POPOVER(popover), GTK_POS_BOTTOM);
+    gtk_style_context_add_class(gtk_widget_get_style_context(popover),
+        "format-popover-shell");
+
+    content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_container_set_border_width(GTK_CONTAINER(content), 10);
+    gtk_style_context_add_class(gtk_widget_get_style_context(content),
+        "format-popover");
+
+    title = gtk_label_new("Command Format");
+    gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(title),
+        "format-popover-title");
+    gtk_box_pack_start(GTK_BOX(content), title, FALSE, FALSE, 0);
+
+    body = gtk_label_new(GUI_FORMAT_HELP_TEXT);
+    gtk_label_set_xalign(GTK_LABEL(body), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(body), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(body), 48);
+    gtk_style_context_add_class(gtk_widget_get_style_context(body),
+        "format-popover-body");
+    gtk_box_pack_start(GTK_BOX(content), body, FALSE, FALSE, 0);
+
+    gtk_container_add(GTK_CONTAINER(popover), content);
+    return popover;
+}
+
 static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *historyPanel;
     GtkWidget *historyHeader;
@@ -140,18 +191,20 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     GtkWidget *moveBox;
     GtkWidget *formatHelp;
     GtkWidget *formatIcon;
+    GtkWidget *formatPopover;
     GtkWidget *submitButton;
     GtkWidget *undoButton;
     GtkWidget *hintButton;
     GtkWidget *buttonBox;
 
-    historyPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    historyPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_style_context_add_class(gtk_widget_get_style_context(historyPanel), "panel");
+    gtk_style_context_add_class(gtk_widget_get_style_context(historyPanel), "history-card");
     gtk_box_pack_start(GTK_BOX(parent), historyPanel, TRUE, TRUE, 0);
 
     historyHeader = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(historyPanel), historyHeader, FALSE, FALSE, 0);
-    historyIcon = gui_create_ui_icon("history-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    historyIcon = gui_create_ui_icon("icon-history-dark.svg", GUI_UI_ICON_SIZE);
     if (historyIcon != NULL) {
         gtk_box_pack_start(GTK_BOX(historyHeader), historyIcon, FALSE, FALSE, 0);
     }
@@ -190,7 +243,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_style_context_add_class(gtk_widget_get_style_context(scrolledWindow), "history-panel");
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledWindow),
         GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_widget_set_size_request(scrolledWindow, -1, 260);
+    gtk_widget_set_size_request(scrolledWindow, -1, 300);
     gtk_container_add(GTK_CONTAINER(scrolledWindow), gui->history_view);
     gtk_box_pack_start(GTK_BOX(historyPanel), scrolledWindow, TRUE, TRUE, 0);
 
@@ -200,16 +253,26 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_style_context_add_class(gtk_widget_get_style_context(gui->status_label), "status-normal");
     gtk_box_pack_start(GTK_BOX(parent), gui->status_label, FALSE, FALSE, 0);
 
-    enterBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    enterBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_style_context_add_class(gtk_widget_get_style_context(enterBox), "panel");
+    gtk_style_context_add_class(gtk_widget_get_style_context(enterBox), "move-entry-panel");
     gtk_box_pack_start(GTK_BOX(parent), enterBox, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(enterBox), gtk_label_new("Enter Move"), FALSE, FALSE, 0);
+    {
+        GtkWidget *entryLabel = gtk_label_new("Enter Move");
 
-    moveBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+        gtk_widget_set_halign(entryLabel, GTK_ALIGN_START);
+        gtk_style_context_add_class(gtk_widget_get_style_context(entryLabel), "section-label");
+        gtk_box_pack_start(GTK_BOX(enterBox), entryLabel, FALSE, FALSE, 0);
+    }
+
+    moveBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_pack_start(GTK_BOX(enterBox), moveBox, FALSE, FALSE, 0);
     gui->from_entry = gtk_entry_new();
     gui->to_entry = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(gui->from_entry), "From");
     gtk_entry_set_placeholder_text(GTK_ENTRY(gui->to_entry), "To");
+    gtk_widget_set_size_request(gui->from_entry, 88, 38);
+    gtk_widget_set_size_request(gui->to_entry, 88, 38);
     gtk_widget_set_tooltip_text(gui->from_entry, "Source square, for example E2.");
     gtk_widget_set_tooltip_text(gui->to_entry, "Destination square, for example E4.");
     g_signal_connect(gui->from_entry, "changed", G_CALLBACK(gui_on_move_entry_changed), gui);
@@ -217,23 +280,32 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_start(GTK_BOX(moveBox), gui->from_entry, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(moveBox), gui->to_entry, TRUE, TRUE, 0);
 
-    formatHelp = gtk_event_box_new();
-    gtk_event_box_set_visible_window(GTK_EVENT_BOX(formatHelp), TRUE);
-    gtk_widget_set_size_request(formatHelp, 28, 28);
-    gtk_widget_set_tooltip_text(formatHelp,
-        "Move format: E2 to E4. Castling uses king start/end squares. Promotion is selected after submit.");
+    formatHelp = gtk_button_new();
+    gtk_widget_set_can_focus(formatHelp, FALSE);
+    gtk_widget_set_size_request(formatHelp, 32, 32);
     gtk_style_context_add_class(gtk_widget_get_style_context(formatHelp), "format-help");
-    formatIcon = gui_create_ui_icon("info-icon-svgrepo-com.svg", GUI_UI_ICON_SIZE);
+    formatIcon = gui_create_ui_icon("icon-info-dark.svg", GUI_UI_ICON_SIZE);
     if (formatIcon == NULL) {
         formatIcon = gtk_label_new("i");
         gtk_style_context_add_class(gtk_widget_get_style_context(formatIcon), "info-icon");
     }
-    gtk_container_add(GTK_CONTAINER(formatHelp), formatIcon);
+    gtk_button_set_image(GTK_BUTTON(formatHelp), formatIcon);
+    gtk_button_set_always_show_image(GTK_BUTTON(formatHelp), TRUE);
+    formatPopover = gui_create_format_help_popover(formatHelp);
+    g_object_set_data_full(G_OBJECT(formatHelp),
+        "format-popover",
+        g_object_ref_sink(formatPopover),
+        (GDestroyNotify)gtk_widget_destroy);
+    g_signal_connect(formatHelp,
+        "clicked",
+        G_CALLBACK(gui_on_format_help_clicked),
+        formatPopover);
     gtk_box_pack_start(GTK_BOX(moveBox), formatHelp, FALSE, FALSE, 0);
 
     submitButton = gtk_button_new_with_label("Submit");
     gui->submit_button = submitButton;
     gtk_style_context_add_class(gtk_widget_get_style_context(submitButton), "primary-button");
+    gtk_widget_set_size_request(submitButton, 96, 40);
     gtk_box_pack_start(GTK_BOX(moveBox), submitButton, FALSE, FALSE, 0);
     g_signal_connect(submitButton, "clicked", G_CALLBACK(gui_on_submit_move_clicked), gui);
 
@@ -245,35 +317,46 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
     hintButton = gtk_button_new_with_label("Hint");
     gui->hint_button = hintButton;
-    gui_set_button_icon(hintButton, "bulb-on-svgrepo-com (1).svg", GUI_UI_ICON_SIZE);
+    gui_set_button_icon(hintButton, "icon-hint-dark.svg", GUI_UI_ICON_SIZE);
     gtk_style_context_add_class(gtk_widget_get_style_context(hintButton), "hint-button");
     gtk_widget_set_size_request(hintButton, 92, 44);
     gtk_widget_set_tooltip_text(hintButton, "Show a suggested move.");
     g_signal_connect(hintButton, "clicked", G_CALLBACK(gui_on_hint_clicked), gui);
 
-    buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_style_context_add_class(gtk_widget_get_style_context(buttonBox), "action-row");
     gtk_box_pack_start(GTK_BOX(buttonBox), undoButton, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(buttonBox), hintButton, TRUE, TRUE, 0);
     gtk_box_pack_end(GTK_BOX(parent), buttonBox, FALSE, FALSE, 0);
 }
 
 static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *state) {
+    GtkWidget *boardPanel;
     GtkWidget *boardBox;
     GtkWidget *rankGrid;
+    GtkWidget *boardFrame;
     GtkWidget *boardGrid;
     GtkWidget *fileGrid;
     int row;
     int col;
 
     (void)state;
+    boardPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_widget_set_hexpand(boardPanel, TRUE);
+    gtk_widget_set_vexpand(boardPanel, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(boardPanel), "board-panel");
+    gtk_box_pack_start(GTK_BOX(parent), boardPanel, TRUE, TRUE, 0);
+
     gui->black_timer_label = gtk_label_new("Black --:--:--");
     gtk_widget_set_halign(gui->black_timer_label, GTK_ALIGN_END);
-    gtk_box_pack_start(GTK_BOX(parent), gui->black_timer_label, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->black_timer_label),
+        "timer-label");
+    gtk_box_pack_start(GTK_BOX(boardPanel), gui->black_timer_label, FALSE, FALSE, 0);
 
     boardBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_hexpand(boardBox, TRUE);
     gtk_widget_set_vexpand(boardBox, TRUE);
-    gtk_box_pack_start(GTK_BOX(parent), boardBox, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(boardPanel), boardBox, TRUE, TRUE, 0);
 
     rankGrid = gtk_grid_new();
     gtk_grid_set_row_homogeneous(GTK_GRID(rankGrid), TRUE);
@@ -282,17 +365,30 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     gtk_box_pack_start(GTK_BOX(boardBox), rankGrid, FALSE, FALSE, 0);
     for (row = 0; row < 8; ++row) {
         char label[2];
+        GtkWidget *rankLabel;
 
         snprintf(label, sizeof(label), "%d", 8 - row);
-        gtk_grid_attach(GTK_GRID(rankGrid), gtk_label_new(label), 0, row, 1, 1);
+        rankLabel = gtk_label_new(label);
+
+        gtk_style_context_add_class(gtk_widget_get_style_context(rankLabel),
+            "coordinate-label");
+        gtk_grid_attach(GTK_GRID(rankGrid), rankLabel, 0, row, 1, 1);
     }
+
+    boardFrame = gtk_aspect_frame_new(NULL, 0.5f, 0.5f, 1.25f, FALSE);
+    gtk_widget_set_size_request(boardFrame, 560, 448);
+    gtk_widget_set_hexpand(boardFrame, TRUE);
+    gtk_widget_set_vexpand(boardFrame, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(boardFrame), "board-frame");
+    gtk_box_pack_start(GTK_BOX(boardBox), boardFrame, TRUE, TRUE, 0);
 
     boardGrid = gtk_grid_new();
     gtk_grid_set_row_homogeneous(GTK_GRID(boardGrid), TRUE);
     gtk_grid_set_column_homogeneous(GTK_GRID(boardGrid), TRUE);
     gtk_widget_set_hexpand(boardGrid, TRUE);
     gtk_widget_set_vexpand(boardGrid, TRUE);
-    gtk_box_pack_start(GTK_BOX(boardBox), boardGrid, TRUE, TRUE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(boardGrid), "board-grid");
+    gtk_container_add(GTK_CONTAINER(boardFrame), boardGrid);
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
@@ -331,7 +427,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     fileGrid = gtk_grid_new();
     gtk_widget_set_size_request(fileGrid, -1, 50);
     gtk_widget_set_hexpand(fileGrid, TRUE);
-    gtk_box_pack_start(GTK_BOX(parent), fileGrid, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(boardPanel), fileGrid, FALSE, FALSE, 0);
     {
         GtkWidget *emptyLabel = gtk_label_new("");
         gtk_widget_set_size_request(emptyLabel, 30, -1);
@@ -342,53 +438,87 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
         GtkWidget *fileLabel = gtk_label_new(label);
 
         gtk_widget_set_hexpand(fileLabel, TRUE);
+        gtk_style_context_add_class(gtk_widget_get_style_context(fileLabel),
+            "coordinate-label");
         gtk_grid_attach(GTK_GRID(fileGrid), fileLabel, col + 1, 0, 1, 1);
     }
 
     gui->white_timer_label = gtk_label_new("White --:--:--");
     gtk_widget_set_halign(gui->white_timer_label, GTK_ALIGN_END);
-    gtk_box_pack_end(GTK_BOX(parent), gui->white_timer_label, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->white_timer_label),
+        "timer-label");
+    gtk_box_pack_end(GTK_BOX(boardPanel), gui->white_timer_label, FALSE, FALSE, 0);
 }
 
 void gui_build_gameplay_ui(Gui *gui, const GameState *state) {
+    GtkWidget *topBar;
+    GtkWidget *modeLabel;
     GtkWidget *turnLabel;
     GtkWidget *middleBox;
     GtkWidget *leftBox;
     GtkWidget *rightBox;
+    GtkWidget *fullscreenButton;
     GtkWidget *leaveButton;
 
     gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 12);
 
+    topBar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_hexpand(topBar, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(topBar), "match-bar");
+    gtk_box_pack_start(GTK_BOX(gui->main_box), topBar, FALSE, FALSE, 0);
+
+    modeLabel = gtk_label_new(gui_game_mode_title(state->config.mode));
+    gtk_widget_set_halign(modeLabel, GTK_ALIGN_START);
+    gtk_style_context_add_class(gtk_widget_get_style_context(modeLabel), "match-meta");
+    gtk_box_pack_start(GTK_BOX(topBar), modeLabel, FALSE, FALSE, 0);
+
     turnLabel = gtk_label_new("");
+    gtk_widget_set_hexpand(turnLabel, TRUE);
     gtk_widget_set_halign(turnLabel, GTK_ALIGN_CENTER);
     gtk_style_context_add_class(gtk_widget_get_style_context(turnLabel), "turn-banner");
-    gtk_box_pack_start(GTK_BOX(gui->main_box), turnLabel, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(topBar), turnLabel, TRUE, TRUE, 0);
     gui->turn_label = turnLabel;
     gui->last_move_count = -1;
 
-    middleBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    fullscreenButton = gtk_button_new_with_label("Fullscreen");
+    gui->fullscreen_button = fullscreenButton;
+    gtk_style_context_add_class(gtk_widget_get_style_context(fullscreenButton),
+        "fullscreen-button");
+    gtk_widget_set_size_request(fullscreenButton, 122, 40);
+    gtk_widget_set_halign(fullscreenButton, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(topBar), fullscreenButton, FALSE, FALSE, 0);
+    g_signal_connect(fullscreenButton, "clicked",
+        G_CALLBACK(gui_on_fullscreen_clicked),
+        gui);
+    gui_update_fullscreen_button(gui);
+
+    leaveButton = gtk_button_new_with_label("Leave Game");
+    gui->leave_game_button = leaveButton;
+    gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
+    gtk_widget_set_size_request(leaveButton, 128, 40);
+    gtk_widget_set_halign(leaveButton, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(topBar), leaveButton, FALSE, FALSE, 0);
+    g_signal_connect(leaveButton, "clicked", G_CALLBACK(gui_on_leave_game_clicked), gui);
+
+    middleBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
     gtk_widget_set_hexpand(middleBox, TRUE);
     gtk_widget_set_vexpand(middleBox, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(middleBox), "game-shell");
     gtk_box_pack_start(GTK_BOX(gui->main_box), middleBox, TRUE, TRUE, 0);
 
     leftBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    gtk_widget_set_size_request(leftBox, 360, -1);
+    gtk_widget_set_size_request(leftBox, 350, -1);
     gtk_widget_set_vexpand(leftBox, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(leftBox), "sidebar");
     gtk_box_pack_start(GTK_BOX(middleBox), leftBox, FALSE, TRUE, 0);
     build_gameplay_sidebar(gui, leftBox);
 
     rightBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     gtk_widget_set_hexpand(rightBox, TRUE);
     gtk_widget_set_vexpand(rightBox, TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(rightBox), "board-area");
     gtk_box_pack_start(GTK_BOX(middleBox), rightBox, TRUE, TRUE, 0);
     build_gameplay_board(gui, rightBox, state);
-
-    leaveButton = gtk_button_new_with_label("Leave Game");
-    gui->leave_game_button = leaveButton;
-    gtk_style_context_add_class(gtk_widget_get_style_context(leaveButton), "destructive-button");
-    gtk_widget_set_halign(leaveButton, GTK_ALIGN_CENTER);
-    gtk_box_pack_end(GTK_BOX(gui->main_box), leaveButton, FALSE, FALSE, 0);
-    g_signal_connect(leaveButton, "clicked", G_CALLBACK(gui_on_leave_game_clicked), gui);
 
     gtk_widget_show_all(gui->window);
 }
@@ -495,8 +625,8 @@ static GtkTextTag *gui_get_latest_move_tag(GtkTextBuffer *buffer) {
     if (latestTag == NULL) {
         latestTag = gtk_text_buffer_create_tag(buffer,
             "latest-move",
-            "background", "#e8f1fb",
-            "foreground", "#0f172a",
+            "background", "#4f3718",
+            "foreground", "#fff7e6",
             NULL);
     }
     return latestTag;

@@ -28,6 +28,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->submit_button = NULL;
     gui->undo_button = NULL;
     gui->hint_button = NULL;
+    gui->fullscreen_button = NULL;
     gui->leave_game_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;
@@ -36,6 +37,11 @@ void gui_clear_view_refs(Gui *gui) {
     gui->setup_side_white = NULL;
     gui->setup_side_black = NULL;
     gui->has_highlight_from = 0;
+    gui->has_hint_highlight = 0;
+    gui->hint_from = createPosition(-1, -1);
+    gui->hint_to = createPosition(-1, -1);
+    gui->hint_turn = EMPTY_COLOR;
+    gui->hint_move_count = -1;
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
@@ -136,6 +142,7 @@ void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog) {
 
     gtk_window_set_modal(window, TRUE);
     gtk_window_set_keep_above(window, TRUE);
+    gtk_window_set_type_hint(window, GDK_WINDOW_TYPE_HINT_DIALOG);
     gtk_window_set_position(window, GTK_WIN_POS_CENTER_ON_PARENT);
 }
 
@@ -153,8 +160,29 @@ void gui_destroy_endgame_dialog(Gui *gui) {
     }
 }
 
+static void gui_on_confirm_response_clicked(GtkButton *button, gpointer user_data) {
+    int response;
+
+    if (!GTK_IS_BUTTON(button) || !GTK_IS_DIALOG(user_data)) {
+        return;
+    }
+
+    response = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button),
+        "dialog-response"));
+    gtk_dialog_response(GTK_DIALOG(user_data), response);
+}
+
 int gui_confirm(Gui *gui, const char *title, const char *message) {
     GtkWidget *dialog;
+    GtkWidget *contentArea;
+    GtkWidget *body;
+    GtkWidget *icon;
+    GtkWidget *textBox;
+    GtkWidget *titleLabel;
+    GtkWidget *messageLabel;
+    GtkWidget *buttonRow;
+    GtkWidget *noButton;
+    GtkWidget *yesButton;
     GtkWindow *parent = NULL;
     int response;
 
@@ -166,18 +194,83 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
         parent = GTK_WINDOW(gui->window);
     }
 
-    dialog = gtk_message_dialog_new(parent,
-        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-        GTK_MESSAGE_WARNING,
-        GTK_BUTTONS_YES_NO,
-        "%s",
-        message);
-    if (title != NULL) {
-        gtk_window_set_title(GTK_WINDOW(dialog), title);
+    dialog = gtk_dialog_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), (title != NULL) ? title : "Confirm");
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
+    if (parent != NULL) {
+        gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
     }
 
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
     gui_prepare_modal_dialog(gui, dialog);
+
+    contentArea = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_container_set_border_width(GTK_CONTAINER(body), 14);
+    gtk_style_context_add_class(gtk_widget_get_style_context(body),
+        "confirm-dialog-body");
+    gtk_box_pack_start(GTK_BOX(contentArea), body, TRUE, TRUE, 0);
+
+    icon = gui_create_ui_icon("icon-alert-dark.svg", 38);
+    if (icon == NULL) {
+        icon = gtk_label_new("!");
+        gtk_style_context_add_class(gtk_widget_get_style_context(icon),
+            "confirm-icon-fallback");
+    }
+    gtk_widget_set_size_request(icon, 42, 42);
+    gtk_widget_set_valign(icon, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(body), icon, FALSE, FALSE, 0);
+
+    textBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_box_pack_start(GTK_BOX(body), textBox, TRUE, TRUE, 0);
+
+    titleLabel = gtk_label_new((title != NULL) ? title : "Confirm Action");
+    gtk_label_set_xalign(GTK_LABEL(titleLabel), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(titleLabel),
+        "confirm-title");
+    gtk_box_pack_start(GTK_BOX(textBox), titleLabel, FALSE, FALSE, 0);
+
+    messageLabel = gtk_label_new(message);
+    gtk_label_set_xalign(GTK_LABEL(messageLabel), 0.0f);
+    gtk_label_set_line_wrap(GTK_LABEL(messageLabel), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(messageLabel), 42);
+    gtk_style_context_add_class(gtk_widget_get_style_context(messageLabel),
+        "confirm-message");
+    gtk_box_pack_start(GTK_BOX(textBox), messageLabel, FALSE, FALSE, 0);
+
+    buttonRow = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_set_halign(buttonRow, GTK_ALIGN_CENTER);
+    gtk_style_context_add_class(gtk_widget_get_style_context(buttonRow),
+        "confirm-button-row");
+    gtk_box_pack_start(GTK_BOX(contentArea), buttonRow, FALSE, FALSE, 0);
+
+    noButton = gtk_button_new_with_label("No");
+    gtk_widget_set_size_request(noButton, 96, 38);
+    gtk_widget_set_can_default(noButton, TRUE);
+    g_object_set_data(G_OBJECT(noButton),
+        "dialog-response",
+        GINT_TO_POINTER(GTK_RESPONSE_NO));
+    g_signal_connect(noButton,
+        "clicked",
+        G_CALLBACK(gui_on_confirm_response_clicked),
+        dialog);
+    gtk_box_pack_start(GTK_BOX(buttonRow), noButton, FALSE, FALSE, 0);
+
+    yesButton = gtk_button_new_with_label("Yes");
+    gtk_widget_set_size_request(yesButton, 96, 38);
+    gtk_style_context_add_class(gtk_widget_get_style_context(yesButton),
+        "destructive-button");
+    g_object_set_data(G_OBJECT(yesButton),
+        "dialog-response",
+        GINT_TO_POINTER(GTK_RESPONSE_YES));
+    g_signal_connect(yesButton,
+        "clicked",
+        G_CALLBACK(gui_on_confirm_response_clicked),
+        dialog);
+    gtk_box_pack_start(GTK_BOX(buttonRow), yesButton, FALSE, FALSE, 0);
+    gtk_widget_grab_default(noButton);
+
+    gtk_widget_show_all(dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     return response == GTK_RESPONSE_YES;
@@ -221,6 +314,8 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 
     gui_clear_view_refs(gui);
     gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, spacing);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->main_box),
+        "app-root");
     gtk_widget_set_halign(gui->main_box, halign);
     gtk_widget_set_valign(gui->main_box, valign);
     gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
@@ -229,7 +324,7 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 GtkWidget *gui_create_centered_button(const char *label) {
     GtkWidget *button = gtk_button_new_with_label(label);
 
-    gtk_widget_set_size_request(button, 180, 44);
+    gtk_widget_set_size_request(button, 210, 46);
     gtk_widget_set_hexpand(button, TRUE);
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
     return button;

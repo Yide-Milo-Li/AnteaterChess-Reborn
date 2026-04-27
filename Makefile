@@ -99,6 +99,7 @@ GUI_SRCS := \
 	src/ui/gui_format.c \
 	src/ui/gui_gameplay_screen.c \
 	src/ui/gui_screens.c \
+	src/ui/gui_style.c \
 	src/ui/gui_setup_screen.c
 
 GUI_MAIN_SRC := src/main.c

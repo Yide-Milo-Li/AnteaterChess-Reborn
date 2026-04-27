@@ -323,6 +323,38 @@ static int square_attacked_by(const Board *board, Position target, Color attacki
     return 0;
 }
 
+static int square_supported_by_excluding(const Board *board,
+                                         Position target,
+                                         Color supportingColor,
+                                         Position excluded) {
+    int row;
+    int col;
+
+    if (board == NULL || !isValidPosition(target)) {
+        return 0;
+    }
+
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position from = createPosition(row, col);
+            Piece piece;
+
+            if (positionEqual(from, excluded)) {
+                continue;
+            }
+
+            piece = getPiece(board, from);
+            if (piece.type == EMPTY_PIECE || piece.color != supportingColor) {
+                continue;
+            }
+            if (attacks_square(board, from, piece, target)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 static int anteater_can_capture_ant_square(Position from, Position target) {
     int rowDistance;
     int colDistance;
@@ -834,6 +866,115 @@ static int board_phase(const Board *board) {
     return clamp_int_local(phase, 0, 28);
 }
 
+static int piece_advance(Position pos, Color color) {
+    if (!isValidPosition(pos)) {
+        return 0;
+    }
+    return (color == WHITE) ? (ROWS - 1 - pos.row) : pos.row;
+}
+
+static int knight_has_safe_retreat(const Board *board, Position pos, Color color) {
+    static const int rowOffsets[] = {-2, -2, -1, -1, 1, 1, 2, 2};
+    static const int colOffsets[] = {-1, 1, -2, 2, -2, 2, -1, 1};
+    Color enemy;
+    int currentAdvance;
+    int index;
+
+    if (board == NULL || !isValidPosition(pos)) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    currentAdvance = piece_advance(pos, color);
+    for (index = 0; index < 8; ++index) {
+        Position target = createPosition(pos.row + rowOffsets[index],
+            pos.col + colOffsets[index]);
+        Piece occupant;
+
+        if (!isValidPosition(target) || piece_advance(target, color) >= currentAdvance) {
+            continue;
+        }
+
+        occupant = getPiece(board, target);
+        if (occupant.color == color || occupant.type == KING) {
+            continue;
+        }
+        if (!square_attacked_by(board, target, enemy)
+            || square_supported_by_excluding(board, target, color, pos)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int opening_knight_overextension_penalty_at(const Board *board,
+                                                   Position pos,
+                                                   Color color,
+                                                   int phase) {
+    Color enemy;
+    int advance;
+    int penalty;
+    int supported;
+    int attacked;
+
+    if (board == NULL || phase < 16 || !isValidPosition(pos)) {
+        return 0;
+    }
+
+    advance = piece_advance(pos, color);
+    if (advance < 4) {
+        return 0;
+    }
+
+    enemy = (color == WHITE) ? BLACK : WHITE;
+    supported = square_supported_by_excluding(board, pos, color, pos);
+    attacked = square_attacked_by(board, pos, enemy);
+    penalty = 70 + (advance - 4) * 70;
+
+    if (!supported) {
+        penalty += 150;
+    }
+    if (attacked) {
+        penalty += supported ? 55 : 135;
+    }
+    if (!knight_has_safe_retreat(board, pos, color)) {
+        penalty += 105;
+    }
+    if (advance >= 6) {
+        penalty += 120;
+    }
+
+    return penalty;
+}
+
+static int opening_knight_overextension_penalty_for(const GameState *state,
+                                                    Color color,
+                                                    int phase) {
+    int row;
+    int col;
+    int penalty;
+
+    if (state == NULL) {
+        return 0;
+    }
+
+    penalty = 0;
+    for (row = 0; row < ROWS; ++row) {
+        for (col = 0; col < COLS; ++col) {
+            Position pos = createPosition(row, col);
+            Piece piece = getPiece(&state->board, pos);
+
+            if (piece.type == KNIGHT && piece.color == color) {
+                penalty += opening_knight_overextension_penalty_at(&state->board,
+                    pos,
+                    color,
+                    phase);
+            }
+        }
+    }
+    return penalty;
+}
+
 static int promotion_lane_control_penalty(const Board *board,
                                           Position pos,
                                           Color color) {
@@ -1290,6 +1431,39 @@ static int move_allows_immediate_loss(const GameState *state,
     return loses;
 }
 
+static int move_creates_opening_knight_overextension(const GameState *state,
+                                                     const Move *move) {
+    GameState *afterMove;
+    int phase;
+    int penalty;
+
+    if (state == NULL || move == NULL || move->movedPiece.type != KNIGHT) {
+        return 0;
+    }
+
+    phase = board_phase(&state->board);
+    if (phase < 16 || piece_advance(move->to, move->movedPiece.color) < 4) {
+        return 0;
+    }
+
+    afterMove = (GameState *)malloc(sizeof(*afterMove));
+    if (afterMove == NULL) {
+        return 0;
+    }
+    *afterMove = *state;
+    if (applyMove(afterMove, *move) != 0) {
+        free(afterMove);
+        return 0;
+    }
+
+    penalty = opening_knight_overextension_penalty_at(&afterMove->board,
+        move->to,
+        move->movedPiece.color,
+        phase);
+    free(afterMove);
+    return penalty >= 260;
+}
+
 static int root_guard_score(const GameState *stateAfterMove,
                             const Move *move,
                             Color movingSide) {
@@ -1309,6 +1483,69 @@ static int root_guard_score(const GameState *stateAfterMove,
     score += king_crisis_score_for(stateAfterMove, stateAfterMove->currentTurn) / 3;
     score -= king_crisis_score_for(stateAfterMove, movingSide) / 2;
     return score;
+}
+
+static int replace_opening_knight_raid(const GameState *state, Move *move) {
+    MoveList *candidates;
+    Move bestMove;
+    Color movingSide;
+    int bestScore;
+    int found;
+    int index;
+
+    if (state == NULL || move == NULL
+        || (state->currentTurn != WHITE && state->currentTurn != BLACK)
+        || !move_creates_opening_knight_overextension(state, move)) {
+        return 0;
+    }
+
+    movingSide = state->currentTurn;
+    candidates = (MoveList *)malloc(sizeof(*candidates));
+    if (candidates == NULL) {
+        return 0;
+    }
+    if (generateLegalMoves(state, candidates) != 0) {
+        free(candidates);
+        return 0;
+    }
+
+    bestScore = -1000000;
+    found = 0;
+    for (index = 0; index < candidates->count; ++index) {
+        GameState *afterMove;
+        int score;
+
+        if (move_creates_opening_knight_overextension(state, &candidates->moves[index])
+            || move_allows_immediate_loss(state, &candidates->moves[index], movingSide)) {
+            continue;
+        }
+
+        afterMove = (GameState *)malloc(sizeof(*afterMove));
+        if (afterMove == NULL) {
+            continue;
+        }
+        *afterMove = *state;
+        if (applyMove(afterMove, candidates->moves[index]) != 0) {
+            free(afterMove);
+            continue;
+        }
+
+        score = root_guard_score(afterMove, &candidates->moves[index], movingSide);
+        free(afterMove);
+        if (!found || score > bestScore) {
+            bestScore = score;
+            bestMove = candidates->moves[index];
+            found = 1;
+        }
+    }
+
+    free(candidates);
+    if (!found) {
+        return 0;
+    }
+
+    *move = bestMove;
+    return 1;
 }
 
 static int replace_immediate_loss_blunder(const GameState *state, Move *move) {
@@ -1387,6 +1624,8 @@ static int tournament_evaluate_adjustment(const GameState *state) {
     phase = board_phase(&state->board);
     return king_safety_adjustment_for(state, WHITE, phase)
         - king_safety_adjustment_for(state, BLACK, phase)
+        - opening_knight_overextension_penalty_for(state, WHITE, phase)
+        + opening_knight_overextension_penalty_for(state, BLACK, phase)
         + promotion_pressure_for(state, WHITE, phase)
         - promotion_pressure_for(state, BLACK, phase)
         + back_rank_invasion_pressure_for(state, WHITE)
@@ -1527,5 +1766,6 @@ int generateTournamentAIMoveWithBudget(const GameState *state,
         return result;
     }
     (void)replace_immediate_loss_blunder(state, move);
+    (void)replace_opening_knight_raid(state, move);
     return 0;
 }

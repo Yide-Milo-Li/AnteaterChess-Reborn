@@ -252,6 +252,32 @@ static void setup_tournament_log_142053_after_move_14(GameState *state) {
     replay_tournament_log_142053_prefix(state, 14);
 }
 
+static void replay_tournament_log_163625_prefix(GameState *state, int moveCount) {
+    static const char *fromSquares[] = {
+        "I1", "B8", "J3", "I8", "A2", "H7"
+    };
+    static const char *toSquares[] = {
+        "J3", "C6", "I5", "J6", "A4", "H6"
+    };
+    int index;
+
+    initBoard(&state->board);
+    initMoveList(&state->moveHistory);
+    state->moveCount = 0;
+    state->currentTurn = WHITE;
+    state->config.aiDifficultyWhite = DIFFICULTY_TOURNAMENT;
+    state->config.aiDifficultyBlack = DIFFICULTY_HARD;
+    state->config.aiTimeLimit = 0;
+
+    for (index = 0; index < moveCount; ++index) {
+        apply_logged_move(state, fromSquares[index], toSquares[index]);
+    }
+}
+
+static void setup_tournament_log_163625_after_move_6(GameState *state) {
+    replay_tournament_log_163625_prefix(state, 6);
+}
+
 static void setup_tournament_log_153600_after_move_140(GameState *state) {
     clear_board(&state->board);
     initMoveList(&state->moveHistory);
@@ -524,6 +550,21 @@ static void test_tournament_ai_avoids_logged_h2_mate(void) {
         && positionEqual(move.to, createPosition(3, 8)) == 1));
 }
 
+static void test_tournament_ai_avoids_unsupported_logged_knight_raid(void) {
+    GameState state = create_ai_ready_state();
+    GameState before;
+    Move move;
+
+    setup_tournament_log_163625_after_move_6(&state);
+    before = state;
+
+    assert(generateAIMoveWithBudget(&state, &move, 1200) == 0);
+    assert_state_unchanged(&before, &state);
+    assert_move_is_playable_and_safe(&state, move);
+    assert(!(positionEqual(move.from, createPosition(3, 8)) == 1
+        && positionEqual(move.to, createPosition(1, 7)) == 1));
+}
+
 static void test_tournament_ai_intercepts_logged_g_runner(void) {
     GameState state = create_ai_ready_state();
     GameState before;
@@ -652,6 +693,7 @@ int main(void) {
     test_tournament_ai_captures_loose_checker_from_logged_game();
     test_tournament_ai_does_not_ignore_logged_bishop_check_threat();
     test_tournament_ai_avoids_logged_h2_mate();
+    test_tournament_ai_avoids_unsupported_logged_knight_raid();
     test_tournament_ai_intercepts_logged_g_runner();
     test_tournament_time_manager_rolls_saved_time_forward();
     test_ai_fails_cleanly_when_no_legal_move_exists();

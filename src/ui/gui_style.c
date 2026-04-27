@@ -16,6 +16,7 @@ void gui_install_style(void) {
         ".confirm-title { color: #fff1ed; font-weight: bold; font-size: 15px; } "
         ".confirm-message { color: #f8f5ee; } "
         ".confirm-icon-fallback { color: #fff1ed; background-color: #6b2d28; border: 1px solid #ff8b80; border-radius: 999px; font-weight: bold; } "
+        ".confirm-button-row { background-color: transparent; padding: 0 14px 14px 14px; } "
         "button { color: #fffaf0; background-image: none; background-color: #303030; border: 1px solid #8f846d; border-radius: 6px; padding: 8px 12px; } "
         "button label { color: #fffaf0; } "
         "button:hover { background-color: #424242; border-color: #f0c15f; } "

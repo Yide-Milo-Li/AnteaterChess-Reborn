@@ -160,6 +160,18 @@ void gui_destroy_endgame_dialog(Gui *gui) {
     }
 }
 
+static void gui_on_confirm_response_clicked(GtkButton *button, gpointer user_data) {
+    int response;
+
+    if (!GTK_IS_BUTTON(button) || !GTK_IS_DIALOG(user_data)) {
+        return;
+    }
+
+    response = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button),
+        "dialog-response"));
+    gtk_dialog_response(GTK_DIALOG(user_data), response);
+}
+
 int gui_confirm(Gui *gui, const char *title, const char *message) {
     GtkWidget *dialog;
     GtkWidget *contentArea;
@@ -168,6 +180,8 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
     GtkWidget *textBox;
     GtkWidget *titleLabel;
     GtkWidget *messageLabel;
+    GtkWidget *buttonRow;
+    GtkWidget *noButton;
     GtkWidget *yesButton;
     GtkWindow *parent = NULL;
     int response;
@@ -180,14 +194,12 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
         parent = GTK_WINDOW(gui->window);
     }
 
-    dialog = gtk_dialog_new_with_buttons((title != NULL) ? title : "Confirm",
-        parent,
-        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-        "No",
-        GTK_RESPONSE_NO,
-        "Yes",
-        GTK_RESPONSE_YES,
-        NULL);
+    dialog = gtk_dialog_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), (title != NULL) ? title : "Confirm");
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
+    if (parent != NULL) {
+        gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
+    }
 
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_NO);
     gui_prepare_modal_dialog(gui, dialog);
@@ -226,12 +238,37 @@ int gui_confirm(Gui *gui, const char *title, const char *message) {
         "confirm-message");
     gtk_box_pack_start(GTK_BOX(textBox), messageLabel, FALSE, FALSE, 0);
 
-    yesButton = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
-        GTK_RESPONSE_YES);
-    if (GTK_IS_WIDGET(yesButton)) {
-        gtk_style_context_add_class(gtk_widget_get_style_context(yesButton),
-            "destructive-button");
-    }
+    buttonRow = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_set_halign(buttonRow, GTK_ALIGN_CENTER);
+    gtk_style_context_add_class(gtk_widget_get_style_context(buttonRow),
+        "confirm-button-row");
+    gtk_box_pack_start(GTK_BOX(contentArea), buttonRow, FALSE, FALSE, 0);
+
+    noButton = gtk_button_new_with_label("No");
+    gtk_widget_set_size_request(noButton, 96, 38);
+    gtk_widget_set_can_default(noButton, TRUE);
+    g_object_set_data(G_OBJECT(noButton),
+        "dialog-response",
+        GINT_TO_POINTER(GTK_RESPONSE_NO));
+    g_signal_connect(noButton,
+        "clicked",
+        G_CALLBACK(gui_on_confirm_response_clicked),
+        dialog);
+    gtk_box_pack_start(GTK_BOX(buttonRow), noButton, FALSE, FALSE, 0);
+
+    yesButton = gtk_button_new_with_label("Yes");
+    gtk_widget_set_size_request(yesButton, 96, 38);
+    gtk_style_context_add_class(gtk_widget_get_style_context(yesButton),
+        "destructive-button");
+    g_object_set_data(G_OBJECT(yesButton),
+        "dialog-response",
+        GINT_TO_POINTER(GTK_RESPONSE_YES));
+    g_signal_connect(yesButton,
+        "clicked",
+        G_CALLBACK(gui_on_confirm_response_clicked),
+        dialog);
+    gtk_box_pack_start(GTK_BOX(buttonRow), yesButton, FALSE, FALSE, 0);
+    gtk_widget_grab_default(noButton);
 
     gtk_widget_show_all(dialog);
     response = gtk_dialog_run(GTK_DIALOG(dialog));

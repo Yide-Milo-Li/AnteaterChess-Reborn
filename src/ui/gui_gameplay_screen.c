@@ -146,15 +146,6 @@ static void gui_on_format_help_clicked(GtkButton *button, gpointer user_data) {
     gui_show_format_help_popover(GTK_WIDGET(user_data));
 }
 
-static gboolean gui_on_format_help_enter(GtkWidget *widget,
-                                         GdkEventCrossing *event,
-                                         gpointer user_data) {
-    (void)widget;
-    (void)event;
-    gui_show_format_help_popover(GTK_WIDGET(user_data));
-    return FALSE;
-}
-
 static GtkWidget *gui_create_format_help_popover(GtkWidget *relativeTo) {
     GtkWidget *popover;
     GtkWidget *content;
@@ -305,11 +296,6 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
         "format-popover",
         g_object_ref_sink(formatPopover),
         (GDestroyNotify)gtk_widget_destroy);
-    gtk_widget_add_events(formatHelp, GDK_ENTER_NOTIFY_MASK);
-    g_signal_connect(formatHelp,
-        "enter-notify-event",
-        G_CALLBACK(gui_on_format_help_enter),
-        formatPopover);
     g_signal_connect(formatHelp,
         "clicked",
         G_CALLBACK(gui_on_format_help_clicked),

@@ -28,6 +28,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->submit_button = NULL;
     gui->undo_button = NULL;
     gui->hint_button = NULL;
+    gui->fullscreen_button = NULL;
     gui->leave_game_button = NULL;
     gui->setup_timer_toggle = NULL;
     gui->setup_hours_spin = NULL;
@@ -136,6 +137,7 @@ void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog) {
 
     gtk_window_set_modal(window, TRUE);
     gtk_window_set_keep_above(window, TRUE);
+    gtk_window_set_type_hint(window, GDK_WINDOW_TYPE_HINT_DIALOG);
     gtk_window_set_position(window, GTK_WIN_POS_CENTER_ON_PARENT);
 }
 
@@ -221,6 +223,8 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 
     gui_clear_view_refs(gui);
     gui->main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, spacing);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->main_box),
+        "app-root");
     gtk_widget_set_halign(gui->main_box, halign);
     gtk_widget_set_valign(gui->main_box, valign);
     gtk_container_add(GTK_CONTAINER(gui->window), gui->main_box);
@@ -229,7 +233,7 @@ void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacin
 GtkWidget *gui_create_centered_button(const char *label) {
     GtkWidget *button = gtk_button_new_with_label(label);
 
-    gtk_widget_set_size_request(button, 180, 44);
+    gtk_widget_set_size_request(button, 210, 46);
     gtk_widget_set_hexpand(button, TRUE);
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
     return button;

@@ -4,16 +4,23 @@
 
 static void build_difficulty_group(GtkWidget *parent, const char *labelText,
                                    GtkWidget *buttons[GUI_AI_DIFFICULTY_COUNT]) {
+    GtkWidget *group;
     GtkWidget *label;
     GtkWidget *box;
 
+    group = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_style_context_add_class(gtk_widget_get_style_context(group), "setup-group");
+    gtk_box_pack_start(GTK_BOX(parent), group, FALSE, FALSE, 0);
+
     label = gtk_label_new(labelText);
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), "section-label");
+    gtk_box_pack_start(GTK_BOX(group), label, FALSE, FALSE, 0);
 
     box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), box, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(box), "segmented-row");
+    gtk_box_pack_start(GTK_BOX(group), box, FALSE, FALSE, 0);
 
     buttons[0] = gtk_radio_button_new_with_label(NULL, "Easy");
     buttons[1] = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(buttons[0]), "Medium");
@@ -28,18 +35,24 @@ static void build_difficulty_group(GtkWidget *parent, const char *labelText,
 }
 
 static void build_timer_controls(Gui *gui, GtkWidget *parent) {
+    GtkWidget *timerPanel;
     GtkWidget *timerBox;
     GtkWidget *hoursLabel;
     GtkWidget *minutesLabel;
     GtkWidget *secondsLabel;
 
+    timerPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_style_context_add_class(gtk_widget_get_style_context(timerPanel), "setup-group");
+    gtk_box_pack_start(GTK_BOX(parent), timerPanel, FALSE, FALSE, 0);
+
     gui->setup_timer_toggle = gtk_toggle_button_new_with_label("Turn timer");
     gtk_widget_set_halign(gui->setup_timer_toggle, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), gui->setup_timer_toggle, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(timerPanel), gui->setup_timer_toggle, FALSE, FALSE, 0);
 
     timerBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_set_halign(timerBox, GTK_ALIGN_CENTER);
-    gtk_box_pack_start(GTK_BOX(parent), timerBox, FALSE, FALSE, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(timerBox), "segmented-row");
+    gtk_box_pack_start(GTK_BOX(timerPanel), timerBox, FALSE, FALSE, 0);
 
     hoursLabel = gtk_label_new("Hours:");
     gui->setup_hours_spin = gtk_spin_button_new_with_range(0, 1, 1);
@@ -104,6 +117,9 @@ static void build_ai_budget_summary(GtkWidget *parent) {
         getDefaultAITimeBudgetMs(DIFFICULTY_EXPERIMENTAL));
     label = gtk_label_new(text);
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(label), 72);
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), "caption-label");
     gtk_box_pack_start(GTK_BOX(parent), label, FALSE, FALSE, 0);
 }
 
@@ -244,25 +260,32 @@ void gui_build_setup_menu(Gui *gui) {
 
     gui_rebuild_root_box(gui, GTK_ALIGN_FILL, GTK_ALIGN_FILL, 18);
 
-    contentBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 24);
+    contentBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
     gtk_widget_set_halign(contentBox, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(contentBox, GTK_ALIGN_CENTER);
-    gtk_widget_set_size_request(contentBox, 620, -1);
+    gtk_widget_set_size_request(contentBox, 680, -1);
     gtk_style_context_add_class(gtk_widget_get_style_context(contentBox), "menu-panel");
+    gtk_style_context_add_class(gtk_widget_get_style_context(contentBox), "setup-panel");
     gtk_box_pack_start(GTK_BOX(gui->main_box), contentBox, TRUE, FALSE, 0);
 
     label = gtk_label_new(gui_game_mode_title(gui->pendingConfig.mode));
     gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+    gtk_style_context_add_class(gtk_widget_get_style_context(label), "app-title");
     gtk_box_pack_start(GTK_BOX(contentBox), label, FALSE, FALSE, 0);
 
     if (gui->pendingConfig.mode == MODE_HUMAN_VS_COMPUTER) {
+        GtkWidget *sideGroup = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
         GtkWidget *sideLabel = gtk_label_new("Select Side");
         GtkWidget *sideBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
 
+        gtk_style_context_add_class(gtk_widget_get_style_context(sideGroup), "setup-group");
         gtk_widget_set_halign(sideLabel, GTK_ALIGN_CENTER);
         gtk_widget_set_halign(sideBox, GTK_ALIGN_CENTER);
-        gtk_box_pack_start(GTK_BOX(contentBox), sideLabel, FALSE, FALSE, 0);
-        gtk_box_pack_start(GTK_BOX(contentBox), sideBox, FALSE, FALSE, 0);
+        gtk_style_context_add_class(gtk_widget_get_style_context(sideLabel), "section-label");
+        gtk_style_context_add_class(gtk_widget_get_style_context(sideBox), "segmented-row");
+        gtk_box_pack_start(GTK_BOX(contentBox), sideGroup, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(sideGroup), sideLabel, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(sideGroup), sideBox, FALSE, FALSE, 0);
 
         gui->setup_side_white = gtk_radio_button_new_with_label(NULL, "White");
         gui->setup_side_black = gtk_radio_button_new_with_label_from_widget(

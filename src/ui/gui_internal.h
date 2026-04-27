@@ -43,6 +43,7 @@ struct Gui {
     GtkWidget *submit_button;
     GtkWidget *undo_button;
     GtkWidget *hint_button;
+    GtkWidget *fullscreen_button;
     GtkWidget *leave_game_button;
     GtkWidget *endgame_dialog;
     GtkWidget *setup_timer_toggle;
@@ -83,6 +84,7 @@ struct Gui {
 };
 
 void gui_clear_view_refs(Gui *gui);
+void gui_install_style(void);
 void gui_rebuild_root_box(Gui *gui, GtkAlign halign, GtkAlign valign, int spacing);
 GtkWidget *gui_create_centered_button(const char *label);
 void gui_set_status(Gui *gui, GuiStatusKind kind, const char *text);
@@ -95,6 +97,8 @@ void gui_prepare_modal_dialog(Gui *gui, GtkWidget *dialog);
 void gui_destroy_endgame_dialog(Gui *gui);
 int gui_confirm(Gui *gui, const char *title, const char *message);
 void gui_set_error(Gui *gui, ErrorCode code);
+void gui_toggle_fullscreen(Gui *gui);
+void gui_update_fullscreen_button(Gui *gui);
 void gui_attach_move_provider(Gui *gui);
 void gui_invalidate_async_results(Gui *gui);
 void gui_cancel_async_jobs(Gui *gui);
@@ -156,6 +160,7 @@ void gui_on_move_entry_changed(GtkEditable *editable, gpointer user_data);
 gboolean gui_on_board_cell_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
 void gui_on_undo_clicked(GtkButton *button, gpointer user_data);
 void gui_on_hint_clicked(GtkButton *button, gpointer user_data);
+void gui_on_fullscreen_clicked(GtkButton *button, gpointer user_data);
 void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data);
 void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data);

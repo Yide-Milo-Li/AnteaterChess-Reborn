@@ -14,26 +14,12 @@ static gboolean gui_on_window_key_press(GtkWidget *widget, GdkEventKey *event, g
     }
 
     if (event->keyval == GDK_KEY_F11) {
-        if (gui->fullscreen_transition_pending) {
-            return TRUE;
-        }
-
-        gui->fullscreen_transition_pending = 1;
-        if (gui->is_fullscreen) {
-            gtk_window_unfullscreen(GTK_WINDOW(gui->window));
-        } else {
-            gtk_window_fullscreen(GTK_WINDOW(gui->window));
-        }
+        gui_toggle_fullscreen(gui);
         return TRUE;
     }
 
     if (event->keyval == GDK_KEY_Escape && gui->is_fullscreen) {
-        if (gui->fullscreen_transition_pending) {
-            return TRUE;
-        }
-
-        gui->fullscreen_transition_pending = 1;
-        gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+        gui_toggle_fullscreen(gui);
         return TRUE;
     }
 
@@ -54,8 +40,41 @@ static gboolean gui_on_window_state_event(GtkWidget *widget,
         gui->is_fullscreen =
             (event->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) ? 1 : 0;
         gui->fullscreen_transition_pending = 0;
+        gui_update_fullscreen_button(gui);
     }
     return FALSE;
+}
+
+void gui_toggle_fullscreen(Gui *gui) {
+    if (gui == NULL || !GTK_IS_WINDOW(gui->window)) {
+        return;
+    }
+    if (gui->fullscreen_transition_pending) {
+        return;
+    }
+
+    gui->fullscreen_transition_pending = 1;
+    if (gui->is_fullscreen) {
+        gtk_window_unfullscreen(GTK_WINDOW(gui->window));
+    } else {
+        gtk_window_fullscreen(GTK_WINDOW(gui->window));
+    }
+}
+
+void gui_update_fullscreen_button(Gui *gui) {
+    const char *label;
+    const char *tooltip;
+
+    if (gui == NULL || !GTK_IS_BUTTON(gui->fullscreen_button)) {
+        return;
+    }
+
+    label = gui->is_fullscreen ? "Windowed" : "Fullscreen";
+    tooltip = gui->is_fullscreen
+        ? "Exit fullscreen mode."
+        : "Enter fullscreen mode.";
+    gtk_button_set_label(GTK_BUTTON(gui->fullscreen_button), label);
+    gtk_widget_set_tooltip_text(gui->fullscreen_button, tooltip);
 }
 
 static void gui_update_endgame_turn_display(Gui *gui, const GameState *state) {
@@ -75,10 +94,10 @@ static void gui_update_endgame_turn_display(Gui *gui, const GameState *state) {
 }
 
 Gui *gui_create(int *argc, char ***argv) {
-    GtkCssProvider *provider;
     Gui *gui;
 
     gtk_init(argc, argv);
+    gui_install_style();
 
     gui = g_new0(Gui, 1);
     gui->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -88,60 +107,8 @@ Gui *gui_create(int *argc, char ***argv) {
     gtk_window_set_position(GTK_WINDOW(gui->window), GTK_WIN_POS_CENTER);
     gtk_container_set_border_width(GTK_CONTAINER(gui->window), 24);
     gtk_widget_add_events(gui->window, GDK_KEY_PRESS_MASK | GDK_STRUCTURE_MASK);
-
-    provider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(provider,
-        "GtkWindow { background-color: #e8edf3; } "
-        "label { color: #111827; } "
-        "tooltip { background-color: #111827; border: 1px solid #f8fafc; border-radius: 4px; } "
-        "tooltip label { color: #f9fafb; padding: 6px; } "
-        "button { color: #111827; background-image: none; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; } "
-        "button label { color: #111827; } "
-        "button:hover { background-color: #e0f2fe; border-color: #0284c7; } "
-        "button:active { background-color: #bae6fd; } "
-        "button:disabled, button:disabled label { color: #6b7280; background-color: #e5e7eb; } "
-        "button.primary-button { color: #ffffff; background-color: #2563eb; border-color: #1d4ed8; font-weight: bold; } "
-        "button.primary-button label { color: #ffffff; } "
-        "button.primary-button:hover { background-color: #1d4ed8; border-color: #1e40af; } "
-        "button.primary-button:disabled { color: #dbeafe; background-color: #64748b; border-color: #475569; } "
-        "button.primary-button:disabled label { color: #dbeafe; } "
-        "button.ai-status-button, button.ai-status-button:disabled { color: #1e3a8a; background-color: #dbeafe; border-color: #93c5fd; font-weight: bold; } "
-        "button.ai-status-button label, button.ai-status-button:disabled label { color: #1e3a8a; } "
-        "entry { color: #111827; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; } "
-        ".panel { background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; } "
-        ".menu-panel { background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px; } "
-        ".panel-title { color: #0f172a; font-weight: bold; } "
-        ".clock-text { color: #475569; font-weight: bold; } "
-        ".history-panel { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; } "
-        ".history-view, textview, textview text { color: #0f172a; background-color: #ffffff; font-size: 12px; } "
-        ".ai-summary { color: #475569; font-size: 12px; } "
-        ".status-normal, .status-busy, .status-error, .status-success { border-radius: 6px; padding: 6px; } "
-        ".status-normal { color: #334155; background-color: transparent; border: 1px solid transparent; } "
-        ".status-busy { color: #1e3a8a; background-color: #dbeafe; border: 1px solid #93c5fd; } "
-        ".status-success { color: #166534; background-color: #dcfce7; border: 1px solid #86efac; } "
-        ".status-error { color: #991b1b; background-color: #fee2e2; border: 1px solid #fecaca; } "
-        ".hint-button { background-color: #f8fafc; border-color: #cbd5e1; } "
-        ".hint-button:hover { background-color: #eef6ff; border-color: #94a3b8; } "
-        ".format-help { background-color: transparent; border-radius: 999px; padding: 4px; } "
-        ".format-help:hover { background-color: #e0f2fe; } "
-        ".info-icon { color: #2563eb; font-weight: bold; } "
-        ".destructive-button { background-color: #fff1f2; border-color: #fb7185; } "
-        ".destructive-button:hover { background-color: #ffe4e6; border-color: #e11d48; } "
-        ".turn-banner { color: #0f172a; font-size: 18px; font-weight: bold; padding: 6px 12px; border-radius: 8px; background-color: #f8fafc; border: 1px solid #cbd5e1; } "
-        ".light-square { background-color: #f0d9b5; } "
-        ".dark-square { background-color: #b58863; } "
-        ".piece-fallback { color: #111827; font-size: 28px; font-weight: bold; } "
-        ".highlight-from { box-shadow: inset 0 0 0 4px rgba(37, 99, 235, 0.85); } "
-        ".highlight-destination { box-shadow: inset 0 0 0 4px rgba(22, 163, 74, 0.82); } "
-        ".highlight-selected { box-shadow: inset 0 0 0 5px rgba(234, 179, 8, 0.95); } "
-        ".move-input-valid { box-shadow: inset 0 0 0 2px #2e7d32; } "
-        ".move-input-invalid { box-shadow: inset 0 0 0 2px #b00020; }",
-        -1,
-        NULL);
-    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
-        GTK_STYLE_PROVIDER(provider),
-        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref(provider);
+    gtk_style_context_add_class(gtk_widget_get_style_context(gui->window),
+        "app-window");
 
     initDefaultGameConfig(&gui->pendingConfig);
     initController(&gui->controller, &gui->pendingConfig);

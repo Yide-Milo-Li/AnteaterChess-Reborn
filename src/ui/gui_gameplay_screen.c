@@ -332,11 +332,8 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
 
 static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *state) {
     GtkWidget *boardPanel;
-    GtkWidget *boardBox;
-    GtkWidget *rankGrid;
     GtkWidget *boardFrame;
     GtkWidget *boardGrid;
-    GtkWidget *fileGrid;
     int row;
     int col;
 
@@ -353,34 +350,12 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
         "timer-label");
     gtk_box_pack_start(GTK_BOX(boardPanel), gui->black_timer_label, FALSE, FALSE, 0);
 
-    boardBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_widget_set_hexpand(boardBox, TRUE);
-    gtk_widget_set_vexpand(boardBox, TRUE);
-    gtk_box_pack_start(GTK_BOX(boardPanel), boardBox, TRUE, TRUE, 0);
-
-    rankGrid = gtk_grid_new();
-    gtk_grid_set_row_homogeneous(GTK_GRID(rankGrid), TRUE);
-    gtk_grid_set_column_homogeneous(GTK_GRID(rankGrid), TRUE);
-    gtk_widget_set_size_request(rankGrid, 30, -1);
-    gtk_box_pack_start(GTK_BOX(boardBox), rankGrid, FALSE, FALSE, 0);
-    for (row = 0; row < 8; ++row) {
-        char label[2];
-        GtkWidget *rankLabel;
-
-        snprintf(label, sizeof(label), "%d", 8 - row);
-        rankLabel = gtk_label_new(label);
-
-        gtk_style_context_add_class(gtk_widget_get_style_context(rankLabel),
-            "coordinate-label");
-        gtk_grid_attach(GTK_GRID(rankGrid), rankLabel, 0, row, 1, 1);
-    }
-
-    boardFrame = gtk_aspect_frame_new(NULL, 0.5f, 0.5f, 1.25f, FALSE);
-    gtk_widget_set_size_request(boardFrame, 560, 448);
+    boardFrame = gtk_aspect_frame_new(NULL, 0.5f, 0.5f, 11.0f / 9.0f, FALSE);
+    gtk_widget_set_size_request(boardFrame, 616, 504);
     gtk_widget_set_hexpand(boardFrame, TRUE);
     gtk_widget_set_vexpand(boardFrame, TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(boardFrame), "board-frame");
-    gtk_box_pack_start(GTK_BOX(boardBox), boardFrame, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(boardPanel), boardFrame, TRUE, TRUE, 0);
 
     boardGrid = gtk_grid_new();
     gtk_grid_set_row_homogeneous(GTK_GRID(boardGrid), TRUE);
@@ -389,6 +364,22 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
     gtk_widget_set_vexpand(boardGrid, TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(boardGrid), "board-grid");
     gtk_container_add(GTK_CONTAINER(boardFrame), boardGrid);
+
+    for (row = 0; row < 8; ++row) {
+        char label[2];
+        GtkWidget *rankLabel;
+
+        snprintf(label, sizeof(label), "%d", 8 - row);
+        rankLabel = gtk_label_new(label);
+
+        gtk_widget_set_hexpand(rankLabel, TRUE);
+        gtk_widget_set_vexpand(rankLabel, TRUE);
+        gtk_widget_set_halign(rankLabel, GTK_ALIGN_CENTER);
+        gtk_widget_set_valign(rankLabel, GTK_ALIGN_CENTER);
+        gtk_style_context_add_class(gtk_widget_get_style_context(rankLabel),
+            "coordinate-label");
+        gtk_grid_attach(GTK_GRID(boardGrid), rankLabel, 0, row, 1, 1);
+    }
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
@@ -420,27 +411,27 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GameState *s
             g_signal_connect(eventBox, "button-press-event",
                 G_CALLBACK(gui_on_board_cell_button_press),
                 gui);
-            gtk_grid_attach(GTK_GRID(boardGrid), eventBox, col, row, 1, 1);
+            gtk_grid_attach(GTK_GRID(boardGrid), eventBox, col + 1, row, 1, 1);
         }
     }
 
-    fileGrid = gtk_grid_new();
-    gtk_widget_set_size_request(fileGrid, -1, 50);
-    gtk_widget_set_hexpand(fileGrid, TRUE);
-    gtk_box_pack_start(GTK_BOX(boardPanel), fileGrid, FALSE, FALSE, 0);
     {
         GtkWidget *emptyLabel = gtk_label_new("");
-        gtk_widget_set_size_request(emptyLabel, 30, -1);
-        gtk_grid_attach(GTK_GRID(fileGrid), emptyLabel, 0, 0, 1, 1);
+        gtk_widget_set_hexpand(emptyLabel, TRUE);
+        gtk_widget_set_vexpand(emptyLabel, TRUE);
+        gtk_grid_attach(GTK_GRID(boardGrid), emptyLabel, 0, 8, 1, 1);
     }
     for (col = 0; col < 10; ++col) {
         char label[2] = {(char) ('A' + col), '\0'};
         GtkWidget *fileLabel = gtk_label_new(label);
 
         gtk_widget_set_hexpand(fileLabel, TRUE);
+        gtk_widget_set_vexpand(fileLabel, TRUE);
+        gtk_widget_set_halign(fileLabel, GTK_ALIGN_CENTER);
+        gtk_widget_set_valign(fileLabel, GTK_ALIGN_CENTER);
         gtk_style_context_add_class(gtk_widget_get_style_context(fileLabel),
             "coordinate-label");
-        gtk_grid_attach(GTK_GRID(fileGrid), fileLabel, col + 1, 0, 1, 1);
+        gtk_grid_attach(GTK_GRID(boardGrid), fileLabel, col + 1, 8, 1, 1);
     }
 
     gui->white_timer_label = gtk_label_new("White --:--:--");

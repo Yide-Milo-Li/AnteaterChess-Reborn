@@ -286,10 +286,12 @@ static int pst_bonus(Piece piece, int row, int col, int phase) {
     }
 }
 
+// check if move is a promotion
 static int is_promotion_move(const Move *move) {
     return move != NULL && isPromotionSpecialMove(move->specialType);
 }
 
+// noisy = capture / anteater eat / promotion
 static int is_noisy_move(const Move *move) {
     return move->captureCount > 0 || move->specialType == ANTEATER_CAPTURE || is_promotion_move(move);
 }
@@ -311,7 +313,6 @@ static int absolute_value(int value) {
     return value;
 }
 
-// irreversile move (cannot be undone)
 static int is_irreversible_move(const Move *move) {
     if (move == NULL) {
         return 0;
@@ -361,6 +362,7 @@ static int is_path_clear_for_attack(const Board *board, Position from, Position 
     return 1;
 }
 
+// ant attack: one diagonal step forward
 static int ant_attacks_square(Position from, Piece piece, Position target) {
     int direction;
 
@@ -370,6 +372,7 @@ static int ant_attacks_square(Position from, Piece piece, Position target) {
     return (target.row - from.row) == direction && absolute_value(target.col - from.col) == 1;
 }
 
+// rook attack: same row or col and path clear
 static int rook_attacks_square(const Board *board, Position from, Position target) {
     // target not in same column or row
     if (from.row != target.row && from.col != target.col) {
@@ -380,6 +383,7 @@ static int rook_attacks_square(const Board *board, Position from, Position targe
     return is_path_clear_for_attack(board, from, target);
 }
 
+// bishop attack: same diagonal and path clear
 static int bishop_attacks_square(const Board *board, Position from, Position target) {
     if (absolute_value(target.row - from.row) != absolute_value(target.col - from.col)) {
         return 0;
@@ -387,6 +391,7 @@ static int bishop_attacks_square(const Board *board, Position from, Position tar
     return is_path_clear_for_attack(board, from, target);
 }
 
+// knight attack: L-shape (2,1) or (1,2)
 static int knight_attacks_square(Position from, Position target) {
     int rowDistance;
     int colDistance;
@@ -396,6 +401,7 @@ static int knight_attacks_square(Position from, Position target) {
     return (rowDistance == 2 && colDistance == 1) || (rowDistance == 1 && colDistance == 2);
 }
 
+// king attack: one step in any direction
 static int king_attacks_square(Position from, Position target) {
     int rowDistance;
     int colDistance;
@@ -459,6 +465,7 @@ static int anteater_attacks_piece_for_see(const Board *board, Position from, Pie
     return 0;
 }
 
+// dispatcher: does piece at `from` attack `target` (used inside SEE)
 static int piece_attacks_square_for_see(const Board *board, Position from, Piece piece, Position target,
                                         Piece targetPiece) {
     switch (piece.type) {
@@ -482,6 +489,8 @@ static int piece_attacks_square_for_see(const Board *board, Position from, Piece
     }
 }
 
+// scan whole board, return 1 if any enemy piece attack the king target
+// anteater is ignored, king cannot be eaten by anteater
 static int square_is_attacked_for_king(const Board *board, Position target, Color attackingColor) {
     int row;
     int col;
@@ -492,9 +501,11 @@ static int square_is_attacked_for_king(const Board *board, Position target, Colo
             Piece piece = getPiece(board, from);
             Piece kingTarget = createPiece(KING, (attackingColor == WHITE) ? BLACK : WHITE);
 
+            // skip empty and friendly
             if (piece.type == EMPTY_PIECE || piece.color != attackingColor) {
                 continue;
             }
+            // anteater cannot eat king
             if (piece.type == ANTEATER) {
                 continue;
             }
@@ -517,6 +528,7 @@ static Piece piece_after_see_capture(Piece piece, Position target) {
     return piece;
 }
 
+// apply move on the SEE temp board, only care of capture and promotion
 static void apply_move_to_board_for_see(Board *board, Move move) {
     Piece placedPiece;
     int captureIndex;
@@ -713,6 +725,7 @@ static int count_sliding_mobility(const Board *board, Position from, Piece piece
     return mobility;
 }
 
+// ant mobility: 1 step + double step + diagonal capture
 static int count_ant_mobility(const Board *board, Position from, Piece piece) {
     int direction;
     int mobility;
@@ -755,6 +768,7 @@ static int count_ant_mobility(const Board *board, Position from, Piece piece) {
     return mobility;
 }
 
+// knight mobility: 8 jump targets
 static int count_knight_mobility(const Board *board, Position from, Piece piece) {
     // knight moves
     static const int rowOffsets[] = {-2, -2, -1, -1, 1, 1, 2, 2};
@@ -780,6 +794,7 @@ static int count_knight_mobility(const Board *board, Position from, Piece piece)
     return mobility;
 }
 
+// anteater mobility: 8 single-step + 4 ant-chain direction
 static int count_anteater_mobility(const Board *board, Position from, Piece piece) {
     // first step, all 8 directions
     static const int rowSteps[] = {-1, -1, -1, 0, 0, 1, 1, 1};
@@ -830,6 +845,7 @@ static int count_anteater_mobility(const Board *board, Position from, Piece piec
     return mobility;
 }
 
+// king mobility: 8 surrounding squares
 static int count_king_mobility(const Board *board, Position from, Piece piece) {
     int rowOffset;
     int colOffset;
@@ -860,6 +876,7 @@ static int count_king_mobility(const Board *board, Position from, Piece piece) {
     return mobility;
 }
 
+// dispatcher: get mobility count for any piece
 static int piece_mobility(const Board *board, Position from, Piece piece) {
     switch (piece.type) {
     case ANT:
@@ -890,6 +907,7 @@ static int piece_mobility(const Board *board, Position from, Piece piece) {
     }
 }
 
+// is there a friendly ant defending the target square (diagonal back)
 static int ant_supports_square(const Board *board, Color color, Position target) {
     int supportRow;
     int offset;
@@ -912,6 +930,7 @@ static int ant_supports_square(const Board *board, Color color, Position target)
     return 0;
 }
 
+// can any enemy ant push to attack this square (diagonal forward)
 static int enemy_ant_can_attack_square(const Board *board, Color color, Position target) {
     Color enemyColor;
     int enemyRow;
@@ -936,7 +955,7 @@ static int enemy_ant_can_attack_square(const Board *board, Color color, Position
     return 0;
 }
 
-// Evaluate pawns cuuurent implenmnet doesn't consider anteaters
+// Evaluate pawns, current implenmnet doesn't consider anteaters
 static int evaluate_pawns(const GameState *state, Color color, const int antFiles[2][COLS], int phase) {
     int score;
     int row;
@@ -1172,6 +1191,7 @@ static int evaluate_development(const GameState *state, Color color, int phase) 
     return score;
 }
 
+// bonus for anteater that have 2+ enemy ants in a chain (can be eaten in one move)
 static int evaluate_anteater_threats(const Board *board, Color color) {
     static const int dr[] = {-1, 1, 0, 0};
     static const int dc[] = {0, 0, -1, 1};
@@ -1217,6 +1237,7 @@ static int evaluate_anteater_threats(const Board *board, Color color) {
     return score;
 }
 
+// outposts: knight/bishop/anteater on enemy half, supported by ant, no enemy ant can attack
 static int evaluate_outposts(const Board *board, Color color, int phase) {
     int score;
     int row;
@@ -1383,6 +1404,7 @@ static int evaluate_relative(const GameState *state) {
     return -absoluteScore + 1;
 }
 
+// clamp to [min, max]
 static int clamp_int(int value, int minValue, int maxValue) {
     if (value < minValue) {
         return minValue;
@@ -1393,6 +1415,7 @@ static int clamp_int(int value, int minValue, int maxValue) {
     return value;
 }
 
+// WHITE = 0, BLACK = 1
 static int color_time_index(Color color) {
     if (color == BLACK) {
         return 1;
@@ -1400,6 +1423,7 @@ static int color_time_index(Color color) {
     return 0;
 }
 
+// ms passed since search began
 static int elapsed_ms(const SearchContext *ctx) {
     int64_t now;
 
@@ -1412,6 +1436,7 @@ static int elapsed_ms(const SearchContext *ctx) {
     return (int)(now - ctx->searchStartMs);
 }
 
+// only check time every 1024 nodes for performance
 static int time_is_up(SearchContext *ctx) {
     if (ctx->timeLimitMs <= 0) {
         return 0;
@@ -1424,6 +1449,7 @@ static int time_is_up(SearchContext *ctx) {
     return ctx->stopSearch;
 }
 
+// reset tournament time manager, full clock and empty pool
 void initAITimeManager(AITimeManager *manager) {
     int index;
 
@@ -1453,9 +1479,7 @@ int getAITournamentBudgetMs(AITimeManager *manager, Color color) {
     if (remainingMs <= AI_MIN_MOVE_BUDGET_MS) {
         return AI_MIN_MOVE_BUDGET_MS;
     }
-    availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS
-        ? remainingMs - AI_TOURNAMENT_RESERVE_MS
-        : remainingMs;
+    availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS ? remainingMs - AI_TOURNAMENT_RESERVE_MS : remainingMs;
     bonusMs = manager->poolMs[index] / 4;
     bonusMs = clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
 
@@ -1478,10 +1502,7 @@ int isAITournamentTimeExpired(const AITimeManager *manager, Color color) {
     return manager->remainingMs[index] <= 0;
 }
 
-void updateAITournamentTime(AITimeManager *manager,
-                            Color color,
-                            int budgetMs,
-                            int elapsedMs) {
+void updateAITournamentTime(AITimeManager *manager, Color color, int budgetMs, int elapsedMs) {
     int index;
     int poolMs;
 
@@ -1540,6 +1561,7 @@ static void age_history_scores(void) {
     }
 }
 
+// alloc move buffers, set time limits, bump TT generation
 static int init_search_context(SearchContext *ctx, int timeLimitMs) {
     int64_t now;
 
@@ -1569,6 +1591,7 @@ static int init_search_context(SearchContext *ctx, int timeLimitMs) {
     return 0;
 }
 
+// free move buffers
 static void destroy_search_context(SearchContext *ctx) {
     if (ctx != NULL) {
         free(ctx->moveBuffers);
@@ -1576,6 +1599,7 @@ static void destroy_search_context(SearchContext *ctx) {
     }
 }
 
+// replay all history move to fill the hash list, used for repetition detection
 static int build_game_hash_history(SearchContext *ctx, const GameState *state) {
     GameState replay;
     HashState currentHash;
@@ -1619,6 +1643,7 @@ static int build_game_hash_history(SearchContext *ctx, const GameState *state) {
     return 0;
 }
 
+// check if current position has been seen before, in search stack or game history
 static int node_is_repetition(const SearchContext *ctx, uint64_t key, int ply) {
     int index;
 
@@ -1626,11 +1651,13 @@ static int node_is_repetition(const SearchContext *ctx, uint64_t key, int ply) {
         return 0;
     }
 
+    // search stack: only go back to last irreversible move
     for (index = ply - 1; index >= ctx->repetitionLimit[ply]; --index) {
         if (ctx->hashStack[index].value == key) {
             return 1;
         }
     }
+    // game history: only when no irreversible move in search stack
     if (ctx->repetitionLimit[ply] == 0) {
         for (index = ctx->gameHistoryStart; index + 1 < ctx->gameHashCount; ++index) {
             if (ctx->gameHashes[index] == key) {
@@ -1642,10 +1669,12 @@ static int node_is_repetition(const SearchContext *ctx, uint64_t key, int ply) {
     return 0;
 }
 
+// hash key -> TT slot (TT_SIZE must be power of 2)
 static TTEntry *tt_slot(uint64_t key) {
     return &g_transpositionTable[key & (TT_SIZE - 1)];
 }
 
+// adjust mate score before saving to TT (mate distance independent of ply)
 static int score_to_tt(int score, int ply) {
     if (score > AI_MATE - 1000) {
         return score + ply;
@@ -1657,6 +1686,7 @@ static int score_to_tt(int score, int ply) {
     return score;
 }
 
+// reverse of score_to_tt, restore mate score relative to current ply
 static int score_from_tt(int score, int ply) {
     if (score > AI_MATE - 1000) {
         return score - ply;
@@ -1668,6 +1698,7 @@ static int score_from_tt(int score, int ply) {
     return score;
 }
 
+// look up TT entry by hash key, copy out if found
 static int tt_lookup(uint64_t key, TTEntry *entry) {
     TTEntry *slot;
 
@@ -1682,6 +1713,7 @@ static int tt_lookup(uint64_t key, TTEntry *entry) {
     return 1;
 }
 
+// store result in TT, replace if new is more useful
 static void tt_store(uint64_t key, int depth, int ply, int score, int flag, const Move *bestMove,
                      unsigned char generation) {
     TTEntry *entry;
@@ -1689,12 +1721,16 @@ static void tt_store(uint64_t key, int depth, int ply, int score, int flag, cons
 
     entry = tt_slot(key);
     replace = 0;
+    // empty slot or different position
     if (entry->key != key) {
         replace = 1;
+        // exact result is always best
     } else if (flag == TT_FLAG_EXACT && entry->flag != TT_FLAG_EXACT) {
         replace = 1;
+        // deeper search overrides shallower
     } else if (depth >= entry->depth) {
         replace = 1;
+        // older generation, replace
     } else if (entry->generation != generation) {
         replace = 1;
     }
@@ -1719,6 +1755,7 @@ static void tt_store(uint64_t key, int depth, int ply, int score, int flag, cons
     }
 }
 
+// does the move match the best move stored in TT entry
 static int move_matches_entry(const Move *move, const TTEntry *entry) {
     if (move == NULL || entry == NULL || entry->from >= ROWS * COLS || entry->to >= ROWS * COLS) {
         return 0;
@@ -1728,6 +1765,7 @@ static int move_matches_entry(const Move *move, const TTEntry *entry) {
            move->specialType == (SpecialMove)entry->special;
 }
 
+// compare two moves by from/to/special, ignore captures
 static int move_equal_signature(const Move *lhs, const Move *rhs) {
     if (lhs == NULL || rhs == NULL) {
         return 0;
@@ -1737,6 +1775,7 @@ static int move_equal_signature(const Move *lhs, const Move *rhs) {
            lhs->specialType == rhs->specialType;
 }
 
+// remember a quiet move that caused beta cutoff at this ply, used for move ordering
 static void save_killer(SearchContext *ctx, int ply, Move move) {
     (void)ctx;
     ensure_search_heuristics_ready();
@@ -1756,6 +1795,7 @@ static void save_killer(SearchContext *ctx, int ply, Move move) {
     g_killerValid[ply][0] = 1;
 }
 
+// update history table for quiet moves, clamp to limit
 static void update_history_score(SearchContext *ctx, Color color, Move move, int delta) {
     int from;
     int to;
@@ -1778,6 +1818,7 @@ static void update_history_score(SearchContext *ctx, Color color, Move move, int
     }
 }
 
+// rough capture score for move ordering, MVV-LVA style
 static int tactical_move_score(const Move *move) {
     int score;
     int captureIndex;
@@ -1798,6 +1839,7 @@ static int tactical_move_score(const Move *move) {
     return score;
 }
 
+// quick (no recapture) win/loss for move, used to skip full SEE when result obvious
 static int quick_exchange_margin(const Move *move) {
     int gain;
     int risk;
@@ -1815,6 +1857,7 @@ static int quick_exchange_margin(const Move *move) {
     return gain - risk;
 }
 
+// give each move a score for ordering, big = try first
 static int move_order_score(SearchContext *ctx, const GameState *state, const Move *move, int ply,
                             const TTEntry *ttMove) {
     int from;
@@ -1823,9 +1866,11 @@ static int move_order_score(SearchContext *ctx, const GameState *state, const Mo
 
     (void)ctx;
     ensure_search_heuristics_ready();
+    // TT best move first
     if (move_matches_entry(move, ttMove)) {
         return INT_MAX;
     }
+    // capture / promotion: SEE based, good capture > killer > bad capture
     if (is_noisy_move(move)) {
         int quickMargin = quick_exchange_margin(move);
         int seeScore = quickMargin;
@@ -1839,6 +1884,7 @@ static int move_order_score(SearchContext *ctx, const GameState *state, const Mo
         }
         return 220000 + seeScore * 64 + tacticalScore;
     }
+    // killer move: quiet move that caused cutoff before
     if (ply < AI_MAX_PLY && g_killerValid[ply][0] && move_equal_signature(move, &g_killerMoves[ply][0])) {
         return 900000;
     }
@@ -1846,6 +1892,7 @@ static int move_order_score(SearchContext *ctx, const GameState *state, const Mo
         return 899000;
     }
 
+    // history score, plus small bonus for castling
     from = square_index(move->from);
     to = square_index(move->to);
     score = g_history[state->currentTurn][from][to];
@@ -1856,6 +1903,7 @@ static int move_order_score(SearchContext *ctx, const GameState *state, const Mo
     return score;
 }
 
+// insertion sort, descending order by move_order_score
 static void sort_moves(SearchContext *ctx, const GameState *state, MoveList *list, int ply, const TTEntry *ttMove) {
     int scores[MAX_MOVES];
     int index;
@@ -1880,6 +1928,7 @@ static void sort_moves(SearchContext *ctx, const GameState *state, MoveList *lis
     }
 }
 
+// insertion sort root moves by their last-iteration score
 static void sort_root_moves_by_scores(MoveList *list, int scores[MAX_MOVES]) {
     int index;
 
@@ -1899,6 +1948,7 @@ static void sort_root_moves_by_scores(MoveList *list, int scores[MAX_MOVES]) {
     }
 }
 
+// generate moves for search, optionally filter to noisy only (used by quiescence)
 static int generate_search_moves(GameState *state, MoveList *list, int onlyNoisy) {
     int index;
     int writeIndex;
@@ -1908,6 +1958,7 @@ static int generate_search_moves(GameState *state, MoveList *list, int onlyNoisy
         return 1;
     }
 
+    // history almost full, fall back to legal-only generation to be safe
     if (state->moveHistory.count > MAX_MOVES - AI_MAX_PLY - 2) {
         if (generateLegalMoves(state, list) != 0) {
             return 1;
@@ -1933,6 +1984,7 @@ static int generate_search_moves(GameState *state, MoveList *list, int onlyNoisy
         return 0;
     }
 
+    // compact in-place, keep only noisy moves
     total = list->count;
     writeIndex = 0;
     for (index = 0; index < total; ++index) {
@@ -1944,6 +1996,7 @@ static int generate_search_moves(GameState *state, MoveList *list, int onlyNoisy
     return 0;
 }
 
+// has any non-king/non-ant piece, used to disable null move in pawn endings
 static int side_has_major_material(const Board *board, Color color) {
     int row;
     int col;
@@ -1978,6 +2031,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
 
 static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha, int beta, int ply, int allowNull);
 
+// null move: skip our turn and search shallow, if still >= beta, position is too good
 static int try_null_move(SearchContext *ctx, GameState *state, int depth, int beta, int ply) {
     Color originalTurn;
     int originalHistoryCount;
@@ -1995,6 +2049,7 @@ static int try_null_move(SearchContext *ctx, GameState *state, int depth, int be
     originalMoveCount = state->moveCount;
     dummy = createMove(createPosition(-1, -1), createPosition(-1, -1), createPiece(EMPTY_PIECE, EMPTY_COLOR));
 
+    // swap turn, push dummy move so undo work consistently
     state->currentTurn = (originalTurn == WHITE) ? BLACK : WHITE;
     state->moveHistory.moves[state->moveHistory.count++] = dummy;
     state->moveCount += 1;
@@ -2007,6 +2062,7 @@ static int try_null_move(SearchContext *ctx, GameState *state, int depth, int be
     ctx->repetitionLimit[ply + 1] = ply + 1;
     ctx->nullMoveActive[ply + 1] = 1;
 
+    // reduce more when depth is large
     reduction = NULL_MOVE_R;
     if (depth >= 6) {
         ++reduction;
@@ -2019,6 +2075,7 @@ static int try_null_move(SearchContext *ctx, GameState *state, int depth, int be
     return score;
 }
 
+// main alpha-beta search with PVS, TT, null move, LMR
 static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha, int beta, int ply, int allowNull) {
     TTEntry ttEntry;
     int ttHit;
@@ -2034,19 +2091,23 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     int pvNode;
     Color movingSide;
 
+    // time check, return current static eval
     if (time_is_up(ctx)) {
         return evaluate_relative(state);
     }
 
+    // ply too deep, just return eval
     if (ply >= AI_MAX_PLY - 2) {
         return evaluate_relative(state);
     }
 
     ++ctx->nodes;
     key = ctx->hashStack[ply].value;
+    // repetition = draw
     if (node_is_repetition(ctx, key, ply)) {
         return 0;
     }
+    // mate distance pruning
     if (alpha < -AI_MATE + ply) {
         alpha = -AI_MATE + ply;
     }
@@ -2056,6 +2117,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     if (alpha >= beta) {
         return alpha;
     }
+    // TT cutoff
     ttHit = tt_lookup(key, &ttEntry);
     pvNode = (beta - alpha > 1);
     if (ttHit && ttEntry.depth >= depth) {
@@ -2073,13 +2135,16 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     }
 
     inCheck = isInCheck(state, state->currentTurn);
+    // check extension: search 1 more ply when in check
     if (inCheck) {
         ++depth;
     }
+    // depth 0: drop into quiescence
     if (depth <= 0) {
         return quiescence(ctx, state, alpha, beta, ply, 0);
     }
 
+    // null move pruning
     if (allowNull && !pvNode && !inCheck && depth >= 3 && side_has_major_material(&state->board, state->currentTurn)) {
         int nullScore = try_null_move(ctx, state, depth, beta, ply);
 
@@ -2098,6 +2163,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     if (generate_search_moves(state, moves, 0) != 0) {
         return evaluate_relative(state);
     }
+    // no legal move: checkmate or stalemate
     if (moves->count == 0) {
         if (inCheck) {
             return -AI_MATE + ply;
@@ -2122,6 +2188,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         if (applyMove(state, move) != 0) {
             continue;
         }
+        // skip illegal move (leaving own king in check)
         if (isInCheck(state, movingSide) != 0) {
             if (undoMove(state) != 0) {
                 return evaluate_relative(state);
@@ -2136,9 +2203,11 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
             }
             continue;
         }
+        // irreversible move resets the repetition window
         ctx->repetitionLimit[ply + 1] = is_irreversible_move(&move) ? (ply + 1) : ctx->repetitionLimit[ply];
         ctx->nullMoveActive[ply + 1] = ctx->nullMoveActive[ply];
 
+        // tactical extension: promotion / multi-ant anteater
         extension = 0;
         if (depth <= 6) {
             if (is_promotion_move(&move)) {
@@ -2149,6 +2218,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         }
         childDepth = depth - 1 + extension;
 
+        // late move reduction: bigger cut for late, deep, quiet moves
         reduction = 0;
         if (legalCount >= 4 && depth >= 4 && !inCheck && is_quiet_move(&move) && !pvNode) {
             reduction = 1;
@@ -2166,6 +2236,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
             }
         }
 
+        // PVS: first move full window, others null window then full if needed
         if (legalCount == 1) {
             score = -alpha_beta(ctx, state, childDepth, -beta, -alpha, ply + 1, 1);
         } else {
@@ -2174,10 +2245,13 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
             if (reducedDepth < 0) {
                 reducedDepth = 0;
             }
+            // null window with reduction
             score = -alpha_beta(ctx, state, reducedDepth, -alpha - 1, -alpha, ply + 1, 1);
+            // re-search at full depth if reduction was wrong
             if (!ctx->stopSearch && reduction > 0 && score > alpha) {
                 score = -alpha_beta(ctx, state, childDepth, -alpha - 1, -alpha, ply + 1, 1);
             }
+            // re-search with full window when score raised alpha
             if (!ctx->stopSearch && score > alpha && score < beta) {
                 score = -alpha_beta(ctx, state, childDepth, -beta, -alpha, ply + 1, 1);
             }
@@ -2198,6 +2272,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
         if (score > alpha) {
             alpha = score;
         }
+        // beta cutoff
         if (alpha >= beta) {
             if (is_quiet_move(&move)) {
                 save_killer(ctx, ply, move);
@@ -2206,6 +2281,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
             tt_store(key, depth, ply, alpha, TT_FLAG_LOWER, &move, ctx->generation);
             return alpha;
         }
+        // small penalty for quiet move that did not raise alpha
         if (is_quiet_move(&move)) {
             update_history_score(ctx, movingSide, move, -(depth + 1));
         }
@@ -2226,6 +2302,7 @@ static int alpha_beta(SearchContext *ctx, GameState *state, int depth, int alpha
     return bestScore;
 }
 
+// quiescence: only search noisy moves to stabilize the eval (avoid horizon effect)
 static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta, int ply, int qDepth) {
     TTEntry ttEntry;
     int ttHit;
@@ -2268,6 +2345,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
 
     inCheck = isInCheck(state, state->currentTurn);
     standPat = alpha;
+    // stand-pat: assume not moving is OK if not in check
     if (!inCheck) {
         standPat = evaluate_relative(state);
         if (standPat >= beta) {
@@ -2277,12 +2355,14 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
         if (standPat > alpha) {
             alpha = standPat;
         }
+        // q depth limit reached, return current
         if (qDepth >= AI_Q_DEPTH) {
             tt_store(key, 0, ply, alpha, (alpha <= originalAlpha) ? TT_FLAG_UPPER : TT_FLAG_EXACT, NULL,
                      ctx->generation);
             return alpha;
         }
     } else if (qDepth >= AI_Q_DEPTH + 2) {
+        // when in check we go a bit deeper but still cap it
         return evaluate_relative(state);
     }
 
@@ -2307,6 +2387,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
         if (!inCheck) {
             int quickMargin;
 
+            // skip clearly losing capture using SEE
             quickMargin = quick_exchange_margin(&move);
             if (quickMargin < 0 && !is_promotion_move(&move)) {
                 int seeScore = see_move_score(state, &move);
@@ -2316,6 +2397,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
                 }
                 quickMargin = seeScore;
             }
+            // delta pruning: skip if even best capture cannot raise alpha
             if (standPat + see_initial_gain(&move) + 100 < alpha && !is_promotion_move(&move)) {
                 continue;
             }
@@ -2366,6 +2448,7 @@ static int quiescence(SearchContext *ctx, GameState *state, int alpha, int beta,
     return alpha;
 }
 
+// pick the difficulty for the side to move, default MEDIUM if not set
 static AIDifficulty difficulty_for_turn(const GameState *state) {
     AIDifficulty difficulty;
 
@@ -2381,6 +2464,7 @@ static AIDifficulty difficulty_for_turn(const GameState *state) {
     return difficulty;
 }
 
+// max search depth per difficulty, also cap at AI_MAX_PLY-2
 static int depth_for_difficulty(AIDifficulty difficulty) {
     switch (difficulty) {
     case DIFFICULTY_EASY:
@@ -2397,6 +2481,7 @@ static int depth_for_difficulty(AIDifficulty difficulty) {
     }
 }
 
+// per-move time budget in ms, user setting beats difficulty default
 static int time_budget_for_state(const GameState *state, AIDifficulty difficulty) {
     if (state->config.aiTimeLimit > 0) {
         return state->config.aiTimeLimit * 1000;
@@ -2418,6 +2503,7 @@ static int time_budget_for_state(const GameState *state, AIDifficulty difficulty
     }
 }
 
+// experimental and tournament use the hard search internally
 static AIDifficulty search_difficulty_for(AIDifficulty difficulty) {
     if (difficulty == DIFFICULTY_EXPERIMENTAL || difficulty == DIFFICULTY_TOURNAMENT) {
         return DIFFICULTY_HARD;
@@ -2425,6 +2511,7 @@ static AIDifficulty search_difficulty_for(AIDifficulty difficulty) {
     return difficulty;
 }
 
+// iterative deepening with aspiration window, returns best move so far when time up
 static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs, Move *bestMove) {
     SearchContext ctx;
     GameState searchState;
@@ -2467,6 +2554,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
         return 1;
     }
 
+    // initial sort, prefer TT best move if any
     memset(rootScores, 0, sizeof(rootScores));
     if (tt_lookup(ctx.hashStack[0].value, &rootEntry)) {
         sort_moves(&ctx, &searchState, rootMoves, 0, &rootEntry);
@@ -2475,6 +2563,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
     }
 
     *bestMove = rootMoves->moves[0];
+    // only one move, no search needed
     if (rootMoves->count == 1) {
         destroy_search_context(&ctx);
         return 0;
@@ -2483,6 +2572,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
     currentBest = rootMoves->moves[0];
     currentBestScore = -AI_INF;
 
+    // iterative deepening
     for (depth = 1; depth <= maxDepth; ++depth) {
         Move iterationBest;
         int iterationBestScore;
@@ -2493,6 +2583,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
 
         iterationBest = currentBest;
         iterationBestScore = -AI_INF;
+        // aspiration window: search narrow window first, widen on fail
         aspiration = ASPIRATION_WINDOW;
         if (depth > 1 && currentBestScore > -AI_INF / 2) {
             alphaBase = currentBestScore - aspiration;
@@ -2502,6 +2593,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
             betaBase = AI_INF;
         }
 
+        // up to 4 widening attempts
         for (attempt = 0; attempt < 4; ++attempt) {
             int alpha;
             int beta;
@@ -2533,6 +2625,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
                 ctx.repetitionLimit[1] = is_irreversible_move(&move) ? 1 : 0;
                 ctx.nullMoveActive[1] = 0;
 
+                // PVS at root: first move full window, others null then full re-search
                 if (index == 0) {
                     score = -alpha_beta(&ctx, &searchState, depth - 1, -beta, -localAlpha, 1, 1);
                 } else {
@@ -2564,6 +2657,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
                 break;
             }
 
+            // failed low/high: widen the failing side and retry
             if (alphaBase != -AI_INF || betaBase != AI_INF) {
                 if (iterationBestScore <= alpha) {
                     alphaBase -= aspiration * 4;
@@ -2592,12 +2686,15 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
         currentBest = iterationBest;
         currentBestScore = iterationBestScore;
         *bestMove = currentBest;
+        // resort root moves so good ones go first next iteration
         sort_root_moves_by_scores(rootMoves, rootScores);
         tt_store(ctx.hashStack[0].value, depth, 0, currentBestScore, TT_FLAG_EXACT, &currentBest, ctx.generation);
 
+        // mate found, stop early
         if (currentBestScore >= AI_MATE - 1000 || currentBestScore <= -AI_MATE + 1000) {
             break;
         }
+        // soft time limit: don't start a new iteration we won't finish
         if (ctx.softTimeLimitMs > 0 && elapsed_ms(&ctx) >= ctx.softTimeLimitMs) {
             break;
         }
@@ -2607,6 +2704,7 @@ static int search_best_move(const GameState *state, int maxDepth, int maxTimeMs,
     return 0;
 }
 
+// public entry: produce one AI move for current side, also handle alien plugin
 int generateAIMove(const GameState *state, Move *move) {
     AIDifficulty difficulty;
     AIDifficulty effective;
@@ -2640,6 +2738,7 @@ int generateAIMove(const GameState *state, Move *move) {
     return 0;
 }
 
+// like generateAIMove but caller decide the time budget (used in tournament)
 int generateAIMoveWithBudget(const GameState *state, Move *move, int budgetMs) {
     AIDifficulty difficulty;
     AIDifficulty effective;
@@ -2655,6 +2754,7 @@ int generateAIMoveWithBudget(const GameState *state, Move *move, int budgetMs) {
     return search_best_move(state, maxDepth, budgetMs, move);
 }
 
+// suggest a hint move for the player, MEDIUM strength to keep it fast
 int generateHintMove(const GameState *state, Move *move) {
     int maxTimeMs;
 

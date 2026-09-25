@@ -27,101 +27,18 @@ static void test_platform(void) {
     g_rmdir(directory);
     g_free(directory);
 }
-#include <stdio.h>
-#ifdef _WIN32
-#include <windows.h>
-static LONG WINAPI vectored_handler(EXCEPTION_POINTERS *info) {
-    DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
-    void *addr = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : NULL;
-    if (code != 0x406D1388 && code != 0x000006BA && code != 0x40010006) {
-        fprintf(stderr, "\n[VEH] Exception 0x%08lX at %p\n", code, addr);
-        fflush(stderr);
-    }
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-#endif
-static void on_exit_handler(void) {
-    fprintf(stderr, "\n[EXIT] atexit handler called!\n");
-    fflush(stderr);
-}
-static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
-                        const gchar *message, gpointer user_data) {
-    (void)user_data;
-    fprintf(stderr, "[GLIB %s:0x%x] %s\n", log_domain ? log_domain : "default", (unsigned)log_level, message ? message : "");
-    fflush(stderr);
-}
-#include <signal.h>
-static void sig_handler(int sig) {
-    fprintf(stderr, "\n[SIGNAL] Received signal %d\n", sig);
-#ifdef _WIN32
-    void *stack[64];
-    WORD frames = CaptureStackBackTrace(0, 64, stack, NULL);
-    for (WORD i = 0; i < frames; ++i) {
-        void *addr = stack[i];
-        HMODULE mod = NULL;
-        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                               (LPCSTR)addr, &mod)) {
-            char modname[MAX_PATH];
-            GetModuleFileNameA(mod, modname, sizeof(modname));
-            uintptr_t offset = (uintptr_t)addr - (uintptr_t)mod;
-            fprintf(stderr, "  [%d] %s + 0x%zx (%p)\n", (int)i, modname, (size_t)offset, addr);
-        } else {
-            fprintf(stderr, "  [%d] %p\n", (int)i, addr);
-        }
-    }
-#endif
-    fflush(stderr);
-}
-static void event_watcher(GdkEvent *event, gpointer data) {
-    (void)data;
-    printf("[GDK_EVENT] start type=%d\n", event ? event->type : -1); fflush(stdout);
-    gtk_main_do_event(event);
-    printf("[GDK_EVENT] end type=%d\n", event ? event->type : -1); fflush(stdout);
-}
 static void pump(void) {
-    printf("[pump] start\n"); fflush(stdout);
-    int iterations = 0;
-    while (1) {
-        printf("[pump] before iteration %d\n", iterations + 1); fflush(stdout);
-        gboolean more = g_main_context_iteration(NULL, FALSE);
-        printf("[pump] iteration %d returned %d\n", iterations + 1, (int)more); fflush(stdout);
-        if (!more)
-            break;
-        ++iterations;
+    while (g_main_context_iteration(NULL, FALSE)) {
     }
-    printf("[pump] end after %d iterations\n", iterations); fflush(stdout);
 }
+
 int main(int argc, char **argv) {
-#ifdef _WIN32
-    _set_error_mode(_OUT_TO_STDERR);
-    AddVectoredExceptionHandler(1, vectored_handler);
-#endif
-    signal(SIGABRT, sig_handler);
-    signal(SIGSEGV, sig_handler);
-    signal(SIGTERM, sig_handler);
-    signal(SIGINT, sig_handler);
-    signal(SIGILL, sig_handler);
-    signal(SIGFPE, sig_handler);
-    atexit(on_exit_handler);
-    g_log_set_default_handler(log_handler, NULL);
-    printf("[test_desktop] starting\n"); fflush(stdout);
     test_platform();
-    printf("[test_desktop] platform ok\n"); fflush(stdout);
-    printf("[test_desktop] calling gui_create\n"); fflush(stdout);
     Gui *g = gui_create(&argc, &argv);
-    printf("[test_desktop] gui_create returned %p\n", (void *)g); fflush(stdout);
     assert(g);
-    gdk_event_handler_set(event_watcher, NULL, NULL);
-    printf("[test_desktop] calling gui_sync\n"); fflush(stdout);
     gui_sync(g);
-    printf("[test_desktop] gui_sync returned\n"); fflush(stdout);
-    printf("[test_desktop] calling gtk_widget_show_all\n"); fflush(stdout);
     gtk_widget_show_all(g->window);
-    printf("[test_desktop] gtk_widget_show_all returned\n"); fflush(stdout);
-    printf("[test_desktop] calling pump\n"); fflush(stdout);
     pump();
-    printf("[test_desktop] pump returned\n"); fflush(stdout);
-    printf("[test_desktop] window shown ok\n"); fflush(stdout);
     assert(g->page == AC_MAIN_MENU_STATE);
     gui_on_new_game_clicked(NULL, g);
     assert(g->page == AC_GAME_MODE_SELECTION_STATE);
@@ -149,7 +66,6 @@ int main(int argc, char **argv) {
     gui_invalidate_async_results(g);
     gui_cancel_async_jobs(g);
     assert(!g->hint_job && !g->has_hint_highlight);
-    printf("[test_desktop] hint ok\n"); fflush(stdout);
     for (int mode = AC_MODE_HUMAN_VS_COMPUTER; mode <= AC_MODE_COMPUTER_VS_COMPUTER; ++mode) {
         ac_init_game_config_for_mode(&c, (AcGameMode)mode);
         c.playerColor = AC_BLACK;
@@ -166,7 +82,6 @@ int main(int argc, char **argv) {
         ac_session_finish(g->session);
         gui_cancel_async_jobs(g);
     }
-    printf("[test_desktop] ai modes ok\n"); fflush(stdout);
     ac_init_game_config_for_mode(&c, AC_MODE_COMPUTER_VS_COMPUTER);
     assert(!gui_start_game(g, &c, &error));
     gui_sync(g);
@@ -177,15 +92,11 @@ int main(int argc, char **argv) {
     gui_cancel_async_jobs(g);
     pump();
     assert(gui_get_state(g)->moveHistory.count == 0);
-    printf("[test_desktop] rapid starts ok\n"); fflush(stdout);
     ac_init_game_config_for_mode(&c, AC_MODE_COMPUTER_VS_COMPUTER);
     assert(!gui_start_game(g, &c, &error));
     gui_sync(g);
     assert(g->ai_job);
-    printf("[test_desktop] destroying window\n"); fflush(stdout);
     gtk_widget_destroy(g->window);
-    printf("[test_desktop] window destroyed, calling gui_destroy\n"); fflush(stdout);
     gui_destroy(g);
-    printf("[test_desktop] gui_destroy done, returning 0\n"); fflush(stdout);
     return 0;
 }

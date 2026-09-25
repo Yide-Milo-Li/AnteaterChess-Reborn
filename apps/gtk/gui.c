@@ -84,13 +84,9 @@ static void gui_update_endgame_turn_display(Gui *gui, const GuiView *state) {
 Gui *gui_create(int *argc, char ***argv) {
     Gui *gui;
 
-    printf("[gui_create] prepare runtime\n"); fflush(stdout);
     ac_platform_prepare_runtime();
-    printf("[gui_create] gtk_init\n"); fflush(stdout);
     gtk_init(argc, argv);
-    printf("[gui_create] install style\n"); fflush(stdout);
     gui_install_style();
-    printf("[gui_create] creating window\n"); fflush(stdout);
 
     gui = g_new0(Gui, 1);
     gui->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);

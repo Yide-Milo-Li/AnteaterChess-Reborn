@@ -29,16 +29,41 @@ def windows_runtime(stage, executable):
     # UCRT Python gets Windows pkg-config paths. cygpath also handles /ucrt64.
     if not prefix.exists():
         prefix = Path(run('cygpath', '-w', str(prefix)))
-    query = prefix / 'bin/gdk-pixbuf-query-loaders.exe'
     loader = next((prefix/'lib/gdk-pixbuf-2.0/2.10.0/loaders').glob('*svg.dll'))
-    copy(query, stage/query.name)
-    copy(loader, stage/'lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.dll')
-    queue = [executable, query, loader]
+    copy(loader, stage/'lib/gdk-pixbuf-2.0/2.10.0/loaders'/loader.name)
+    if loader.name != 'libpixbufloader-svg.dll':
+        copy(loader, stage/'lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.dll')
+    cache_lines = [
+        '# GdkPixbuf Image Loader Modules file',
+        '# Automatically generated file, do not edit',
+        '#',
+        f'"lib/gdk-pixbuf-2.0/2.10.0/loaders/{loader.name}"',
+        '"svg" 6 "gdk_pixbuf__svg" "Scalable Vector Graphics" "LGPL"',
+        '"image/svg+xml" "image/svg" "image/svg-xml" "image/vnd.adobe.svg+xml" "text/xml-svg" "image/svg+xml-compressed" ""',
+        '"svg" "svgz" "svg.gz" ""',
+        '" <svg" "*    " 100',
+        '" <!DOCTYPE svg" "*             " 100',
+        ''
+    ]
+    if loader.name != 'libpixbufloader-svg.dll':
+        cache_lines.extend([
+            '"lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.dll"',
+            '"svg" 6 "gdk_pixbuf__svg" "Scalable Vector Graphics" "LGPL"',
+            '"image/svg+xml" "image/svg" "image/svg-xml" "image/vnd.adobe.svg+xml" "text/xml-svg" "image/svg+xml-compressed" ""',
+            '"svg" "svgz" "svg.gz" ""',
+            '" <svg" "*    " 100',
+            '" <!DOCTYPE svg" "*             " 100',
+            ''
+        ])
+    cache_path = stage/'lib/gdk-pixbuf-2.0/2.10.0/loaders.cache'
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text('\n'.join(cache_lines)+'\n', encoding='utf-8')
+    queue = [executable, loader]
     for helper in (prefix/'bin').glob('gspawn-win64-helper*.exe'):
-        copy(helper,stage/helper.name)
+        copy(helper, stage/helper.name)
         queue.append(helper)
     seen = set()
-    source_paths = [query, loader]
+    source_paths = [loader]
     system = Path(os.environ.get('SystemRoot', 'C:/Windows')) / 'System32'
     while queue:
         binary = queue.pop()
@@ -100,7 +125,7 @@ def main():
     if archive.exists() and manifest.exists() and json.loads(manifest.read_text()) == inputs:
         print(f'Unchanged: {archive.name}')
         return
-    with tempfile.TemporaryDirectory(prefix='package-', dir=dist) as temporary:
+    with tempfile.TemporaryDirectory(prefix='package-', dir=dist, ignore_cleanup_errors=True) as temporary:
         stage = Path(temporary)/name
         stage.mkdir()
         if args.kind == 'source':

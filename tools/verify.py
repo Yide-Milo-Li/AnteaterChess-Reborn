@@ -5,7 +5,7 @@ root=Path(__file__).resolve().parents[1]
 dist=root/'dist'
 def run(args,cwd,env=None):
     subprocess.run(args,cwd=cwd,env=env,check=True,timeout=240)
-with tempfile.TemporaryDirectory(prefix='verify-',dir=root/'build') as temp:
+with tempfile.TemporaryDirectory(prefix='verify-',dir=root/'build',ignore_cleanup_errors=True) as temp:
     work=Path(temp)/'path with spaces 棋'
     work.mkdir()
     for archive in sorted(dist.iterdir()):

@@ -31,13 +31,17 @@ static void pump(void) {
     while (g_main_context_iteration(NULL, FALSE))
         ;
 }
+#include <stdio.h>
 int main(int argc, char **argv) {
+    printf("[test_desktop] starting\n"); fflush(stdout);
     test_platform();
+    printf("[test_desktop] platform ok\n"); fflush(stdout);
     Gui *g = gui_create(&argc, &argv);
     assert(g);
     gui_sync(g);
     gtk_widget_show_all(g->window);
     pump();
+    printf("[test_desktop] window shown ok\n"); fflush(stdout);
     assert(g->page == AC_MAIN_MENU_STATE);
     gui_on_new_game_clicked(NULL, g);
     assert(g->page == AC_GAME_MODE_SELECTION_STATE);
@@ -65,6 +69,7 @@ int main(int argc, char **argv) {
     gui_invalidate_async_results(g);
     gui_cancel_async_jobs(g);
     assert(!g->hint_job && !g->has_hint_highlight);
+    printf("[test_desktop] hint ok\n"); fflush(stdout);
     for (int mode = AC_MODE_HUMAN_VS_COMPUTER; mode <= AC_MODE_COMPUTER_VS_COMPUTER; ++mode) {
         ac_init_game_config_for_mode(&c, (AcGameMode)mode);
         c.playerColor = AC_BLACK;
@@ -81,6 +86,7 @@ int main(int argc, char **argv) {
         ac_session_finish(g->session);
         gui_cancel_async_jobs(g);
     }
+    printf("[test_desktop] ai modes ok\n"); fflush(stdout);
     ac_init_game_config_for_mode(&c, AC_MODE_COMPUTER_VS_COMPUTER);
     assert(!gui_start_game(g, &c, &error));
     gui_sync(g);
@@ -91,11 +97,15 @@ int main(int argc, char **argv) {
     gui_cancel_async_jobs(g);
     pump();
     assert(gui_get_state(g)->moveHistory.count == 0);
+    printf("[test_desktop] rapid starts ok\n"); fflush(stdout);
     ac_init_game_config_for_mode(&c, AC_MODE_COMPUTER_VS_COMPUTER);
     assert(!gui_start_game(g, &c, &error));
     gui_sync(g);
     assert(g->ai_job);
+    printf("[test_desktop] destroying window\n"); fflush(stdout);
     gtk_widget_destroy(g->window);
+    printf("[test_desktop] window destroyed, calling gui_destroy\n"); fflush(stdout);
     gui_destroy(g);
+    printf("[test_desktop] gui_destroy done, returning 0\n"); fflush(stdout);
     return 0;
 }

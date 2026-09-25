@@ -1,0 +1,594 @@
+#include "gui_internal.h"
+
+#include <ctype.h>
+
+static int gui_text_is_blank(const char *text) {
+    const unsigned char *cursor = (const unsigned char *)text;
+
+    if (cursor == NULL) {
+        return 1;
+    }
+
+    while (*cursor != '\0') {
+        if (!isspace(*cursor)) {
+            return 0;
+        }
+        ++cursor;
+    }
+
+    return 1;
+}
+
+static void gui_set_style_class(GtkWidget *widget, const char *className, int enabled) {
+    GtkStyleContext *context;
+
+    if (!GTK_IS_WIDGET(widget) || className == NULL) {
+        return;
+    }
+
+    context = gtk_widget_get_style_context(widget);
+    if (enabled) {
+        gtk_style_context_add_class(context, className);
+    } else {
+        gtk_style_context_remove_class(context, className);
+    }
+}
+
+static void gui_mark_entry(GtkWidget *entry, int state) {
+    if (!GTK_IS_WIDGET(entry)) {
+        return;
+    }
+
+    gui_set_style_class(entry, "move-input-valid", 0);
+    gui_set_style_class(entry, "move-input-invalid", 0);
+    if (state > 0) {
+        gui_set_style_class(entry, "move-input-valid", 1);
+    } else if (state < 0) {
+        gui_set_style_class(entry, "move-input-invalid", 1);
+    }
+}
+
+static int gui_destination_is_highlighted(const Gui *gui, AcSquare pos) {
+    if (gui == NULL || !ac_is_valid_position(pos)) {
+        return 0;
+    }
+
+    return gui->highlight_destinations[pos.row][pos.col] != 0;
+}
+
+static int gui_hint_matches_state(const Gui *gui, const GuiView *state) {
+    if (gui == NULL || state == NULL || !gui->has_hint_highlight) {
+        return 0;
+    }
+
+    return state->systemState == AC_GAMEPLAY_STATE && state->currentTurn == gui->hint_turn &&
+           state->moveHistory.count == gui->hint_move_count && ac_is_valid_position(gui->hint_from) &&
+           ac_is_valid_position(gui->hint_to);
+}
+
+static void gui_remove_hint_classes(Gui *gui) {
+    int row;
+    int col;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            if (!GTK_IS_WIDGET(gui->board_cells[row][col])) {
+                continue;
+            }
+            gui_set_style_class(gui->board_cells[row][col], "hint-from", 0);
+            gui_set_style_class(gui->board_cells[row][col], "hint-destination", 0);
+        }
+    }
+}
+
+void gui_clear_hint_highlight(Gui *gui) {
+    if (gui == NULL) {
+        return;
+    }
+
+    gui_remove_hint_classes(gui);
+    gui->has_hint_highlight = 0;
+    gui->hint_from = ac_create_position(-1, -1);
+    gui->hint_to = ac_create_position(-1, -1);
+    gui->hint_turn = AC_EMPTY_COLOR;
+    gui->hint_move_count = -1;
+}
+
+void gui_refresh_hint_highlight(Gui *gui) {
+    const GuiView *state;
+
+    if (gui == NULL || !gui->has_hint_highlight) {
+        return;
+    }
+
+    state = gui_get_state(gui);
+    if (!gui_hint_matches_state(gui, state)) {
+        gui_clear_hint_highlight(gui);
+        return;
+    }
+
+    gui_remove_hint_classes(gui);
+    if (GTK_IS_WIDGET(gui->board_cells[gui->hint_from.row][gui->hint_from.col])) {
+        gui_set_style_class(gui->board_cells[gui->hint_from.row][gui->hint_from.col], "hint-from", 1);
+    }
+    if (GTK_IS_WIDGET(gui->board_cells[gui->hint_to.row][gui->hint_to.col])) {
+        gui_set_style_class(gui->board_cells[gui->hint_to.row][gui->hint_to.col], "hint-destination", 1);
+    }
+}
+
+void gui_show_hint_move(Gui *gui, AcMove move) {
+    const GuiView *state;
+
+    if (gui == NULL || !ac_is_valid_position(move.from) || !ac_is_valid_position(move.to)) {
+        return;
+    }
+
+    state = gui_get_state(gui);
+    if (state == NULL || state->systemState != AC_GAMEPLAY_STATE) {
+        return;
+    }
+
+    gui_clear_hint_highlight(gui);
+    gui->hint_from = move.from;
+    gui->hint_to = move.to;
+    gui->hint_turn = state->currentTurn;
+    gui->hint_move_count = state->moveHistory.count;
+    gui->has_hint_highlight = 1;
+    gui_refresh_hint_highlight(gui);
+}
+
+void gui_clear_move_highlights(Gui *gui) {
+    int row;
+    int col;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    gui->has_highlight_from = 0;
+    gui->highlight_from = ac_create_position(-1, -1);
+    for (row = 0; row < 8; ++row) {
+        for (col = 0; col < 10; ++col) {
+            gui->highlight_destinations[row][col] = 0;
+            if (!GTK_IS_WIDGET(gui->board_cells[row][col])) {
+                continue;
+            }
+            gui_set_style_class(gui->board_cells[row][col], "highlight-from", 0);
+            gui_set_style_class(gui->board_cells[row][col], "highlight-destination", 0);
+            gui_set_style_class(gui->board_cells[row][col], "highlight-selected", 0);
+        }
+    }
+
+    gui_mark_entry(gui->from_entry, 0);
+    gui_mark_entry(gui->to_entry, 0);
+}
+
+void gui_refresh_move_highlights(Gui *gui) {
+    const GuiView *state;
+    const char *fromText;
+    const char *toText;
+    AcSquare from;
+    AcSquare to;
+    AcMoveList *moves;
+    int index;
+
+    if (gui == NULL) {
+        return;
+    }
+
+    gui_clear_move_highlights(gui);
+    state = gui_get_state(gui);
+    if (state == NULL || state->systemState != AC_GAMEPLAY_STATE || gui_current_turn_is_ai(state) ||
+        !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
+        return;
+    }
+
+    fromText = gtk_entry_get_text(GTK_ENTRY(gui->from_entry));
+    toText = gtk_entry_get_text(GTK_ENTRY(gui->to_entry));
+    if (gui_text_is_blank(fromText)) {
+        if (!gui_text_is_blank(toText)) {
+            gui_mark_entry(gui->to_entry, -1);
+        }
+        return;
+    }
+
+    from = ac_parse_position(fromText);
+    if (!ac_is_valid_position(from) || ac_validate_selection(&state->position, from) != AC_SELECT_VALID) {
+        gui_mark_entry(gui->from_entry, -1);
+        if (!gui_text_is_blank(toText)) {
+            gui_mark_entry(gui->to_entry, -1);
+        }
+        return;
+    }
+
+    gui_mark_entry(gui->from_entry, 1);
+    gui->has_highlight_from = 1;
+    gui->highlight_from = from;
+    gui_set_style_class(gui->board_cells[from.row][from.col], "highlight-from", 1);
+
+    moves = g_new0(AcMoveList, 1);
+    if (moves == NULL) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    if (ac_generate_legal_moves_for_position(&state->position, from, moves) == 0) {
+        for (index = 0; index < ac_get_move_count(moves); ++index) {
+            AcMove *move = ac_get_move(moves, index);
+
+            if (move == NULL || !ac_is_valid_position(move->to)) {
+                continue;
+            }
+
+            gui->highlight_destinations[move->to.row][move->to.col] = 1;
+            gui_set_style_class(gui->board_cells[move->to.row][move->to.col], "highlight-destination", 1);
+        }
+    }
+    g_free(moves);
+
+    if (gui_text_is_blank(toText)) {
+        return;
+    }
+
+    to = ac_parse_position(toText);
+    if (ac_is_valid_position(to) && gui_destination_is_highlighted(gui, to)) {
+        gui_mark_entry(gui->to_entry, 1);
+        gui_set_style_class(gui->board_cells[to.row][to.col], "highlight-selected", 1);
+    } else {
+        gui_mark_entry(gui->to_entry, -1);
+    }
+}
+
+static int gui_select_promotion_choice(Gui *gui, AcPromotionChoice *choice) {
+    GtkWidget *dialog;
+    GtkWindow *parent = NULL;
+    int response;
+
+    if (choice == NULL) {
+        return 1;
+    }
+
+    if (gui_window_is_valid(gui)) {
+        parent = GTK_WINDOW(gui->window);
+    }
+
+    dialog = gtk_message_dialog_new(parent, GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_QUESTION,
+                                    GTK_BUTTONS_NONE, "%s", "Choose promotion piece");
+    gtk_window_set_title(GTK_WINDOW(dialog), "Promotion");
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Queen", AC_PROMOTION_CHOICE_QUEEN);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Rook", AC_PROMOTION_CHOICE_ROOK);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Bishop", AC_PROMOTION_CHOICE_BISHOP);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "Knight", AC_PROMOTION_CHOICE_KNIGHT);
+
+    gui_prepare_modal_dialog(gui, dialog);
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch (response) {
+    case AC_PROMOTION_CHOICE_QUEEN:
+    case AC_PROMOTION_CHOICE_ROOK:
+    case AC_PROMOTION_CHOICE_BISHOP:
+    case AC_PROMOTION_CHOICE_KNIGHT:
+        *choice = (AcPromotionChoice)response;
+        return 0;
+    default:
+        return 1;
+    }
+}
+
+void gui_on_new_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_destroy_endgame_dialog(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_new_game(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_quit_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    if (!gui_confirm(gui, "Quit Game", "Are you sure you want to quit?")) {
+        return;
+    }
+
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_exit(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_mode_selected(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    AcGameMode mode = (AcGameMode)GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "game-mode"));
+
+    ac_init_game_config_for_mode(&gui->pendingConfig, mode);
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_new_game(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_back_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_destroy_endgame_dialog(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_back(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_start_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    AcGameConfig config;
+    AcErrorCode errorCode;
+
+    (void)button;
+    if (gui_collect_setup_config(gui, &config, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
+        return;
+    }
+
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    errorCode = AC_ERR_FATAL;
+    if (gui_start_game(gui, &config, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
+        return;
+    }
+
+    gui->pendingConfig = config;
+    gui_sync(gui);
+}
+
+void gui_on_setup_timer_toggled(GtkToggleButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    gboolean active;
+    int index;
+
+    (void)button;
+    if (gui == NULL) {
+        return;
+    }
+
+    active = GTK_IS_TOGGLE_BUTTON(gui->setup_timer_toggle)
+                 ? gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gui->setup_timer_toggle))
+                 : FALSE;
+
+    for (index = 0; index < 6; ++index) {
+        if (!GTK_IS_WIDGET(gui->setup_timer_widgets[index])) {
+            continue;
+        }
+
+        if (active) {
+            gtk_widget_show(gui->setup_timer_widgets[index]);
+        } else {
+            gtk_widget_hide(gui->setup_timer_widgets[index]);
+        }
+    }
+}
+
+void gui_on_submit_move_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    const char *fromText;
+    const char *toText;
+    AcMoveRequest request;
+    AcErrorCode errorCode;
+    int needsPromotion;
+
+    (void)button;
+    if (gui == NULL || !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    fromText = gtk_entry_get_text(GTK_ENTRY(gui->from_entry));
+    toText = gtk_entry_get_text(GTK_ENTRY(gui->to_entry));
+    if (ac_parse_move_request_fields(fromText, toText, AC_PROMOTION_CHOICE_QUEEN, &request) != 0) {
+        gui_set_error(gui, AC_ERR_INVALID_MOVE_FORMAT);
+        return;
+    }
+
+    needsPromotion = 0;
+    if (ac_session_promotion(gui->session, request, &needsPromotion) == 0 && needsPromotion) {
+        AcPromotionChoice promotion;
+
+        if (gui_select_promotion_choice(gui, &promotion) != 0) {
+            return;
+        }
+        request.promotion = promotion;
+    }
+
+    errorCode = AC_ERR_ILLEGAL_MOVE;
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_submit_request(gui, request, &errorCode) != 0) {
+        gui_set_error(gui, errorCode);
+        return;
+    }
+
+    gtk_entry_set_text(GTK_ENTRY(gui->from_entry), "");
+    gtk_entry_set_text(GTK_ENTRY(gui->to_entry), "");
+    gui_set_status_text(gui, "");
+    gui_clear_move_highlights(gui);
+    gui_sync(gui);
+}
+
+void gui_on_move_entry_changed(GtkEditable *editable, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)editable;
+    gui_clear_hint_highlight(gui);
+    gui_refresh_move_highlights(gui);
+}
+
+gboolean gui_on_board_cell_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    const GuiView *state;
+    AcSquare pos;
+    char positionText[8];
+    int row;
+    int col;
+
+    if (gui == NULL || event == NULL) {
+        return FALSE;
+    }
+
+    state = gui_get_state(gui);
+    if (state == NULL || state->systemState != AC_GAMEPLAY_STATE) {
+        return FALSE;
+    }
+
+    if (gui_current_turn_is_ai(state)) {
+        gui_set_error(gui, AC_ERR_NOT_YOUR_TURN);
+        return TRUE;
+    }
+
+    row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "board-row"));
+    col = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "board-col"));
+    pos = ac_create_position(row, col);
+    if (!ac_is_valid_position(pos) || !GTK_IS_ENTRY(gui->from_entry) || !GTK_IS_ENTRY(gui->to_entry)) {
+        return FALSE;
+    }
+
+    gui_format_position_text(pos, positionText);
+    gui_clear_hint_highlight(gui);
+    if (event->button == 1) {
+        gtk_entry_set_text(GTK_ENTRY(gui->from_entry), positionText);
+        gtk_entry_set_text(GTK_ENTRY(gui->to_entry), "");
+        gui_set_status_text(gui, "");
+        gui_refresh_move_highlights(gui);
+        return TRUE;
+    }
+
+    if (event->button == 3) {
+        gtk_entry_set_text(GTK_ENTRY(gui->to_entry), positionText);
+        gui_refresh_move_highlights(gui);
+        if (gui_destination_is_highlighted(gui, pos)) {
+            gui_on_submit_move_clicked(NULL, gui);
+        } else {
+            gui_set_error(gui, AC_ERR_ILLEGAL_MOVE);
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+void gui_on_undo_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    if (ac_session_undo(gui->session) != 0) {
+        gui_set_error(gui, AC_ERR_UNDO_UNAVAILABLE);
+        return;
+    }
+
+    gui_set_status_text(gui, "");
+    gui_sync(gui);
+}
+
+void gui_on_hint_clicked(GtkButton *button, gpointer data) {
+    (void)button;
+    Gui *gui = data;
+    gui_clear_hint_highlight(gui);
+    if (gui_start_hint_job(gui))
+        gui_set_error(gui, AC_ERR_HINT_UNAVAILABLE);
+}
+
+void gui_on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_toggle_fullscreen(gui);
+}
+
+void gui_on_leave_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    if (!gui_confirm(gui, "Leave Game", "Leave the current game?")) {
+        return;
+    }
+
+    gui_clear_hint_highlight(gui);
+    gui_invalidate_async_results(gui);
+    if (ac_session_finish(gui->session) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_endgame_new_game_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_destroy_endgame_dialog(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_new_game(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_endgame_main_menu_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_destroy_endgame_dialog(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_back(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}
+
+void gui_on_endgame_exit_clicked(GtkButton *button, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+
+    (void)button;
+    gui_clear_hint_highlight(gui);
+    gui_destroy_endgame_dialog(gui);
+    gui_invalidate_async_results(gui);
+    if (gui_request_exit(gui) != 0) {
+        gui_set_error(gui, AC_ERR_FATAL);
+        return;
+    }
+
+    gui_sync(gui);
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources><gresource prefix="/org/anteater/reborn">
+  <file>BlackAnt.svg</file>
+  <file>BlackAnteater.svg</file>
+  <file>BlackBishop.svg</file>
+  <file>BlackKing.svg</file>
+  <file>BlackKnight.svg</file>
+  <file>BlackQueen.svg</file>
+  <file>BlackRook.svg</file>
+  <file>icon-alert-dark.svg</file>
+  <file>icon-hint-dark.svg</file>
+  <file>icon-history-dark.svg</file>
+  <file>icon-info-dark.svg</file>
+  <file>WhiteAnteater.svg</file>
+  <file>WhiteAntsvg.svg</file>
+  <file>WhiteBishop.svg</file>
+  <file>WhiteKing.svg</file>
+  <file>WhiteKnight.svg</file>
+  <file>WhiteQueen.svg</file>
+  <file>WhiteRook.svg</file>
+</gresource></gresources>

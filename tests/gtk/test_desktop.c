@@ -50,6 +50,17 @@ static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
     fprintf(stderr, "[GLIB %s:0x%x] %s\n", log_domain ? log_domain : "default", (unsigned)log_level, message ? message : "");
     fflush(stderr);
 }
+#include <signal.h>
+static void sig_handler(int sig) {
+    fprintf(stderr, "\n[SIGNAL] Received signal %d\n", sig);
+    fflush(stderr);
+}
+static void event_watcher(GdkEvent *event, gpointer data) {
+    (void)data;
+    printf("[GDK_EVENT] start type=%d\n", event ? event->type : -1); fflush(stdout);
+    gtk_main_do_event(event);
+    printf("[GDK_EVENT] end type=%d\n", event ? event->type : -1); fflush(stdout);
+}
 static void pump(void) {
     printf("[pump] start\n"); fflush(stdout);
     int iterations = 0;
@@ -67,6 +78,12 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
     AddVectoredExceptionHandler(1, vectored_handler);
 #endif
+    signal(SIGABRT, sig_handler);
+    signal(SIGSEGV, sig_handler);
+    signal(SIGTERM, sig_handler);
+    signal(SIGINT, sig_handler);
+    signal(SIGILL, sig_handler);
+    signal(SIGFPE, sig_handler);
     atexit(on_exit_handler);
     g_log_set_default_handler(log_handler, NULL);
     printf("[test_desktop] starting\n"); fflush(stdout);
@@ -76,6 +93,7 @@ int main(int argc, char **argv) {
     Gui *g = gui_create(&argc, &argv);
     printf("[test_desktop] gui_create returned %p\n", (void *)g); fflush(stdout);
     assert(g);
+    gdk_event_handler_set(event_watcher, NULL, NULL);
     printf("[test_desktop] calling gui_sync\n"); fflush(stdout);
     gui_sync(g);
     printf("[test_desktop] gui_sync returned\n"); fflush(stdout);

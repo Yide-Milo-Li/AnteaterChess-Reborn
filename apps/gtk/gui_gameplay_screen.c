@@ -1,6 +1,7 @@
 #include "gui_internal.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define GUI_PIECE_IMAGE_SIZE 56
 #define GUI_UI_ICON_SIZE 18
@@ -306,6 +307,42 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_box_pack_end(GTK_BOX(parent), buttonBox, FALSE, FALSE, 0);
 }
 
+static void gui_on_board_grid_size_allocate(GtkWidget *widget, GdkRectangle *allocation, gpointer user_data) {
+    Gui *gui = (Gui *)user_data;
+    const GuiView *state;
+    int cellWidth;
+    int cellHeight;
+    int cellSize;
+    int targetSize;
+
+    (void)widget;
+    if (gui == NULL || allocation == NULL || allocation->width <= 0 || allocation->height <= 0) {
+        return;
+    }
+
+    cellWidth = allocation->width / 11;
+    cellHeight = allocation->height / 9;
+    cellSize = cellWidth < cellHeight ? cellWidth : cellHeight;
+    if (cellSize <= 10) {
+        return;
+    }
+
+    targetSize = (int)(cellSize * 0.84f);
+    if (targetSize < 32) {
+        targetSize = 32;
+    } else if (targetSize > 160) {
+        targetSize = 160;
+    }
+
+    if (abs(targetSize - gui->piece_image_size) >= 2) {
+        gui->piece_image_size = targetSize;
+        state = gui_get_state(gui);
+        if (state != NULL && (state->systemState == AC_GAMEPLAY_STATE || state->systemState == AC_END_GAME_MENU_STATE)) {
+            gui_update_board(gui, state);
+        }
+    }
+}
+
 static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GuiView *state) {
     GtkWidget *boardPanel;
     GtkWidget *boardFrame;
@@ -339,6 +376,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GuiView *sta
     gtk_widget_set_vexpand(boardGrid, TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(boardGrid), "board-grid");
     gtk_container_add(GTK_CONTAINER(boardFrame), boardGrid);
+    g_signal_connect(boardGrid, "size-allocate", G_CALLBACK(gui_on_board_grid_size_allocate), gui);
 
     for (row = 0; row < 8; ++row) {
         char label[2];
@@ -364,6 +402,7 @@ static void build_gameplay_board(Gui *gui, GtkWidget *parent, const GuiView *sta
 
             gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
             gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+            gtk_widget_set_size_request(image, 1, 1);
             gtk_widget_set_halign(pieceLabel, GTK_ALIGN_CENTER);
             gtk_widget_set_valign(pieceLabel, GTK_ALIGN_CENTER);
             gtk_style_context_add_class(gtk_widget_get_style_context(pieceLabel), "piece-fallback");
@@ -498,10 +537,13 @@ void gui_set_board_image(Gui *gui, int row, int col, GdkPixbuf *pixbuf) {
 void gui_update_board(Gui *gui, const GuiView *state) {
     int row;
     int col;
+    int pieceSize;
 
     if (gui == NULL || state == NULL) {
         return;
     }
+
+    pieceSize = gui->piece_image_size > 0 ? gui->piece_image_size : GUI_PIECE_IMAGE_SIZE;
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {
@@ -522,7 +564,7 @@ void gui_update_board(Gui *gui, const GuiView *state) {
                 continue;
             }
 
-            pixbuf = gui_get_piece_pixbuf(piece, GUI_PIECE_IMAGE_SIZE);
+            pixbuf = gui_get_piece_pixbuf(piece, pieceSize);
             if (pixbuf != NULL) {
                 gtk_image_set_from_pixbuf(GTK_IMAGE(gui->board_images[row][col]), pixbuf);
                 gtk_widget_show(gui->board_images[row][col]);
@@ -575,7 +617,7 @@ static GtkTextTag *gui_get_latest_move_tag(GtkTextBuffer *buffer) {
     latestTag = gtk_text_tag_table_lookup(tagTable, "latest-move");
     if (latestTag == NULL) {
         latestTag =
-            gtk_text_buffer_create_tag(buffer, "latest-move", "background", "#4f3718", "foreground", "#fff7e6", NULL);
+            gtk_text_buffer_create_tag(buffer, "latest-move", "background", "#382914", "foreground", "#fef3c7", NULL);
     }
     return latestTag;
 }

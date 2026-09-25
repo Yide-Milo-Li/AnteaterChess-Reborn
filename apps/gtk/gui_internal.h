@@ -137,6 +137,7 @@ struct Gui {
     int is_fullscreen;
     int fullscreen_transition_pending;
     int should_quit;
+    int piece_image_size;
 };
 
 void gui_clear_view_refs(Gui *gui);

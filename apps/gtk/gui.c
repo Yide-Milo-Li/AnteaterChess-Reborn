@@ -126,6 +126,7 @@ Gui *gui_create(int *argc, char ***argv) {
     gui->is_fullscreen = 0;
     gui->fullscreen_transition_pending = 0;
     gui->should_quit = 0;
+    gui->piece_image_size = 56;
 
     g_signal_connect(gui->window, "destroy", G_CALLBACK(gui_on_window_destroy), gui);
     g_signal_connect(gui->window, "key-press-event", G_CALLBACK(gui_on_window_key_press), gui);

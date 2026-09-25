@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AnteaterChess Reborn Architecture",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "game-flow",
+        "label": "Primary Gameplay Flow",
+        "focus": ["player", "gtk-app", "session", "rules", "board-state"],
+        "note": "Follow synchronous user moves through transactional session management to rule execution."
+      },
+      {
+        "id": "ai-search-path",
+        "label": "Asynchronous AI Search",
+        "focus": ["gtk-app", "async-worker", "ai-search", "rules", "board-state"],
+        "note": "AI search runs in an isolated worker thread using cloned board snapshots and cooperative cancellation."
+      },
+      {
+        "id": "platform-and-assets",
+        "label": "Platform & Assets Integration",
+        "focus": ["resources", "gtk-app", "platform", "session", "budget"],
+        "note": "Observe decoupled platform injection, runtime clocks, logs, and compiled vector resources."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "player",
+      "type": "external",
+      "label": "Player / User",
+      "sublabel": "Mouse & Key Input",
+      "pos": [40, 270],
+      "size": [130, 60]
+    },
+    {
+      "id": "resources",
+      "type": "frontend",
+      "label": "Compiled GResource",
+      "sublabel": "18 Vector SVGs + CSS",
+      "pos": [240, 90],
+      "size": [150, 60]
+    },
+    {
+      "id": "gtk-app",
+      "type": "frontend",
+      "label": "GTK 3 Desktop Shell",
+      "sublabel": "Window, Screens, Render",
+      "pos": [240, 270],
+      "size": [150, 60],
+      "tag": "C11 + GTK 3"
+    },
+    {
+      "id": "platform",
+      "type": "security",
+      "label": "Platform Runtime",
+      "sublabel": "Monotonic Clock & Log",
+      "pos": [240, 450],
+      "size": [150, 60]
+    },
+    {
+      "id": "async-worker",
+      "type": "frontend",
+      "label": "GTask Worker",
+      "sublabel": "Background Thread",
+      "pos": [460, 90],
+      "size": [140, 60]
+    },
+    {
+      "id": "session",
+      "type": "backend",
+      "label": "AcSession",
+      "sublabel": "Transactional State",
+      "pos": [460, 270],
+      "size": [140, 60],
+      "tag": "Single-Owner"
+    },
+    {
+      "id": "budget",
+      "type": "backend",
+      "label": "Budget Allocator",
+      "sublabel": "Tournament & Turn Clocks",
+      "pos": [460, 450],
+      "size": [140, 60]
+    },
+    {
+      "id": "ai-search",
+      "type": "backend",
+      "label": "AcSearchContext",
+      "sublabel": "Negamax / Alpha-Beta",
+      "pos": [680, 90],
+      "size": [150, 60],
+      "tag": "Worker-Owned"
+    },
+    {
+      "id": "rules",
+      "type": "backend",
+      "label": "Rules Engine",
+      "sublabel": "MoveGen, Resolver, EndGame",
+      "pos": [680, 270],
+      "size": [150, 60]
+    },
+    {
+      "id": "board-state",
+      "type": "database",
+      "label": "AcPosition & Hash",
+      "sublabel": "Compact 80-Square Board",
+      "pos": [900, 270],
+      "size": [150, 60],
+      "tag": "Zobrist Hash"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Pure C11 Core Engine (Zero GTK/GLib Dependency)",
+      "wraps": ["session", "budget", "ai-search", "rules", "board-state"]
+    },
+    {
+      "kind": "security-group",
+      "label": "GTK 3 Desktop Shell & Platform Adapters",
+      "wraps": ["resources", "gtk-app", "platform", "async-worker"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-input",
+      "from": "player",
+      "to": "gtk-app",
+      "label": "User Input",
+      "variant": "emphasis"
+    },
+    {
+      "id": "load-resources",
+      "from": "resources",
+      "to": "gtk-app",
+      "label": "Load Assets",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 30
+    },
+    {
+      "id": "gtk-to-session",
+      "from": "gtk-app",
+      "to": "session",
+      "label": "Commands",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gtk-to-worker",
+      "from": "gtk-app",
+      "to": "async-worker",
+      "label": "Spawn Job",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "worker-to-ai",
+      "from": "async-worker",
+      "to": "ai-search",
+      "label": "Run Search"
+    },
+    {
+      "id": "ai-to-rules",
+      "from": "ai-search",
+      "to": "rules",
+      "label": "Generate Moves",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 30
+    },
+    {
+      "id": "session-to-rules",
+      "from": "session",
+      "to": "rules",
+      "label": "Validate Move",
+      "variant": "emphasis"
+    },
+    {
+      "id": "session-to-budget",
+      "from": "session",
+      "to": "budget",
+      "label": "Time Check",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 30
+    },
+    {
+      "id": "rules-to-board",
+      "from": "rules",
+      "to": "board-state",
+      "label": "Mutate / Undo",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gtk-to-platform",
+      "from": "gtk-app",
+      "to": "platform",
+      "label": "Callbacks",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 30
+    },
+    {
+      "id": "platform-to-session",
+      "from": "platform",
+      "to": "session",
+      "label": "Clock & Log",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Presentation & Shell",
+      "items": [
+        "GTK 3 desktop application with modern obsidian dark theme",
+        "HiDPI dynamic piece scaling based on board cell geometry",
+        "GTask worker thread ensures zero UI stutter during AI compute"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Session & Rules Isolation",
+      "items": [
+        "Core C11 modules compile cleanly without GTK or GLib",
+        "AcSession enforces transactional state, revision checking, and undo",
+        "8x10 board variant rules with Ants and chain-capturing Anteaters"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "AI & Search Architecture",
+      "items": [
+        "Iterative deepening with aspiration windows and alpha-beta pruning",
+        "Context-owned transposition tables, killer/history heuristics",
+        "Cooperative cancellation via monotonic deadline and GUI generation tokens"
+      ]
+    }
+  ]
+}

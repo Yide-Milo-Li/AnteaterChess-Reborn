@@ -17,6 +17,8 @@ flowchart TD
     Resources[Compiled GResource] --> GTK
 ```
 
+An [interactive architecture diagram](architecture.html) is also available.
+
 The session has no GTK or GLib dependency. Platform callbacks are injected. It uses AI budget helpers but never initiates a search. Search consumes copied positions and historical hashes and never mutates a live session. The former Controller/event queue/FSM contracts are replaced by synchronous session commands and application-owned navigation.
 
 ## Values, ownership, and lifetime

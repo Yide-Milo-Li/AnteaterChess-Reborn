@@ -40,6 +40,7 @@ void gui_clear_view_refs(Gui *gui) {
     gui->hint_to = ac_create_position(-1, -1);
     gui->hint_turn = AC_EMPTY_COLOR;
     gui->hint_move_count = -1;
+    gui->piece_image_size = 56;
 
     for (row = 0; row < 8; ++row) {
         for (col = 0; col < 10; ++col) {

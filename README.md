@@ -1,64 +1,96 @@
 # AnteaterChess Reborn
 
-A C11 / GTK 3 desktop chess variant on an **8 × 10 board**, with Ants and chain-capturing Anteaters. Reborn separates rules, sessions, search, and desktop presentation while retaining the original game's layout and gameplay.
+A C11 / GTK 3 desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
 
-Choose Human vs Human, Human vs AI, or AI vs AI. The desktop includes legal-move highlighting, typed coordinates, promotion selection, hints, undo, configurable turn timers, fullscreen, and game logs. A turn timeout skips the turn; Tournament search has its own time pool. Automatic threefold repetition applies only to AI vs AI.
+---
 
-## Run
+## Highlights & Features
 
-Download the platform archive from [Releases](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases). Windows x64: extract the entire ZIP and run `anteater-chess.exe`; keep its DLLs and support directories together. Ubuntu 24.04 x64: install `libgtk-3-0t64` and `librsvg2-common`, extract the archive, and run `./anteater-chess`. The runtime archives include installation instructions and the current manual.
+- **Modern Obsidian Slate UI**: Clean, minimalist dark theme (`#0e1017` / `#161922`) with refined ivory/walnut board squares, warm gold glow accents, and monospace coordinate grids.
+- **HiDPI Dynamic Piece Scaling**: Real-time adaptive SVG rasterization scales piece graphics dynamically ($32\text{px} \sim 160\text{px}$) with jitter filtering as the window resizes or toggles fullscreen.
+- **Pure C11 Core Engine**: Complete decoupling of core rules, board representation, and AI search from GTK/GLib. The core library compiles independently without desktop dependencies.
+- **Interactive Architecture Diagram**: Explorable standalone HTML architecture map with guided views and component boundaries in [docs/architecture.html](docs/architecture.html).
+- **Multiple Game Modes**: Human vs Human, Human vs AI, and AI vs AI.
+- **Desktop Controls & Ergonomics**: Click-to-move and typed coordinate input, valid move and hint highlighting, multi-level undo, promotion pickers, turn clocks, Tournament time pools, and game diagnostic logs.
+- **Asynchronous AI Worker**: Background `GTask` thread isolation prevents UI freezing during deep search, with cooperative cancellation and session revision validation.
 
-## Build
+---
 
-Ubuntu 24.04:
+## Interactive Architecture
+
+Explore the full system architecture, module boundaries, and data paths in the [Interactive Architecture Diagram](docs/architecture.html).
+
+| Layer / Subsystem | Path | Responsibility |
+| --- | --- | --- |
+| **Desktop Shell** | `apps/gtk/` | GTK 3 windows, screens, event handling, dynamic rendering, worker threads |
+| **Session Engine** | `src/session/` | Transactional state management, revision tracking, undo history, clock ticking |
+| **Rules Engine** | `src/rules/` | Move generation, legality verification, 80-square board, Zobrist hashing |
+| **AI Search** | `src/ai/` | Iterative deepening, alpha-beta pruning, transposition tables, budget management |
+| **Platform Adapter** | `src/platform/` | Monotonic clock injection and user-writable diagnostic loggers |
+| **Assets** | `assets/` | 18 vector SVG piece illustrations compiled into GResource |
+
+---
+
+## Quick Start
+
+### Download Prebuilt Binaries
+
+Platform archives are available under [Releases](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases).
+
+- **Windows x64**: Extract the ZIP package and launch `anteater-chess.exe` (keep accompanying DLLs in place).
+- **Ubuntu 24.04 x64**: Install runtime libraries (`sudo apt install libgtk-3-0t64 librsvg2-common`), extract, and run `./anteater-chess`.
+
+---
+
+## Build from Source
+
+### Ubuntu 24.04
 
 ```sh
 sudo apt-get update
 sudo apt-get install build-essential pkg-config libgtk-3-dev librsvg2-common python3
 make -j4
 make test
+make test-gui
 make run
 ```
 
-Windows: install MSYS2 and open its **UCRT64** shell:
+### Windows (MSYS2 UCRT64)
+
+Install MSYS2 and run inside the **UCRT64** environment:
 
 ```sh
 pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-gtk3 mingw-w64-ucrt-x86_64-librsvg mingw-w64-ucrt-x86_64-python
 make -j4
 make test
+make test-gui
 make run
 ```
 
-`make headless test` needs only C11, GNU Make, and the usual shell tools; it does not query GTK. Use `CONFIG=release` for optimized builds. See the [developer guide](docs/DEVELOPMENT.md) for all targets and packaging.
+### Headless & Release Builds
 
-## Project map
+- Build and test core logic without GTK: `make headless test`
+- Release optimized binaries: `make CONFIG=release gui test test-gui`
+- Source & binary distribution packaging: `make CONFIG=release package-source package`
 
-| Directory | Responsibility |
-| --- | --- |
-| `include/anteater/` | Public C interfaces and values |
-| `src/rules/` | Move generation, legality, reversible positions, hashes |
-| `src/session/` | History, commands, clocks, result, diagnostics |
-| `src/ai/` | Independent search contexts, evaluation, ordering, cache, budgets |
-| `src/platform/` | GLib clock and writable-user-directory logs |
-| `apps/gtk/` | Pages, input, rendering, GTask workers |
-| `assets/` | SVG resources embedded at build time |
-| `tests/` | Rules, session, AI, desktop tests, fuzzing and baseline fixtures |
-| `mk/`, `tools/` | Build, checks, packaging and validation |
-| `docs/` | Current documentation; original PDFs in `legacy/` |
+---
 
 ## Documentation
 
-- [User manual](docs/Chess_UserManual.md): rules, controls, setup, troubleshooting.
-- [Software specification](docs/Chess_SoftwareSpec.md): ownership, contracts, lifecycle, module/state diagrams.
-- [Development](docs/DEVELOPMENT.md): tools, testing, conventions, packaging and release.
-- [Migration](docs/MIGRATION.md): baseline, old paths and interface replacements.
-- [Test migration inventory](docs/TEST-MIGRATION.md): disposition of original scenarios.
-- [Release notes](docs/RELEASE-NOTES.md) and [validation record](docs/VALIDATION.md).
-- [Agent instructions](AGENTS.md).
-- Historical course PDFs: [user manual](docs/legacy/Chess_UserManual.pdf), [software specification](docs/legacy/Chess_SoftwareSpec.pdf). These are preserved unchanged and describe an older implementation. Current Markdown and executable tests take precedence.
+- [User manual](docs/Chess_UserManual.md): Gameplay rules, controls, setup options, troubleshooting.
+- [Software specification](docs/Chess_SoftwareSpec.md): Ownership invariants, API contracts, lifecycle state machine.
+- [Interactive Architecture Diagram](docs/architecture.html): Visual architecture layout with guided inspection views.
+- [Development guide](docs/DEVELOPMENT.md): Build targets, test conventions, packaging, and release processes.
+- [Migration guide](docs/MIGRATION.md): Baseline history, deprecated APIs, and interface mapping.
+- [Test migration inventory](docs/TEST-MIGRATION.md): Mapping and status of original test scenarios.
+- [Release notes](docs/RELEASE-NOTES.md) & [Validation record](docs/VALIDATION.md).
+- [Agent instructions](AGENTS.md): Architectural invariants and pair-programming guidelines.
+- Historical course PDFs: [User manual](docs/legacy/Chess_UserManual.pdf), [Software specification](docs/legacy/Chess_SoftwareSpec.pdf).
 
-## Authors and rights
+---
+
+## Authors & Rights
 
 Originally developed for UC Irvine EECS 22L by **Team 22: DeepAnteater**: Yao Li, Benjamin Feng, Yide Li, Yurang Li, Yasith Diunugala, and Max Zhang. The complete 215-commit baseline history is retained.
 
-The original [COPYRIGHT](COPYRIGHT) terms remain unchanged. This is not an open-source license grant: course staff have the stated course-use permission; other rights remain reserved by the authors. Third-party dependencies retain their own licenses, included with the Windows distribution.
+The original [COPYRIGHT](COPYRIGHT) terms remain unchanged. All rights remain reserved by the authors. Third-party dependencies retain their respective open-source licenses, bundled with binary distributions.

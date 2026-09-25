@@ -1,0 +1,24 @@
+name: Publish validated release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful build workflow run for the current main commit
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify artifacts and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.run_id }}
+        run: |
+          mkdir -p build
+          python3 tools/release.py "$BUILD_RUN"

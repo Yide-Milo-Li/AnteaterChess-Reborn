@@ -2,7 +2,7 @@
 #include <string.h>
 int main(int argc, char **argv) {
     if (argc == 2 && !strcmp(argv[1], "--version")) {
-        g_print("AnteaterChess Reborn 2.0.0\n");
+        g_print("AnteaterChess Reborn 2.0.1\n");
         return 0;
     }
     Gui *g = gui_create(&argc, &argv);

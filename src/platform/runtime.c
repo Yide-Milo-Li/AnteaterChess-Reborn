@@ -117,7 +117,7 @@ AcStatus ac_platform_log_write(void *context, const AcSnapshot *s) {
     }
     if (g_mkdir_with_parents(l->directory, 0700) != 0)
         return AC_IO_ERROR;
-    GString *text = g_string_new("AnteaterChess Reborn 2.0.0\n");
+    GString *text = g_string_new("AnteaterChess Reborn 2.0.1\n");
     g_string_append_printf(text, "Mode: %d\nTurn timer: %d seconds (%s)\n", s->config.mode,
                            s->config.initialTimeSeconds, s->config.timerEnabled ? "enabled" : "disabled");
     for (int i = 0; i < s->historyCount; ++i) {

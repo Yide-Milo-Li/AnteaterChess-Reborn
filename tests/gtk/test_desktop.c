@@ -55,8 +55,11 @@ int main(int argc, char **argv) {
     gui_on_undo_clicked(NULL, g);
     assert(gui_get_state(g)->moveHistory.count == 0);
     assert(!gui_start_hint_job(g));
-    gint64 hint_deadline=g_get_monotonic_time()+10000000;
-    while(g->hint_job && g_get_monotonic_time()<hint_deadline){pump();g_usleep(1000);}
+    gint64 hint_deadline = g_get_monotonic_time() + 10000000;
+    while (g->hint_job && g_get_monotonic_time() < hint_deadline) {
+        pump();
+        g_usleep(1000);
+    }
     assert(!g->hint_job && g->has_hint_highlight);
     assert(!gui_start_hint_job(g));
     gui_invalidate_async_results(g);
@@ -83,11 +86,15 @@ int main(int argc, char **argv) {
     gui_sync(g);
     assert(g->ai_job);
     ac_init_default_game_config(&c);
-    for(int i=0;i<5;++i)assert(!gui_start_game(g,&c,&error));
-    gui_cancel_async_jobs(g);pump();
-    assert(gui_get_state(g)->moveHistory.count==0);
-    ac_init_game_config_for_mode(&c,AC_MODE_COMPUTER_VS_COMPUTER);
-    assert(!gui_start_game(g,&c,&error));gui_sync(g);assert(g->ai_job);
+    for (int i = 0; i < 5; ++i)
+        assert(!gui_start_game(g, &c, &error));
+    gui_cancel_async_jobs(g);
+    pump();
+    assert(gui_get_state(g)->moveHistory.count == 0);
+    ac_init_game_config_for_mode(&c, AC_MODE_COMPUTER_VS_COMPUTER);
+    assert(!gui_start_game(g, &c, &error));
+    gui_sync(g);
+    assert(g->ai_job);
     gtk_widget_destroy(g->window);
     gui_destroy(g);
     return 0;

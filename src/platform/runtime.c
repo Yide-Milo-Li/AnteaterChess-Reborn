@@ -23,14 +23,18 @@ void ac_platform_prepare_runtime(void) {
         if (g_spawn_sync(NULL, args, NULL, 0, NULL, NULL, &output, NULL, &status, NULL) && status == 0) {
             /* query-loaders emits paths relative to its executable on Windows.
              * The writable cache lives elsewhere, so make its module path absolute. */
-            char **lines=g_strsplit(output,"\n",-1);
-            char *escaped=g_strescape(loader,NULL);
-            for(int i=0;lines[i];++i) {
-                if(lines[i][0]=='"' && strstr(lines[i],".dll\"")) {
-                    g_free(lines[i]);lines[i]=g_strdup_printf("\"%s\"",escaped);
+            char **lines = g_strsplit(output, "\n", -1);
+            char *escaped = g_strescape(loader, NULL);
+            for (int i = 0; lines[i]; ++i) {
+                if (lines[i][0] == '"' && strstr(lines[i], ".dll\"")) {
+                    g_free(lines[i]);
+                    lines[i] = g_strdup_printf("\"%s\"", escaped);
                 }
             }
-            g_free(escaped);g_free(output);output=g_strjoinv("\n",lines);g_strfreev(lines);
+            g_free(escaped);
+            g_free(output);
+            output = g_strjoinv("\n", lines);
+            g_strfreev(lines);
             char *directory = g_build_filename(g_get_user_cache_dir(), "AnteaterChess-Reborn", NULL);
             g_mkdir_with_parents(directory, 0700);
             char *cache = g_build_filename(directory, "loaders.cache", NULL);

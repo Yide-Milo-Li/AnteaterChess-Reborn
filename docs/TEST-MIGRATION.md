@@ -4,7 +4,7 @@ All 19 baseline test programs and their named scenarios are retained in [the mac
 
 ## test_ai.c
 
-Replacement: `tests/ai/test_search.c`; search contract, isolation and budget tests.
+Replacement: `tests/ai/test_search.c` and `tests/ai/test_special_positions.c`; search contract, isolation, budget, check evasion, terminal, promotion and en-passant tests. Hints also run in `tests/gtk/test_desktop.c`.
 
 - `test_ai_rejects_null_arguments`
 - `test_ai_returns_legal_move_without_mutating_initial_state`
@@ -175,7 +175,7 @@ Replacement: `tests/rules/test_movegen.c` (public rules interface).
 
 ## test_move_execution.c
 
-Replacement: `tests/rules/test_position.c` (reversible special moves, hash, random sequences); history policy in session tests.
+Replacement: `tests/rules/test_position.c` and `tests/rules/test_special_roundtrip.c` (both-color reversible special moves, hash, random sequences); history policy in session tests.
 
 - `test_apply_move_updates_board_history_and_turn`
 - `test_apply_move_rejects_invalid_requests`

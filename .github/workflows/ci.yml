@@ -58,7 +58,9 @@ jobs:
       - name: Core without GTK
         run: make -j4 BUILD=build/no-gtk test GTK_CFLAGS= GTK_LIBS= GLIB_CFLAGS=
       - name: Release and desktop tests
-        run: make -j4 CONFIG=release test gui test-gui check
+        run: |
+          make -j4 CONFIG=release test gui check
+          make CONFIG=release test-gui
       - name: Packages and rebuild
         run: |
           make -s CONFIG=release benchmark > build/performance.txt

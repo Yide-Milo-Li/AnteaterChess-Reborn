@@ -194,7 +194,7 @@ static GdkPixbuf *gui_load_asset_pixbuf(const char *path, int size) {
     GError *error = NULL;
     GdkPixbuf *p = gdk_pixbuf_new_from_resource_at_scale(path, size, size, TRUE, &error);
     if (error) {
-        g_warning("Resource %s: %s",path,error->message);
+        g_warning("Resource %s: %s", path, error->message);
         g_error_free(error);
     }
     return p;

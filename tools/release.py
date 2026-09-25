@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse, hashlib, json, subprocess, tempfile
 ROOT=Path(__file__).resolve().parents[1]
 def gh(*args):
-    return subprocess.check_output(['gh',*args],cwd=ROOT,text=True,encoding='utf-8').strip()
+    return subprocess.check_output(['gh',*args,'--repo','Yide-Milo-Li/AnteaterChess-Reborn'],cwd=ROOT,text=True,encoding='utf-8').strip()
 parser=argparse.ArgumentParser()
 parser.add_argument('run_id')
 args=parser.parse_args()

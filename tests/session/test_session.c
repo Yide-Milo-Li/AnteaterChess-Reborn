@@ -114,27 +114,34 @@ int main(void) {
     ac_session_snapshot(x, &sx);
     assert(sx.result == AC_RESULT_BLACK_WIN);
     ac_init_default_game_config(&config);
-    assert(!ac_session_start(x,&config));
-    for(int i=0;i<AC_MAX_MOVES;++i)
-        assert(!move(x,from[i%4],to[i%4]));
-    ac_session_snapshot(x,&sx);
-    assert(sx.historyCount==AC_MAX_MOVES && sx.phase==AC_SESSION_ACTIVE);
-    assert(!move(x,"B1","C3"));ac_session_snapshot(x,&sx);
-    assert(sx.result==AC_RESULT_DRAW && sx.historyCount==AC_MAX_MOVES);
-    for(int color=AC_WHITE;color<=AC_BLACK;++color) {
-        ac_init_game_config_for_mode(&config,AC_MODE_HUMAN_VS_COMPUTER);
-        config.playerColor=color;
-        assert(!ac_session_start(x,&config));
-        for(int ply=0;ply<4;++ply) {
-            ac_session_snapshot(x,&sx);
-            AcMoveRequest request;AcMove m;
-            assert(!ac_parse_move_request_fields(from[ply],to[ply],AC_PROMOTION_CHOICE_NONE,&request));
-            if(sx.position.currentTurn==(AcColor)color)assert(!ac_session_submit(x,request));
-            else {assert(!ac_resolve_move_request(&sx.position,request,&m));assert(!ac_session_submit_ai(x,m,sx.revision,350,1));}
+    assert(!ac_session_start(x, &config));
+    for (int i = 0; i < AC_MAX_MOVES; ++i)
+        assert(!move(x, from[i % 4], to[i % 4]));
+    ac_session_snapshot(x, &sx);
+    assert(sx.historyCount == AC_MAX_MOVES && sx.phase == AC_SESSION_ACTIVE);
+    assert(!move(x, "B1", "C3"));
+    ac_session_snapshot(x, &sx);
+    assert(sx.result == AC_RESULT_DRAW && sx.historyCount == AC_MAX_MOVES);
+    for (int color = AC_WHITE; color <= AC_BLACK; ++color) {
+        ac_init_game_config_for_mode(&config, AC_MODE_HUMAN_VS_COMPUTER);
+        config.playerColor = color;
+        assert(!ac_session_start(x, &config));
+        for (int ply = 0; ply < 4; ++ply) {
+            ac_session_snapshot(x, &sx);
+            AcMoveRequest request;
+            AcMove m;
+            assert(!ac_parse_move_request_fields(from[ply], to[ply], AC_PROMOTION_CHOICE_NONE, &request));
+            if (sx.position.currentTurn == (AcColor)color)
+                assert(!ac_session_submit(x, request));
+            else {
+                assert(!ac_resolve_move_request(&sx.position, request, &m));
+                assert(!ac_session_submit_ai(x, m, sx.revision, 350, 1));
+            }
         }
-        assert(!ac_session_undo(x));ac_session_snapshot(x,&sx);
-        assert(sx.position.currentTurn==(AcColor)color);
-        assert(sx.historyCount==(color==AC_WHITE?2:3));
+        assert(!ac_session_undo(x));
+        ac_session_snapshot(x, &sx);
+        assert(sx.position.currentTurn == (AcColor)color);
+        assert(sx.historyCount == (color == AC_WHITE ? 2 : 3));
     }
     free(list);
     ac_session_destroy(x);

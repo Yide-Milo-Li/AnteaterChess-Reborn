@@ -30,14 +30,20 @@ static void test_platform(void) {
 #include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
-static LONG WINAPI unhandled_filter(EXCEPTION_POINTERS *info) {
+static LONG WINAPI vectored_handler(EXCEPTION_POINTERS *info) {
     DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
     void *addr = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : NULL;
-    fprintf(stderr, "\n[CRASH] Unhandled exception 0x%08lX at %p\n", code, addr);
-    fflush(stderr);
+    if (code != 0x406D1388 && code != 0x000006BA && code != 0x40010006) {
+        fprintf(stderr, "\n[VEH] Exception 0x%08lX at %p\n", code, addr);
+        fflush(stderr);
+    }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 #endif
+static void on_exit_handler(void) {
+    fprintf(stderr, "\n[EXIT] atexit handler called!\n");
+    fflush(stderr);
+}
 static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
                         const gchar *message, gpointer user_data) {
     (void)user_data;
@@ -47,16 +53,21 @@ static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
 static void pump(void) {
     printf("[pump] start\n"); fflush(stdout);
     int iterations = 0;
-    while (g_main_context_iteration(NULL, FALSE)) {
+    while (1) {
+        printf("[pump] before iteration %d\n", iterations + 1); fflush(stdout);
+        gboolean more = g_main_context_iteration(NULL, FALSE);
+        printf("[pump] iteration %d returned %d\n", iterations + 1, (int)more); fflush(stdout);
+        if (!more)
+            break;
         ++iterations;
-        printf("[pump] iteration %d done\n", iterations); fflush(stdout);
     }
     printf("[pump] end after %d iterations\n", iterations); fflush(stdout);
 }
 int main(int argc, char **argv) {
 #ifdef _WIN32
-    SetUnhandledExceptionFilter(unhandled_filter);
+    AddVectoredExceptionHandler(1, vectored_handler);
 #endif
+    atexit(on_exit_handler);
     g_log_set_default_handler(log_handler, NULL);
     printf("[test_desktop] starting\n"); fflush(stdout);
     test_platform();

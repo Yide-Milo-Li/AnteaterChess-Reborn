@@ -108,7 +108,7 @@ static void build_ai_budget_summary(GtkWidget *parent) {
     char text[192];
 
     snprintf(text, sizeof(text),
-             "AC_AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10:00.000 pool, max %dms / Experimental "
+             "AI Budget: Easy %dms / Medium %dms / Hard %dms / Tournament 10:00.000 pool, max %dms / Experimental "
              "%dms (alien plugin)",
              ac_get_default_ai_time_budget_ms(AC_DIFFICULTY_EASY),
              ac_get_default_ai_time_budget_ms(AC_DIFFICULTY_MEDIUM),
@@ -301,11 +301,11 @@ void gui_build_setup_menu(Gui *gui) {
         gtk_box_pack_start(GTK_BOX(sideBox), gui->setup_side_white, FALSE, FALSE, 0);
         gtk_box_pack_start(GTK_BOX(sideBox), gui->setup_side_black, FALSE, FALSE, 0);
 
-        build_difficulty_group(contentBox, "AC_AI Difficulty", gui->setup_ai_diff_buttons);
+        build_difficulty_group(contentBox, "AI Difficulty", gui->setup_ai_diff_buttons);
         build_ai_budget_summary(contentBox);
     } else if (gui->pendingConfig.mode == AC_MODE_COMPUTER_VS_COMPUTER) {
-        build_difficulty_group(contentBox, "White AC_AI Difficulty", gui->setup_white_diff_buttons);
-        build_difficulty_group(contentBox, "Black AC_AI Difficulty", gui->setup_black_diff_buttons);
+        build_difficulty_group(contentBox, "White AI Difficulty", gui->setup_white_diff_buttons);
+        build_difficulty_group(contentBox, "Black AI Difficulty", gui->setup_black_diff_buttons);
         build_ai_budget_summary(contentBox);
     }
 

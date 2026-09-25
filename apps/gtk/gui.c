@@ -60,7 +60,19 @@ void gui_update_fullscreen_button(Gui *gui) {
     const char *label;
     const char *tooltip;
 
-    if (gui == NULL || !GTK_IS_BUTTON(gui->fullscreen_button)) {
+    if (gui == NULL) {
+        return;
+    }
+
+    if (GTK_IS_WIDGET(gui->window)) {
+        if (gui->is_fullscreen) {
+            gtk_style_context_add_class(gtk_widget_get_style_context(gui->window), "fullscreen-mode");
+        } else {
+            gtk_style_context_remove_class(gtk_widget_get_style_context(gui->window), "fullscreen-mode");
+        }
+    }
+
+    if (!GTK_IS_BUTTON(gui->fullscreen_button)) {
         return;
     }
 

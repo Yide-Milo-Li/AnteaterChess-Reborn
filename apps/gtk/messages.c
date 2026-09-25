@@ -17,7 +17,7 @@ const char *ac_get_error_message(AcErrorCode code) {
     case AC_ERR_INVALID_MOVE_FORMAT:
         return "Use move format: E2 E4.";
     case AC_ERR_POSITION_OUT_OF_BOUNDS:
-        return "AcSquare is out of bounds.";
+        return "Square is out of bounds.";
     case AC_ERR_EMPTY_SELECTION:
         return "No piece selected.";
     case AC_ERR_OPPONENT_PIECE:
@@ -25,17 +25,17 @@ const char *ac_get_error_message(AcErrorCode code) {
     case AC_ERR_ILLEGAL_MOVE:
         return "Illegal move.";
     case AC_ERR_UNRESOLVED_CHECK:
-        return "AcMove leaves king in check.";
+        return "Move leaves king in check.";
     case AC_ERR_INVALID_TIMER_SETTING:
         return "Enter a time from 1 to 3600.";
     case AC_ERR_INVALID_AI_TIMER_SETTING:
-        return "AC_AI difficulty requires a longer turn timer.";
+        return "AI difficulty requires a longer turn timer.";
     case AC_ERR_UNDO_UNAVAILABLE:
         return "Undo unavailable.";
     case AC_ERR_HINT_UNAVAILABLE:
         return "Hint unavailable.";
     case AC_ERR_AI_UNAVAILABLE:
-        return "AC_AI move unavailable.";
+        return "AI move unavailable.";
     case AC_ERR_NOT_YOUR_TURN:
         return "Not your turn.";
     case AC_ERR_TIME_UP:

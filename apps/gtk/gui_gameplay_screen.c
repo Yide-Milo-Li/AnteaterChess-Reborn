@@ -60,7 +60,7 @@ static void gui_format_history_player(const GuiView *state, AcColor color, char 
     const char *colorText = (color == AC_BLACK) ? "Black" : "White";
 
     if (state != NULL && (color == AC_WHITE || color == AC_BLACK) && state->players[color].type == AC_AI) {
-        snprintf(buffer, 32, "%s (AC_AI)", colorText);
+        snprintf(buffer, 32, "%s (AI)", colorText);
         return;
     }
 
@@ -96,9 +96,9 @@ static void gui_update_history_ai_summary(Gui *gui, const GuiView *state) {
     switch (state->config.mode) {
     case AC_MODE_HUMAN_VS_COMPUTER:
         if (state->config.aiDifficultyWhite != AC_DIFFICULTY_NONE) {
-            snprintf(text, sizeof(text), "White AC_AI: %s", gui_ai_difficulty_text(state->config.aiDifficultyWhite));
+            snprintf(text, sizeof(text), "White AI: %s", gui_ai_difficulty_text(state->config.aiDifficultyWhite));
         } else if (state->config.aiDifficultyBlack != AC_DIFFICULTY_NONE) {
-            snprintf(text, sizeof(text), "Black AC_AI: %s", gui_ai_difficulty_text(state->config.aiDifficultyBlack));
+            snprintf(text, sizeof(text), "Black AI: %s", gui_ai_difficulty_text(state->config.aiDifficultyBlack));
         } else {
             gtk_label_set_text(GTK_LABEL(gui->history_ai_summary_label), "");
             gtk_widget_hide(gui->history_ai_summary_label);
@@ -106,7 +106,7 @@ static void gui_update_history_ai_summary(Gui *gui, const GuiView *state) {
         }
         break;
     case AC_MODE_COMPUTER_VS_COMPUTER:
-        snprintf(text, sizeof(text), "White AC_AI: %s | Black AC_AI: %s",
+        snprintf(text, sizeof(text), "White AI: %s | Black AI: %s",
                  gui_ai_difficulty_text(state->config.aiDifficultyWhite),
                  gui_ai_difficulty_text(state->config.aiDifficultyBlack));
         break;
@@ -148,7 +148,7 @@ static GtkWidget *gui_create_format_help_popover(GtkWidget *relativeTo) {
     gtk_container_set_border_width(GTK_CONTAINER(content), 10);
     gtk_style_context_add_class(gtk_widget_get_style_context(content), "format-popover");
 
-    title = gtk_label_new("AcMove Format");
+    title = gtk_label_new("Move Format");
     gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
     gtk_style_context_add_class(gtk_widget_get_style_context(title), "format-popover-title");
     gtk_box_pack_start(GTK_BOX(content), title, FALSE, FALSE, 0);
@@ -192,7 +192,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     if (historyIcon != NULL) {
         gtk_box_pack_start(GTK_BOX(historyHeader), historyIcon, FALSE, FALSE, 0);
     }
-    historyLabel = gtk_label_new("AcMove History");
+    historyLabel = gtk_label_new("Move History");
     gtk_style_context_add_class(gtk_widget_get_style_context(historyLabel), "panel-title");
     gtk_widget_set_halign(historyLabel, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(historyHeader), historyLabel, FALSE, FALSE, 0);
@@ -217,10 +217,10 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(gui->history_view), FALSE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(gui->history_view), GTK_WRAP_WORD_CHAR);
     gtk_text_view_set_monospace(GTK_TEXT_VIEW(gui->history_view), TRUE);
-    gtk_text_view_set_left_margin(GTK_TEXT_VIEW(gui->history_view), 8);
-    gtk_text_view_set_right_margin(GTK_TEXT_VIEW(gui->history_view), 8);
-    gtk_text_view_set_top_margin(GTK_TEXT_VIEW(gui->history_view), 8);
-    gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(gui->history_view), 8);
+    gtk_text_view_set_left_margin(GTK_TEXT_VIEW(gui->history_view), 10);
+    gtk_text_view_set_right_margin(GTK_TEXT_VIEW(gui->history_view), 10);
+    gtk_text_view_set_top_margin(GTK_TEXT_VIEW(gui->history_view), 10);
+    gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(gui->history_view), 10);
     gtk_style_context_add_class(gtk_widget_get_style_context(gui->history_view), "history-view");
     scrolledWindow = gtk_scrolled_window_new(NULL, NULL);
     gtk_style_context_add_class(gtk_widget_get_style_context(scrolledWindow), "history-panel");
@@ -240,7 +240,7 @@ static void build_gameplay_sidebar(Gui *gui, GtkWidget *parent) {
     gtk_style_context_add_class(gtk_widget_get_style_context(enterBox), "move-entry-panel");
     gtk_box_pack_start(GTK_BOX(parent), enterBox, FALSE, FALSE, 0);
     {
-        GtkWidget *entryLabel = gtk_label_new("Enter AcMove");
+        GtkWidget *entryLabel = gtk_label_new("Enter Move");
 
         gtk_widget_set_halign(entryLabel, GTK_ALIGN_START);
         gtk_style_context_add_class(gtk_widget_get_style_context(entryLabel), "section-label");
@@ -594,7 +594,7 @@ static void gui_format_history_line(const GuiView *state, int index, GString *te
     gui_format_position_text(move.from, fromText);
     gui_format_position_text(move.to, toText);
     gui_format_history_player(state, move.movedPiece.color, playerText);
-    g_string_append_printf(text, "[AcMove %03d] %s | %s %s -> %s", index + 1, playerText,
+    g_string_append_printf(text, "[Move %03d] %s | %s %s -> %s", index + 1, playerText,
                            gui_piece_type_text(move.movedPiece.type), fromText, toText);
     if (move.captureCount > 0) {
         g_string_append_printf(text, " | Captures: %d", move.captureCount);
@@ -798,13 +798,13 @@ void gui_update_gameplay_controls(Gui *gui, const GuiView *state) {
     if (GTK_IS_WIDGET(gui->from_entry)) {
         gtk_widget_set_sensitive(gui->from_entry, canUseHumanControls);
         if (GTK_IS_ENTRY(gui->from_entry)) {
-            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->from_entry), aiTurn ? "AC_AI turn" : "From");
+            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->from_entry), aiTurn ? "AI turn" : "From");
         }
     }
     if (GTK_IS_WIDGET(gui->to_entry)) {
         gtk_widget_set_sensitive(gui->to_entry, canUseHumanControls);
         if (GTK_IS_ENTRY(gui->to_entry)) {
-            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->to_entry), aiTurn ? "AC_AI turn" : "To");
+            gtk_entry_set_placeholder_text(GTK_ENTRY(gui->to_entry), aiTurn ? "AI turn" : "To");
         }
     }
     if (GTK_IS_WIDGET(gui->submit_button)) {
@@ -813,7 +813,7 @@ void gui_update_gameplay_controls(Gui *gui, const GuiView *state) {
         gtk_style_context_remove_class(submitContext, "ai-status-button");
         submitText = "Submit";
         if (aiTurn) {
-            submitText = gui->ai_job == NULL ? "AC_AI Playing" : "AC_AI Thinking...";
+            submitText = gui->ai_job == NULL ? "AI Playing" : "AI Thinking...";
             gtk_style_context_add_class(submitContext, "ai-status-button");
         } else if (canUseHumanControls) {
             gtk_style_context_add_class(submitContext, "primary-button");

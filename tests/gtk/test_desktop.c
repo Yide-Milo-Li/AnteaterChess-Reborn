@@ -53,6 +53,23 @@ static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
 #include <signal.h>
 static void sig_handler(int sig) {
     fprintf(stderr, "\n[SIGNAL] Received signal %d\n", sig);
+#ifdef _WIN32
+    void *stack[64];
+    WORD frames = CaptureStackBackTrace(0, 64, stack, NULL);
+    for (WORD i = 0; i < frames; ++i) {
+        void *addr = stack[i];
+        HMODULE mod = NULL;
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               (LPCSTR)addr, &mod)) {
+            char modname[MAX_PATH];
+            GetModuleFileNameA(mod, modname, sizeof(modname));
+            uintptr_t offset = (uintptr_t)addr - (uintptr_t)mod;
+            fprintf(stderr, "  [%d] %s + 0x%zx (%p)\n", (int)i, modname, (size_t)offset, addr);
+        } else {
+            fprintf(stderr, "  [%d] %p\n", (int)i, addr);
+        }
+    }
+#endif
     fflush(stderr);
 }
 static void event_watcher(GdkEvent *event, gpointer data) {
@@ -76,6 +93,7 @@ static void pump(void) {
 }
 int main(int argc, char **argv) {
 #ifdef _WIN32
+    _set_error_mode(_OUT_TO_STDERR);
     AddVectoredExceptionHandler(1, vectored_handler);
 #endif
     signal(SIGABRT, sig_handler);

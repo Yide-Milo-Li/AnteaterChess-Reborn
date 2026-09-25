@@ -42,7 +42,7 @@ make run
 | `src/platform/` | GLib clock and writable-user-directory logs |
 | `apps/gtk/` | Pages, input, rendering, GTask workers |
 | `assets/` | SVG resources embedded at build time |
-| `tests/` | Rules, session, AI, desktop tests and baseline fixtures |
+| `tests/` | Rules, session, AI, desktop tests, fuzzing and baseline fixtures |
 | `mk/`, `tools/` | Build, checks, packaging and validation |
 | `docs/` | Current documentation; original PDFs in `legacy/` |
 

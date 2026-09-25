@@ -8,6 +8,8 @@ void ac_init_move_list(AcMoveList *l) {
 int ac_add_move(AcMoveList *l, AcMove m) {
     if (!l)
         return AC_INVALID_ARGUMENT;
+    if (l->status != AC_OK)
+        return l->status;
     if (l->count >= AC_MAX_MOVES) {
         l->status = AC_CAPACITY;
         return AC_CAPACITY;

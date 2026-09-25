@@ -2,6 +2,10 @@
 # Build artifacts
 # =========================
 build/
+dist/
+__pycache__/
+AnteaterChess*.tar.gz
+AnteaterChess*.zip
 *.o
 *.d
 *.out

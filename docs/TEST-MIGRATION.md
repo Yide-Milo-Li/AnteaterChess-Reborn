@@ -1,0 +1,250 @@
+# Original test migration inventory
+
+All 19 baseline test programs and their named scenarios are retained in [the machine-readable inventory](../tests/fixtures/legacy-scenarios.json). The table records scenario disposition; removed controller/queue/FSM mechanics are deliberately not compatibility requirements. New aggregate tests cover related behavior together.
+
+## test_ai.c
+
+Replacement: `tests/ai/test_search.c`; search contract, isolation and budget tests.
+
+- `test_ai_rejects_null_arguments`
+- `test_ai_returns_legal_move_without_mutating_initial_state`
+- `test_ai_resolves_check_with_safe_move`
+- `test_hint_returns_legal_move_without_mutating_state`
+- `test_ai_respects_wall_clock_time_limit`
+- `test_ai_generates_move_with_explicit_budget`
+- `test_tournament_time_manager_rolls_saved_time_forward`
+- `test_ai_fails_cleanly_when_no_legal_move_exists`
+- `test_ai_can_choose_promotion_move`
+- `test_ai_can_choose_en_passant`
+
+## test_board.c
+
+Replacement: `tests/rules/test_board.c` (public rules interface).
+
+- `test_board_initialization`
+- `test_board_mutation`
+- `test_invalid_position_access`
+- `test_default_gameconfig`
+
+## test_clock.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_clock_initialization_and_progress`
+- `test_clock_pause_and_resume`
+- `test_monotonic_milliseconds_progress`
+
+## test_controller.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_init_controller_resets_state_and_queue`
+- `test_controller_enqueue_event_routes_by_priority`
+- `test_controller_tick_bootstraps_init_state`
+- `test_controller_tick_processes_one_queued_event`
+- `test_controller_tick_returns_none_when_idle`
+- `test_controller_run_until_idle_bootstraps_init_state`
+- `test_controller_sync_bootstraps_init_state`
+- `test_controller_run_until_idle_completes_termination_handshake`
+- `test_controller_start_configured_game_enters_gameplay`
+- `test_controller_start_rejects_ai_timer_below_budget`
+- `test_controller_start_ai_timer_policy_by_mode`
+- `test_controller_run_until_idle_auto_plays_ai_turn`
+- `test_controller_run_until_idle_leaves_ai_turn_idle_without_provider`
+- `test_controller_submit_ai_move_applies_one_move`
+- `test_controller_submit_ai_move_rejects_human_turn`
+- `test_controller_submit_ai_move_rejects_illegal_move`
+- `test_controller_submit_ai_move_cvc_advances_one_step`
+- `test_controller_time_forfeit_awards_opponent_win`
+- `test_controller_request_new_game_advances_to_mode_menu`
+- `test_controller_request_back_returns_to_main_menu`
+- `test_controller_request_exit_reaches_exit_state`
+- `test_controller_submit_move_applies_valid_move`
+- `test_controller_submit_move_request_detailed_reports_illegal_move`
+- `test_controller_submit_move_request_detailed_reports_non_gameplay`
+- `test_controller_submit_move_request_detailed_rejects_ai_turn`
+- `test_controller_submit_move_draws_at_history_capacity`
+- `test_controller_submit_move_request_applies_promotion_choice`
+- `test_controller_submit_move_request_promotes_to_queen`
+- `test_controller_request_undo_restores_position`
+- `test_controller_request_leave_game_reaches_endgame_menu`
+- `test_controller_get_hint_returns_move_without_mutating_state`
+
+## test_control_flow.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_controller_applies_valid_move`
+- `test_controller_rejects_illegal_move`
+- `test_controller_undo_restores_position`
+- `test_controller_hvh_undo_rewinds_full_round`
+- `test_controller_hvc_undo_returns_to_previous_white_human_turn`
+- `test_controller_hvc_undo_returns_to_previous_black_human_turn`
+- `test_controller_hvc_black_opening_undo_unavailable`
+- `test_controller_auto_promotes_to_queen`
+- `test_controller_applies_castling`
+- `test_controller_applies_en_passant`
+- `test_controller_timer_expiry_passes_turn`
+
+## test_endgame.c
+
+Replacement: `tests/rules/test_endgame.c` (public rules interface).
+
+- `test_is_in_check_detects_attacks_and_blockers`
+- `test_checkmate_detection_finds_forced_mate`
+- `test_checkmate_ignores_capture_king_pseudomove`
+- `test_stalemate_detection_finds_no_legal_move_position`
+- `test_insufficient_material_detects_simple_draws`
+- `test_insufficient_material_detects_boundary_combinations`
+- `test_detect_game_result_updates_game_state`
+- `test_threefold_repetition_detects_repeated_position`
+- `test_threefold_auto_draw_only_in_computer_vs_computer`
+- `test_endgame_detection_ignores_history_capacity_limit`
+
+## test_error.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_known_error_messages`
+- `test_unknown_error_message`
+
+## test_event.c
+
+Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `tests/session/test_session.c` cover observable navigation/session behavior.
+
+- `test_event_constructors`
+- `test_zero_initialized_queue_is_empty`
+- `test_queue_fifo_and_independence`
+- `test_queue_capacity_and_wraparound`
+
+## test_fsm.c
+
+Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `tests/session/test_session.c` cover observable navigation/session behavior.
+
+- `test_forward_state_progression`
+- `test_transition_validation`
+- `test_timer_expiry_and_fatal_error_paths`
+- `test_legacy_hint_event_is_rejected_in_gameplay`
+- `test_resolved_player_move_is_applied_in_gameplay`
+- `test_full_move_history_capacity_draws_in_gameplay`
+
+## test_game_state.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_game_state_initialization_defaults`
+- `test_game_state_player_setup_follows_mode`
+- `test_game_config_mode_defaults`
+- `test_ai_time_budget_helpers`
+- `test_history_and_result_helpers`
+- `test_get_current_player_tracks_turn`
+
+## test_log.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_log_lifecycle_and_history_rebuild`
+- `test_log_default_ai_budget_header`
+
+## test_move.c
+
+Replacement: `tests/rules/test_move.c` (public rules interface).
+
+- `test_create_move_defaults`
+- `test_move_path_and_captures`
+- `test_move_capacity_limits`
+- `test_movelist_operations`
+- `test_promotion_special_move_detection`
+
+## test_movegen.c
+
+Replacement: `tests/rules/test_movegen.c` (public rules interface).
+
+- `test_generate_moves_only_for_current_turn`
+- `test_ant_moves_and_capture`
+- `test_anteater_moves_and_chain_capture`
+- `test_anteater_recursive_turning_capture_paths`
+- `test_sliding_piece_blocking`
+- `test_bishop_and_queen_generation`
+- `test_knight_and_king_moves`
+- `test_promotion_generation`
+- `test_castling_generation`
+- `test_en_passant_generation`
+- `test_movegen_does_not_generate_king_captures`
+- `test_edge_counts_and_validation`
+
+## test_move_execution.c
+
+Replacement: `tests/rules/test_position.c` (reversible special moves, hash, random sequences); history policy in session tests.
+
+- `test_apply_move_updates_board_history_and_turn`
+- `test_apply_move_rejects_invalid_requests`
+- `test_apply_move_removes_all_recorded_captures`
+- `test_apply_move_handles_promotion`
+- `test_apply_move_handles_castling`
+- `test_apply_move_handles_queenside_castling`
+- `test_apply_move_handles_black_capture_promotion`
+- `test_apply_move_handles_en_passant`
+- `test_apply_move_handles_black_en_passant`
+- `test_undo_move_rejects_unavailable_history`
+- `test_undo_move_restores_simple_move`
+- `test_undo_move_restores_chain_captures`
+- `test_undo_move_reverts_promotion_to_original_piece`
+- `test_undo_move_reverts_castling`
+- `test_undo_move_reverts_queenside_castling`
+- `test_undo_move_reverts_black_capture_promotion`
+- `test_undo_move_reverts_en_passant`
+
+## test_move_request_parser.c
+
+Replacement: `tests/rules/test_move_request_parser.c` (public rules interface).
+
+- `test_parse_move_request_fields_accepts_standard_fields`
+- `test_parse_move_request_fields_accepts_trimmed_lowercase_fields`
+- `test_parse_move_request_fields_rejects_invalid_coordinates`
+- `test_parse_move_request_fields_rejects_invalid_promotion`
+- `test_parse_move_request_fields_rejects_null_output`
+
+## test_move_resolver.c
+
+Replacement: `tests/rules/test_move_resolver.c` (public rules interface).
+
+- `test_resolve_simple_move`
+- `test_resolve_castling`
+- `test_resolve_en_passant`
+- `test_resolve_promotion_defaults_to_queen`
+- `test_resolve_explicit_promotion_choices`
+- `test_resolve_rejects_invalid_request`
+
+## test_piece.c
+
+Replacement: `tests/rules/test_piece.c` (public rules interface).
+
+- `test_create_piece`
+- `test_same_color_checks`
+- `test_piece_symbols`
+- `test_piece_validity`
+
+## test_rulecheck.c
+
+Replacement: `tests/rules/test_rulecheck.c` (public rules interface).
+
+- `test_validate_selection_reports_expected_result_codes`
+- `test_validate_move_accepts_basic_ant_advance`
+- `test_validate_move_rejects_invalid_origin_and_target_inputs`
+- `test_validate_move_rejects_blocked_rook_path`
+- `test_validate_move_checks_explicit_capture_metadata`
+- `test_validate_move_rejects_self_check_positions`
+- `test_validate_move_accepts_supported_special_moves`
+- `test_validate_move_accepts_recursive_anteater_capture`
+- `test_validate_move_rejects_illegal_special_moves`
+
+## test_timer.c
+
+Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+
+- `test_turn_helpers_report_expected_active_side`
+- `test_turn_helpers_reject_invalid_state`
+- `test_turn_timer_counts_down_only_for_active_player`
+- `test_turn_timer_resets_after_switch_and_undo`
+- `test_turn_timer_disable_and_expiration_paths`

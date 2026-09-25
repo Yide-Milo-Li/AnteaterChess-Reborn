@@ -27,12 +27,37 @@ static void test_platform(void) {
     g_rmdir(directory);
     g_free(directory);
 }
-static void pump(void) {
-    while (g_main_context_iteration(NULL, FALSE))
-        ;
-}
 #include <stdio.h>
+#ifdef _WIN32
+#include <windows.h>
+static LONG WINAPI unhandled_filter(EXCEPTION_POINTERS *info) {
+    DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
+    void *addr = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : NULL;
+    fprintf(stderr, "\n[CRASH] Unhandled exception 0x%08lX at %p\n", code, addr);
+    fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
+                        const gchar *message, gpointer user_data) {
+    (void)user_data;
+    fprintf(stderr, "[GLIB %s:0x%x] %s\n", log_domain ? log_domain : "default", (unsigned)log_level, message ? message : "");
+    fflush(stderr);
+}
+static void pump(void) {
+    printf("[pump] start\n"); fflush(stdout);
+    int iterations = 0;
+    while (g_main_context_iteration(NULL, FALSE)) {
+        ++iterations;
+        printf("[pump] iteration %d done\n", iterations); fflush(stdout);
+    }
+    printf("[pump] end after %d iterations\n", iterations); fflush(stdout);
+}
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    SetUnhandledExceptionFilter(unhandled_filter);
+#endif
+    g_log_set_default_handler(log_handler, NULL);
     printf("[test_desktop] starting\n"); fflush(stdout);
     test_platform();
     printf("[test_desktop] platform ok\n"); fflush(stdout);

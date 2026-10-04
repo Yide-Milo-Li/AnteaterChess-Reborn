@@ -14,10 +14,10 @@ Baseline: `fb6df82eba4d513bbc160d2d848ffe6abc41cd3e` on original `main`, 215 com
 | `src/ai/ai.c` | `src/ai/{context,search,evaluation,ordering,table,budget}.c` |
 | external Experimental plugin probe | removed; old difficulty value 4 is invalid |
 | `src/ui`, `src/main.c` | `apps/qt` |
-| runtime relative asset files | compiled `assets/resources.xml` GResource |
+| runtime relative asset files | Qt resources in `assets/resources.qrc` and embedded QML |
 | `doc/*.pdf` | identical bytes in `docs/legacy/*.pdf` |
 | `packaging/` | `tools/packaging/templates/`, packaging and verification scripts |
-| root `tests/test_*.c` | categorized `tests/{rules,session,ai,gtk}` |
+| root `tests/test_*.c` | categorized `tests/{rules,session,ai,qt}` |
 
 The old C API, ABI and header paths are intentionally unsupported. `tools/legacy/migration-symbols.json` records mechanical names used during migration; removed state/controller symbols in that inventory are historical, not exported compatibility aliases. There is no saved-game format to migrate.
 
@@ -25,14 +25,16 @@ Rules retain the original variant and limitations documented in the [current man
 
 ## Reborn layout migration
 
-Flat GTK sources are categorized under `apps/gtk/{app,screens,ui,async}`.
-The former combined `src/platform/runtime.c` is split into runtime preparation,
-clock and logging files. Assets move under `pieces/` and `icons/`; `WhiteAntsvg.svg`
-is physically renamed to `WhiteAnt.svg` while its GResource alias stays compatible.
+The historical GTK sources were categorized under `apps/gtk/{app,screens,ui,async}`.
+The current desktop is `apps/qt/{app,models,async,qml,runtime}`. The former
+platform runtime is replaced by Qt executable-path, clock and logging services.
+Assets remain under `pieces/` and `icons/`; `WhiteAntsvg.svg` is physically renamed
+to `WhiteAnt.svg` while its Qt resource alias stays compatible.
 Current documents move under `docs/{user,architecture,development}`; historical
 PDFs remain under `docs/legacy` with identical bytes. Tool paths are now
 `tools/{packaging,dev,legacy}`; direct script invocations use these locations.
-Make target names and the core public C interfaces are retained.
+Make command names and the core public C interfaces are retained through the
+CMake/Ninja forwarding wrapper.
 
 New game logs now live in `logs/` beside the actual executable on both supported
 platforms. Earlier user-data/state logs remain in their original directories.

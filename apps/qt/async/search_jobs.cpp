@@ -25,6 +25,9 @@ bool SearchJobs::start(const AcSnapshot &s, uint64_t generation, bool hint, int 
     thread_->setParent(this);
     QThread *thread = thread_;
     connect(thread, &QThread::finished, this, [this,j,thread] {
+        // Disconnect cannot remove a completion already queued before shutdown.
+        // Check both identities before touching a retired or reused thread address.
+        if (thread_ != thread || job_ != j) return;
         thread->wait();
         outcome_ = j->outcome;
         outcome_.cancelled = j->cancelled.load();

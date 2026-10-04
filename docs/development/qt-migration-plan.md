@@ -8,15 +8,16 @@ Experimental removed, existing visual language and interaction retained.
 
 | Stage | Deliverable | Status |
 | --- | --- | --- |
-| 0 | Fixed baseline, behavior matrix, AI reference, Cairo comparison | In progress |
-| 1 | Independent C core, C++ linkage, Qt/resources on both hosts | Pending |
-| 2 | Session/models, monotonic clocks, executable-relative logs | Pending |
-| 3 | Snapshot worker, cooperative cancellation, stale-result guards | Pending |
-| 4 | Complete QML pages, four difficulties, interaction checks | Pending |
-| 5 | Portable packages, source rebuild, removal of GTK/Cairo | Pending |
-| 6 | Evaluation responsibilities extracted without behavior changes | Pending |
+| 0 | Fixed baseline, behavior matrix, AI reference, Cairo comparison | Complete locally |
+| 1 | Independent C core, C++ linkage, Qt/resources on both hosts | Complete locally |
+| 2 | Session/models, monotonic clocks, executable-relative logs | Complete locally |
+| 3 | Snapshot worker, cooperative cancellation, stale-result guards | Complete locally |
+| 4 | Complete QML pages, four difficulties, interaction checks | Complete locally |
+| 5 | Portable packages, source rebuild, removal of GTK/Cairo | Complete locally; external release review pending |
+| 6 | Evaluation responsibilities extracted without behavior changes | Complete locally |
 
-Do not remove the GTK reference before Qt automated and rendered checks pass.
+The GTK implementation is now a Git-history reference only; Qt automated and
+rendered checks passed before its source and build graph were removed.
 Do not adjust AI weights, ordering, SEE, pruning, rules, undo, Tournament budgets,
 or AI-only repetition adjudication. Experimental's old value 4 is invalid;
 Tournament retains value 5. Historical PDFs, COPYRIGHT, and attribution retain

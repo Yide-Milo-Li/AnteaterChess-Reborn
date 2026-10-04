@@ -80,6 +80,23 @@ private slots:
         QVERIFY(!a.requestClose()); QTRY_COMPARE_WITH_TIMEOUT(ready.count(),1,5000);
         QVERIFY(a.requestClose()); QCOMPARE(a.historyCount(),0);
     }
+    void queuedCompletionAfterShutdown() {
+        Clock clock; auto o = options(clock); ac::SessionAdapter a(&o);
+        QCOMPARE(a.start(config()),AC_OK);
+        ac::SearchJobs jobs;
+        QSignalSpy completed(&jobs,&ac::SearchJobs::completed);
+        QVERIFY(jobs.start(a.snapshot(),1,true,100,1));
+        auto *thread = jobs.findChild<QThread *>(); QVERIFY(thread);
+        // Join without pumping the GUI queue: finished has been posted, but its
+        // main-thread completion has not executed when shutdown retires the job.
+        QVERIFY(thread->wait(5000)); QVERIFY(jobs.busy());
+        jobs.shutdown(); QVERIFY(!jobs.busy());
+        QVERIFY(jobs.start(a.snapshot(),2,true,100,1));
+        QTRY_COMPARE_WITH_TIMEOUT(completed.count(),1,5000);
+        QCOMPARE(jobs.outcome().generation,uint64_t(2)); QVERIFY(!jobs.busy());
+        QCoreApplication::sendPostedEvents(&jobs);
+        QCOMPARE(completed.count(),1);
+    }
     void actualAiAndHintResults() {
         Clock clock; auto o = options(clock); ac::SessionAdapter a(&o);
         auto c = config(AC_MODE_HUMAN_VS_COMPUTER);

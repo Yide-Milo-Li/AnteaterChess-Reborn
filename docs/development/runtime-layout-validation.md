@@ -1,7 +1,9 @@
-# Layout and desktop runtime validation
+# Historical layout and desktop runtime validation
 
 Date: 2026-10-04. Baseline: `6d92663b4899bab6c0b8a1da021b739032ef26f1`.
-These are local implementation checks, not a new published release or a new CI run.
+These are historical local implementation checks for the GTK baseline, not a new
+published release or a new CI run. Current Qt evidence is in
+[qt-migration-validation.md](qt-migration-validation.md).
 The existing version number is retained for the locally generated archives.
 
 ## Environments and baseline

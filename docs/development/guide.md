@@ -24,6 +24,14 @@ Tests use `assert`, including in Release, so do not define `NDEBUG`. GUI tests i
 
 ## Repository layout
 
+Windows game targets use the GUI subsystem in both Debug and Release. Tests and
+benchmarks remain console executables. Use `make WINDOWS_CONSOLE=1 gui` for a
+console-attached debug game; its default output is `build/windows-x64/debug-console/`.
+The suffix also applies to Release console builds, keeping normal and console
+objects/executables separate. If overriding `BUILD`, choose a separate directory
+for each subsystem. `--version` supports captured stdout, and `--smoke-test`
+returns a process status for automated verification.
+
 The GTK application keeps its entry point and shared private header in `apps/gtk/`.
 Its `app/` directory owns lifecycle, commands and navigation; `screens/` owns pages;
 `ui/` owns reusable presentation and messages; `async/` owns background search jobs.

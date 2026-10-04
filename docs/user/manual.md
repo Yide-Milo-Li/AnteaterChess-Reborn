@@ -6,6 +6,9 @@ Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the comp
 
 Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their `lib`, `share`, and configuration directories with the executable.
 
+Windows game builds open the game window without allocating a console. Developer
+console builds are available as described in the development guide.
+
 ## Start a game
 
 Select New Game, choose a mode, configure players and timing, then start.

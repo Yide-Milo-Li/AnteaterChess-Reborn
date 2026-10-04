@@ -40,7 +40,7 @@ $(BUILD)/lib/ai.a: $(AI_OBJS)
 	$(AR) rcs $@ $^
 $(APP): $(GUI_OBJS) $(PLATFORM_OBJS) $(BUILD)/resources.o $(LIBS)
 	@mkdir -p $(@D)
-	$(CC) $(LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GTK_LIBS) -o $@
+	$(CC) $(LDFLAGS) $(APP_LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GTK_LIBS) -o $@
 $(BUILD)/tests/%$(EXE): $(BUILD)/obj/tests/%.o $(LIBS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $< $(GROUP_LIBS) -o $@
@@ -62,5 +62,6 @@ clean:
 help:
 	@echo 'make [gui|headless|test|test-rules|test-session|test-ai|test-gui|run|check|package|package-source|clean]'
 	@echo 'CONFIG=debug (default), release, or sanitize; CC, BUILD, CPPFLAGS, CFLAGS and LDFLAGS are overridable.'
+	@echo 'Windows game builds use the GUI subsystem; WINDOWS_CONSOLE=1 selects a separate console build directory.'
 -include $(shell find $(BUILD)/obj -name '*.d' 2>/dev/null)
 .SECONDARY: $(TEST_OBJS)

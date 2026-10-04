@@ -2,15 +2,36 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QImage>
+#include <QPainter>
+#include <QSvgRenderer>
 #include <QSaveFile>
 #include <QTextStream>
 #include <QUuid>
 #include <chrono>
 #ifdef _WIN32
 #include <windows.h>
+#include <tlhelp32.h>
 #endif
 
 namespace ac {
+bool retiredRuntimeLoaded() {
+#ifdef _WIN32
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetCurrentProcessId());
+    if (snapshot == INVALID_HANDLE_VALUE) return true;
+    MODULEENTRY32W module{}; module.dwSize = sizeof(module);
+    bool retired = false;
+    if (!Module32FirstW(snapshot,&module)) retired = true;
+    else do {
+        QString name = QString::fromWCharArray(module.szModule).toLower();
+        for (const char *prefix : {"libgtk","libgdk","libcairo","libpango","libatk","libpixbuf"})
+            if (name.startsWith(prefix)) retired = true;
+    } while (Module32NextW(snapshot,&module));
+    CloseHandle(snapshot);
+    return retired;
+#else
+    return false;
+#endif
+}
 QString executableDirectory() {
 #ifdef _WIN32
     wchar_t buffer[32768];
@@ -36,17 +57,26 @@ QString pieceAsset(AcPiece piece) {
     return "qrc:/org/anteater/reborn/" + name + ".svg";
 }
 bool verifyResources() {
+    auto render = [](const QString &path, int size) {
+        // Exercise both the image plugin used by QML and vector rendering at
+        // the requested size, instead of only scaling a default raster.
+        QImage source(path);
+        QSvgRenderer svg(path);
+        if (source.isNull() || !svg.isValid()) return false;
+        QImage target(size,size,QImage::Format_ARGB32_Premultiplied);
+        target.fill(Qt::transparent);
+        QPainter painter(&target); svg.render(&painter);
+        return !target.isNull();
+    };
     const char *icons[] = {"icon-alert-dark.svg", "icon-hint-dark.svg", "icon-history-dark.svg", "icon-info-dark.svg"};
     for (int size : {32, 96, 160}) {
         for (int color = AC_WHITE; color <= AC_BLACK; ++color)
             for (int type = AC_ANT; type <= AC_ANTEATER; ++type) {
-                QImage image;
                 QString path = pieceAsset(ac_create_piece(AcPieceType(type), AcColor(color))).mid(3);
-                if (!image.load(path) || image.scaled(size, size).isNull()) return false;
+                if (!render(path,size)) return false;
             }
         for (const char *name : icons) {
-            QImage image;
-            if (!image.load(QString(":/org/anteater/reborn/") + name) || image.scaled(size, size).isNull()) return false;
+            if (!render(QString(":/org/anteater/reborn/")+name,size)) return false;
         }
     }
     return true;

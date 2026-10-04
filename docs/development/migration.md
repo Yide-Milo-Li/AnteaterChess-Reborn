@@ -6,14 +6,14 @@ Baseline: `fb6df82eba4d513bbc160d2d848ffe6abc41cd3e` on original `main`, 215 com
 | --- | --- |
 | `include/core`, `src/core` | `include/anteater/types.h`, `src/rules`, `src/session/config.c` |
 | `src/gameplay`, `src/input` | `src/rules` generation, request parsing, resolution, validation and execution |
-| `GameState` | compact `AcPosition` plus opaque `AcSession`; GTK pages live in private `GuiView` |
+| `GameState` | compact `AcPosition` plus opaque `AcSession`; Qt models own copied projections |
 | `applyMove` / `undoMove` | `ac_position_apply` / `ac_position_unmake` for rules; `ac_session_submit` / `ac_session_undo` for games |
-| `Controller`, FSM, event queue | synchronous `AcSession` commands; GTK-owned navigation and GTask scheduling |
+| `Controller`, FSM, event queue | synchronous `AcSession` commands; desktop-owned navigation and snapshot QThread scheduling |
 | `src/turn`, `src/time` | injected `AcClock`, session tick/turn state |
-| `src/log` / `bin/logs` | `src/platform/logging/log.c`; existing logs are not migrated |
+| `src/log` / `bin/logs` | `apps/qt/runtime/runtime.cpp`; existing logs are not migrated |
 | `src/ai/ai.c` | `src/ai/{context,search,evaluation,ordering,table,budget}.c` |
-| external Experimental plugin probe | explicit Hard fallback, no plugin lookup |
-| `src/ui`, `src/main.c` | `apps/gtk` |
+| external Experimental plugin probe | removed; old difficulty value 4 is invalid |
+| `src/ui`, `src/main.c` | `apps/qt` |
 | runtime relative asset files | compiled `assets/resources.xml` GResource |
 | `doc/*.pdf` | identical bytes in `docs/legacy/*.pdf` |
 | `packaging/` | `tools/packaging/templates/`, packaging and verification scripts |
@@ -36,3 +36,23 @@ Make target names and the core public C interfaces are retained.
 
 New game logs now live in `logs/` beside the actual executable on both supported
 platforms. Earlier user-data/state logs remain in their original directories.
+
+## Qt desktop cutover
+
+The 8fc6f7d GTK desktop is available through Git history; it is not copied into a
+source archive. CMake and Ninja own the build graph and Make forwards commands.
+Qt models copy borrowed history immediately. Workers copy position/hash history,
+use their own search context and atomically cancel; live Session access stays on
+the main thread. QML embeds the existing SVG files/aliases and retains left-select,
+right-move, typed fields, promotion/cancel, F11/Escape and game confirmation flows.
+
+Experimental was a Hard alias. It has been removed from current enums, branches,
+menus and help. Difficulty values remain None=0, Easy=1, Medium=2, Hard=3,
+Tournament=5. Session explicitly rejects 4 rather than remapping it.
+
+The retired runtime's Cairo internal-function scan is deleted. With the locally
+installed Cairo 1.18.6-2, isolated baseline smoke tests succeeded both with and
+without the patch; the original rendering failure was not reproduced. This is not
+proof of an upstream Cairo fix. The new Windows path uses Qt SVG and rejects
+retired runtime modules. Package dependency records disclose indirect GLib usage.
+See [migration validation](qt-migration-validation.md) for host checks and limits.

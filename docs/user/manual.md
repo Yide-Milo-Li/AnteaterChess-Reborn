@@ -2,9 +2,9 @@
 
 ## Install and launch
 
-Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install `libgtk-3-0t64 librsvg2-common` with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported release target. Building from source is described in [Development](../development/guide.md).
+Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install the Qt runtime packages listed in INSTALL.md with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported release target. Building from source is described in [Development](../development/guide.md).
 
-Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their `lib`, `share`, and configuration directories with the executable.
+Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their QML, plugins and configuration directories with the executable.
 
 Windows game builds open the game window without allocating a console. Developer
 console builds are available as described in the development guide.
@@ -23,7 +23,7 @@ The back rank, from A through J for either color, is Rook, Knight, Bishop, Antea
 
 ## Coordinates and input
 
-Files are A–J; ranks are 1–8. A1 is White's left corner; J8 is Black's right corner from White's viewpoint. Internally row 0 is rank 8. Click a friendly piece and then a highlighted destination, or enter From and To coordinates and submit. Typed input accepts lowercase and surrounding whitespace. Illegal selections, blocked moves, and moves leaving your king in check are rejected. F11 toggles fullscreen; Escape leaves fullscreen.
+Files are A–J; ranks are 1–8. A1 is White's left corner; J8 is Black's right corner from White's viewpoint. Internally row 0 is rank 8. Left-click a friendly piece and right-click a highlighted destination, or enter From and To coordinates and submit. Typed input accepts lowercase and surrounding whitespace. Illegal selections, blocked moves, and moves leaving your king in check are rejected. F11 toggles fullscreen; Escape leaves fullscreen.
 
 ## Pieces and special moves
 
@@ -47,7 +47,7 @@ An Anteater's first capture can be diagonal or orthogonal; subsequent captures c
 
 ## Difficulty and clocks
 
-Easy uses a 350 ms default search budget, Medium 2,200 ms, and Hard 7,000 ms. Experimental currently uses the same search as Hard; there is no plugin discovery. The optional AI time override is expressed in seconds. Depth limits and early completed searches can finish before the allotted budget.
+Easy uses a 350 ms default search budget, Medium 2,200 ms, and Hard 7,000 ms. The optional AI time override is expressed in seconds. Depth limits and early completed searches can finish before the allotted budget.
 
 Tournament preserves the original per-color total of 600,999 ms, a 7,000 ms base allocation, and a pool of saved time. Its budget is base plus one quarter of that pool, capped at 10,000 ms, with a 30,000 ms reserve and a 180,000 ms saved-time pool cap. Exhausting the Tournament total awards the win to the opponent. Undo does not refund Tournament time.
 

@@ -17,6 +17,7 @@ ApplicationWindow {
     palette.windowText: Theme.text
     palette.text: Theme.text
     palette.buttonText: Theme.text
+    palette.button: "#1f2430"
     palette.base: Theme.inset
     palette.highlight: Theme.gold
     function toggleFullscreen() { if (isFullscreen) showNormal(); else showFullScreen() }
@@ -107,10 +108,18 @@ ApplicationWindow {
     }
     Dialog {
         id: confirmation
+        objectName: "confirmationDialog"
         property string action: ""
         anchors.centerIn: parent; modal: true
         title: action === "quit" ? "Quit Game" : action === "new" ? "New Game" : "Leave Game"
-        standardButtons: Dialog.Yes | Dialog.No
+        footer: DialogButtonBox {
+            standardButtons: Dialog.Yes | Dialog.No
+            spacing: 8; padding: 12
+            delegate: ActionButton { }
+            background: Rectangle { color: Theme.inset }
+            onAccepted: confirmation.accept()
+            onRejected: confirmation.reject()
+        }
         Label { text: "Are you sure?"; color: Theme.text }
         onAccepted: { if (action === "quit") window.close(); else if (action === "new") backend.newGame(); else backend.finish() }
     }
@@ -128,7 +137,7 @@ ApplicationWindow {
                     onClicked: { backend.submitFields(index+1); promotion.close() }
                 }
             }
-            ActionButton { text: "Cancel"; Layout.fillWidth: true; onClicked: { backend.cancelPromotion(); promotion.close() } }
+            ActionButton { objectName: "promotionCancel"; text: "Cancel"; Layout.fillWidth: true; onClicked: { backend.cancelPromotion(); promotion.close() } }
         }
         onRejected: backend.cancelPromotion()
     }

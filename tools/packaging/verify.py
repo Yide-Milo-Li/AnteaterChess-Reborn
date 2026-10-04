@@ -54,8 +54,7 @@ def main():
         source = next(work.glob('*-source'))
         runtime = next(work.glob('*-' + PLATFORM))
         run([sys.executable, 'tools/dev/check.py'], source)
-        run(['make', '-s', '-j4', 'CONFIG=release', 'test', 'headless',
-             'GTK_CFLAGS=', 'GTK_LIBS=', 'GLIB_CFLAGS='], source)
+        run(['make', '-s', '-j4', 'CONFIG=release', 'test', 'headless'], source)
         run(['make', '-s', '-j4', 'CONFIG=release', 'gui', 'test-platform'], source)
         if os.name == 'nt':
             assert subsystem(source / 'build/windows-x64/release/bin/anteater-chess.exe') == 2
@@ -80,10 +79,19 @@ def main():
 
         exe = runtime / ('anteater-chess.exe' if os.name == 'nt' else 'anteater-chess')
         environment = os.environ.copy()
+        for key in ('QT_PLUGIN_PATH','QT_QPA_PLATFORM_PLUGIN_PATH','QML_IMPORT_PATH','QML2_IMPORT_PATH'):
+            environment.pop(key,None)
         if os.name == 'nt':
             environment['PATH'] = str(runtime) + os.pathsep + str(
                 Path(environment.get('SystemRoot', 'C:/Windows')) / 'System32')
             assert subsystem(exe) == 2
+            forbidden = ('libgtk', 'libgdk', 'libcairo', 'libpango', 'libatk', 'libpixbuf')
+            assert not any(p.name.lower().startswith(forbidden) for p in runtime.rglob('*.dll'))
+            import json
+            manifest = json.loads((runtime/'DEPENDENCIES.json').read_text(encoding='utf-8'))
+            for relative,checksum in manifest['inventory'].items():
+                assert hashlib.sha256((runtime/relative).read_bytes()).hexdigest() == checksum
+            assert set(manifest['inventory']) == {p.relative_to(runtime).as_posix() for p in runtime.rglob('*') if p.is_file()} - {'DEPENDENCIES.json'}
         assert run([str(exe), '--version'], work, environment).strip() == f'AnteaterChess Reborn {version}'
         logs = runtime / 'logs'
         assert not logs.exists()

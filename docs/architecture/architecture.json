@@ -9,20 +9,20 @@
       {
         "id": "game-flow",
         "label": "Primary Gameplay Flow",
-        "focus": ["player", "gtk-app", "session", "rules", "board-state"],
+        "focus": ["player", "qt-app", "session", "rules", "board-state"],
         "note": "Follow synchronous user moves through transactional session management to rule execution."
       },
       {
         "id": "ai-search-path",
         "label": "Asynchronous AI Search",
-        "focus": ["gtk-app", "async-worker", "ai-search", "rules", "board-state"],
+        "focus": ["qt-app", "async-worker", "ai-search", "rules", "board-state"],
         "note": "AI search runs in an isolated worker thread using cloned board snapshots and cooperative cancellation."
       },
       {
         "id": "platform-and-assets",
         "label": "Platform & Assets Integration",
-        "focus": ["resources", "gtk-app", "platform", "session", "budget"],
-        "note": "Inspect runtime paths and executable-side logs, with assets/pieces and icons compiled into GResource."
+        "focus": ["resources", "qt-app", "platform", "session", "budget"],
+        "note": "Inspect runtime paths and executable-side logs, with assets/pieces and icons compiled into Qt resources."
       }
     ]
   },
@@ -38,19 +38,19 @@
     {
       "id": "resources",
       "type": "frontend",
-      "label": "Compiled GResource",
+      "label": "Qt resources",
       "sublabel": "14 Pieces + 4 Icons",
       "pos": [240, 90],
       "size": [150, 60]
     },
     {
-      "id": "gtk-app",
+      "id": "qt-app",
       "type": "frontend",
-      "label": "GTK 3 Desktop Shell",
-      "sublabel": "app / screens / ui / async",
+      "label": "Qt 6 Desktop Shell",
+      "sublabel": "app / models / qml / async",
       "pos": [240, 270],
       "size": [150, 60],
-      "tag": "C11 + GTK 3"
+      "tag": "C11 + C++17 / QML"
     },
     {
       "id": "platform",
@@ -63,7 +63,7 @@
     {
       "id": "async-worker",
       "type": "frontend",
-      "label": "GTask Worker",
+      "label": "QThread Worker",
       "sublabel": "Background Thread",
       "pos": [460, 90],
       "size": [140, 60]
@@ -120,22 +120,22 @@
     },
     {
       "kind": "security-group",
-      "label": "GTK 3 Desktop Shell & Platform Adapters",
-      "wraps": ["resources", "gtk-app", "platform", "async-worker"]
+      "label": "Qt 6 Desktop Shell & Platform Adapters",
+      "wraps": ["resources", "qt-app", "platform", "async-worker"]
     }
   ],
   "connections": [
     {
       "id": "user-input",
       "from": "player",
-      "to": "gtk-app",
+      "to": "qt-app",
       "label": "User Input",
       "variant": "emphasis"
     },
     {
       "id": "load-resources",
       "from": "resources",
-      "to": "gtk-app",
+      "to": "qt-app",
       "label": "Load Assets",
       "fromSide": "bottom",
       "toSide": "top",
@@ -143,14 +143,14 @@
     },
     {
       "id": "gtk-to-session",
-      "from": "gtk-app",
+      "from": "qt-app",
       "to": "session",
       "label": "Commands",
       "variant": "emphasis"
     },
     {
       "id": "gtk-to-worker",
-      "from": "gtk-app",
+      "from": "qt-app",
       "to": "async-worker",
       "label": "Spawn Job",
       "variant": "dashed",
@@ -197,7 +197,7 @@
     },
     {
       "id": "gtk-to-platform",
-      "from": "gtk-app",
+      "from": "qt-app",
       "to": "platform",
       "label": "Callbacks",
       "fromSide": "bottom",
@@ -218,9 +218,9 @@
       "dot": "cyan",
       "title": "Presentation & Shell",
       "items": [
-        "GTK 3 desktop application with modern obsidian dark theme",
+        "Qt 6 desktop application with modern obsidian dark theme",
         "HiDPI dynamic piece scaling based on board cell geometry",
-        "GTask worker thread ensures zero UI stutter during AI compute"
+        "Snapshot worker performs AI search outside the UI thread"
       ]
     },
     {

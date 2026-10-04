@@ -8,6 +8,7 @@ QString executableDirectory();
 int64_t monotonicMilliseconds(void *unused);
 QString pieceAsset(AcPiece piece);
 bool verifyResources();
+bool retiredRuntimeLoaded();
 
 // Empty explicit paths represent discovery failure; no cwd/user-data fallback.
 class SessionLog {

@@ -1,6 +1,9 @@
 # Validation record
 
-For the current local directory and runtime changes, see the
+For the current Qt migration, see [Qt migration validation](qt-migration-validation.md).
+The GTK evidence below describes historical baseline behavior.
+
+For the earlier local directory and runtime changes, see the
 [layout/runtime validation](runtime-layout-validation.md). The evidence below is
 the earlier Reborn baseline and does not constitute CI acceptance of these changes.
 

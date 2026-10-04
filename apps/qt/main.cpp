@@ -13,6 +13,10 @@ int main(int argc, char **argv) {
         return 0;
     }
     QQuickStyle::setStyle("Basic");
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) == "--smoke-test")
+        qInstallMessageHandler([](QtMsgType, const QMessageLogContext &, const QString &message) {
+            std::fprintf(stderr,"%s\n",message.toUtf8().constData());
+        });
     QGuiApplication app(argc,argv);
     app.setOrganizationName("DeepAnteater");
     app.setApplicationName("AnteaterChess Reborn");
@@ -24,7 +28,10 @@ int main(int argc, char **argv) {
     if (engine.rootObjects().isEmpty()) return 1;
     if (app.arguments().contains("--smoke-test")) {
         QTimer::singleShot(200,&app,[&] {
-            bool ok = ac::verifyResources();
+            bool resources = ac::verifyResources();
+            bool retired = ac::retiredRuntimeLoaded();
+            bool ok = resources && !retired;
+            if (!ok) std::fprintf(stderr,"Resource check=%d, retired runtime loaded=%d\n",resources,retired);
             AcGameConfig config{};
             ac_init_default_game_config(&config);
             ok = backend.start(config) == AC_OK && ok;

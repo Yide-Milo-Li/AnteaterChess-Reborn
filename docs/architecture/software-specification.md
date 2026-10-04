@@ -2,19 +2,22 @@
 
 ## Architecture
 
-Public interfaces: [types](../../include/anteater/types.h), [rules](../../include/anteater/rules.h), [session](../../include/anteater/session.h), [AI](../../include/anteater/ai.h). All public library symbols use `ac_`, `Ac`, or `AC_`. GTK internals are private to the application.
+Public interfaces: [types](../../include/anteater/types.h), [rules](../../include/anteater/rules.h), [session](../../include/anteater/session.h), [AI](../../include/anteater/ai.h). All public library symbols use `ac_`, `Ac`, or `AC_`. Qt desktop internals are private to the application.
 
 ```mermaid
 flowchart TD
-    GTK[GTK pages and input] --> Session[AcSession]
-    GTK --> Task[GTask worker]
+    QML[QML pages and input] --> Adapter[Session adapter commands]
+    Adapter --> Session[AcSession]
+    Adapter --> Models[Copied board and history models]
+    Models --> QML
+    Adapter --> Task[Snapshot QThread worker]
     Task --> AI[AcSearchContext]
     Session --> Rules[Rules and AcPosition]
     AI --> Rules
     Session --> Budget[AI time budget helpers]
-    GTK --> Platform[GLib clock and log adapter]
+    Adapter --> Platform[Qt runtime clock and log adapter]
     Platform --> Session
-    Resources[Compiled GResource] --> GTK
+    Resources[Qt resource system] --> QML
 ```
 
 An [interactive architecture diagram](architecture.html) is also available.
@@ -60,22 +63,41 @@ Hashes include pieces, side, castling rights, and a capturable en-passant file. 
 
 ## Search
 
-[search.c](../../src/ai/search.c) retains iterative deepening, aspiration windows, principal-variation alpha-beta, null-move pruning, late-move reductions, and quiescence. [evaluation.c](../../src/ai/evaluation.c) owns piece-square/material evaluation; [ordering.c](../../src/ai/ordering.c) owns captures, killer/history ordering and static exchange analysis; [table.c](../../src/ai/table.c) owns context-local transpositions. Hard and Experimental select the same implementation.
+[search.c](../../src/ai/search.c) retains iterative deepening, aspiration windows,
+principal-variation alpha-beta, null-move pruning, late-move reductions and quiescence.
+Evaluation is split into material/position tables, heuristic attacks and SEE,
+mobility, strategic features and aggregation; each exposes a narrow private header.
+[ordering.c](../../src/ai/ordering.c) owns killer/history and capture ordering;
+[table.c](../../src/ai/table.c) owns context-local transpositions.
+Experimental has been removed. Valid difficulty values are 0, 1, 2, 3 and 5;
+4 is rejected by explicit Session configuration validation. Tournament remains 5.
 
 Results contain the selected legal move, status, completed depth, node count and elapsed milliseconds. Budget exhaustion returns the best available legal move; cooperative cancellation returns `AC_CANCELLED`. Candidate overflow aborts with `AC_CAPACITY`. No legal root move returns `AC_UNAVAILABLE`. Cancellation is checked at search boundaries; elapsed time is checked periodically, so budgets are not hard real-time deadlines.
 
 ## Desktop tasks and resources
 
-[gui_async.c](../../apps/gtk/async/gui_async.c) allocates a job containing copied position and hash history, cancellation object, options, result, session revision and GUI generation. GTask runs the search on a worker. Return-on-cancel is disabled: cancellation requests stop, and job memory remains alive until the worker exits and its main-context completion callback runs. The callback accepts a result only when page, generation, revision, and cancellation state still match. Closing cancels and drains outstanding tasks before releasing the session and log object.
+[search_jobs.cpp](../../apps/qt/async/search_jobs.cpp) owns one job at a time,
+with copied position/hash history, search options, atomic cancellation flag,
+result, Session revision and desktop generation. A QThread runs the search.
+Cancellation sets the atomic flag immediately; it does not require a queued
+worker slot. Completion is delivered on the main thread and joined before job
+storage is released. Results require matching page, generation and revision,
+and an open, uncancelled desktop. Close disables commands, cancels work, then
+waits for cooperative exit before freeing Session/log/model storage.
 
-GTK owns pages, selection, highlighting, and widgets. No worker accesses widgets.
-[resources.xml](../../assets/resources.xml) embeds the categorized SVGs under
-`/org/anteater/reborn/` with stable aliases; resource lookup is independent of the
-startup directory. The private platform interface separates runtime preparation,
-executable-directory discovery, clocks and logging. Path discovery returns an
-allocated UTF-8 absolute directory (free with `g_free`), or NULL on failure.
-Windows uses `GetModuleFileNameW`; Linux resolves `/proc/self/exe`, so symlink
-launches follow the actual executable. Windows DLL/resource setup shares this resolver.
+[session_adapter.cpp](../../apps/qt/app/session_adapter.cpp) is the only live
+Session owner. It executes commands, ticks every 100 ms using injected monotonic
+time, queries Rules for selections and legality, and publishes copied projections.
+Board/history models own their values; borrowed snapshot pointers never reach
+QML or workers. Getters do not mutate game state or navigation. QML pages own
+controls and layouts; a clock tick or ordinary move does not recreate the page.
+
+[resources.qrc](../../assets/resources.qrc) embeds 14 piece and 4 icon SVGs with
+stable `/org/anteater/reborn/` aliases. QML is embedded independently. Assets
+are independent of cwd. Qt SVG rendering supplies device-scaled images.
+[runtime.cpp](../../apps/qt/runtime/runtime.cpp) uses GetModuleFileNameW on
+Windows and `/proc/self/exe` on Linux, preserving actual-executable placement
+through symlink launches. Path failure produces a diagnostic-only log service.
 
 Logs default to `<executable-directory>/logs/session-<UUID>.log`; an explicitly
 injected log directory remains available for fixtures. Each object owns its path
@@ -85,10 +107,10 @@ returns `AC_IO_ERROR` without changing the session command's result. Directory o
 file-write failures follow the same contract, with no working-directory or user-data
 fallback. A log is a current game snapshot, not a saved-game import format.
 
-Upstream API contracts: [GTask thread completion](https://docs.gtk.org/gio/method.Task.run_in_thread.html), [GResource](https://docs.gtk.org/gio/struct.Resource.html), [GTK Windows distribution](https://www.gtk.org/docs/installations/windows/).
+Runtime contracts: [QThread](https://doc.qt.io/qt-6/qthread.html), [Qt resources](https://doc.qt.io/qt-6/resources.html), [Windows deployment](https://doc.qt.io/qt-6/windows-deployment.html).
 
 ## Error contracts and verification
 
-Commands use `AcStatus`: success, invalid argument, illegal move, allocation failure, capacity, cancellation, stale result, unavailable operation, and external I/O failure. Boolean predicates and selection enums explicitly have their own return conventions. Borrowed pointers are never freed by callers. Core APIs do not terminate the process. GLib's ordinary allocation behavior still applies inside the desktop/platform adapters.
+Commands use `AcStatus`: success, invalid argument, illegal move, allocation failure, capacity, cancellation, stale result, unavailable operation, and external I/O failure. Boolean predicates and selection enums explicitly have their own return conventions. Borrowed pointers are never freed by callers. Core APIs do not terminate the process. Qt's allocation behavior applies inside the desktop adapters. Logs use QSaveFile atomic replacement; failure is diagnostic after accepted operations.
 
-See [test migration](../development/test-migration.md) and [validation](../development/validation.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require byte-identical restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. GTK tests exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.
+See [test migration](../development/test-migration.md) and [validation](../development/validation.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require byte-identical restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. Qt Test and Quick Test exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.

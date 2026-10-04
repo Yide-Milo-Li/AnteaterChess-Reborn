@@ -1,88 +1,110 @@
 # Development and release
 
-## Toolchain
+## Toolchain and graph
 
-Use C11, GNU Make, GCC, pkg-config, Python 3 and GTK 3 development packages. [README](../../README.md) lists Windows UCRT64 and Ubuntu 24.04 setup commands. Use the UCRT64 shell, not the MSYS or MINGW64 environment. Runtime GUI adapters also require GLib >= 2.72. `glib-compile-resources` is supplied with GLib. Windows packaging needs `objdump`, `pacman`, GdkPixbuf loaders and their licenses.
+Use C11, C++17, CMake >= 3.21, Ninja, GCC/Clang, Python 3 and Qt >= 6.4.2.
+Qt modules are Core, Gui, Qml, Quick, QuickControls2, Svg, Test and QuickTest.
+[README](../../README.md) lists Ubuntu 24.04 and MSYS2 UCRT64 package commands.
+Windows packaging uses official windeployqt, objdump and pacman ownership records.
+Dependency versions and deployed hashes are recorded in each candidate's
+DEPENDENCIES.json. Dependency upgrades require their own validation record.
+The source API baseline is Qt 6.4.2; a newer local Windows package is not a
+requirement to use newer APIs.
 
-## Build and test
+CMake owns all libraries, desktop, tests and benchmark targets. GNU Make forwards
+commands to [build.py](../../tools/dev/build.py), with no second dependency graph.
+Core-only commands set AC_BUILD_DESKTOP=OFF and do not discover Qt.
 
 ```sh
-make -j4 CONFIG=release
-make test                    # core, no GTK required
-make test-rules
-make test-session
-make test-ai
-make test-platform           # GLib adapter tests, no display required
-make test-gui                # requires a desktop/display
-make check                   # documentation/resources/layout checks
-make CONFIG=sanitize test    # Linux: ASan + UBSan
-xvfb-run -a make test-gui     # Linux headless desktop automation
+make CONFIG=release gui test test-platform test-gui check
+make headless test              # no Qt required
+make test-rules test-session test-ai
+make CONFIG=sanitize test       # Linux ASan + UBSan
+ASAN_OPTIONS=detect_leaks=0 xvfb-run -a make CONFIG=sanitize test-gui
+make CONFIG=release benchmark
 ```
 
-Core-only: `make headless test GTK_CFLAGS= GTK_LIBS= GLIB_CFLAGS=`. Targets do not evaluate GTK variables unless needed. Outputs live in `build/<platform>-x64/<configuration>/`; Debug, Release, and Sanitize do not share objects. GCC dependency files track included headers; the resource target depends on its manifest and SVG files. Override `CC`, `AR`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS`, `BUILD` as needed; retain required language/include options when overriding flags. `make clean` removes only the checked `build` and `dist` generated directories.
+Direct CMake usage:
 
-Tests use `assert`, including in Release, so do not define `NDEBUG`. GUI tests invoke widget handlers and the GTK loop; interactive visual quality still requires human review. Sanitizer GUI runs disable leak detection for process-global GTK caches, while core sanitizer tests retain it. Each test is a separate executable; a failing command stops the target.
+```sh
+cmake -S . -B build/local -G Ninja -DCMAKE_BUILD_TYPE=Release -DAC_BUILD_DESKTOP=ON
+cmake --build build/local --parallel 4
+ctest --test-dir build/local --output-on-failure
+```
 
-## Repository layout
+Outputs live under build/<platform>-x64/<configuration>; override BUILD for an
+isolated tree. Debug, Release, Sanitize and Windows console builds stay separate.
+Use CC/CXX or CMake cache variables to select compilers. C sources are always
+compiled as C; a C++ linkage test exercises the guarded public headers.
+Assertions remain enabled in Release tests. Each failing CTest result stops the
+wrapper. Core sanitizer runs retain leak detection; desktop runs can disable it
+for system Qt caches. Tests verify behavior rather than physical display quality.
 
-Windows game targets use the GUI subsystem in both Debug and Release. Tests and
-benchmarks remain console executables. Use `make WINDOWS_CONSOLE=1 gui` for a
-console-attached debug game; its default output is `build/windows-x64/debug-console/`.
-The suffix also applies to Release console builds, keeping normal and console
-objects/executables separate. If overriding `BUILD`, choose a separate directory
-for each subsystem. `--version` supports captured stdout, and `--smoke-test`
-returns a process status for automated verification.
+## Desktop and ownership
 
-`--smoke-test` checks all embedded pieces/icons and starts/finishes a minimal
-session to exercise the real executable-relative log path. It returns 1 if resources
-or logging fail. `make test-platform` includes a substituted path-discovery failure
-fixture verifying that accepted moves retain an I/O diagnostic.
+The only desktop implementation is apps/qt/. app/ owns Session commands and
+navigation, models/ owns copied board/history projections, async/ owns snapshot
+search work, runtime/ owns paths/clocks/logs, and qml/ owns pages/components.
+A worker never reads a live Session or a QML object. Cooperative cancellation is
+atomic; completion validates page, generation, revision and close state. Never
+release worker data before thread exit or force-terminate a search.
 
-The GTK application keeps its entry point and shared private header in `apps/gtk/`.
-Its `app/` directory owns lifecycle, commands and navigation; `screens/` owns pages;
-`ui/` owns reusable presentation and messages; `async/` owns background search jobs.
-Platform startup/clock helpers live in `src/platform/runtime/`, with logging in
-`src/platform/logging/` and one private `platform.h` interface.
+Qt resources embed the existing SVG aliases. QML pages remain alive during
+ordinary moves/ticks, preserving keyboard focus and scroll position. Use injected
+clocks and diagnostic callbacks for deterministic adapter tests.
 
-`mk/modules.mk` explicitly lists the owned source directories and discovers their
-C files. Add a directory there when introducing a new application subsystem.
-Resources are split between `assets/pieces/` and `assets/icons/`; aliases in the
-manifest preserve their existing GResource names. Public core headers and the
-rules/session/AI source and test boundaries remain unchanged.
-
-Packaging scripts and runtime templates live in `tools/packaging/`, developer
-checks/cleanup/benchmarks in `tools/dev/`, and historical probes in `tools/legacy/`.
-Scripts locate the repository without requiring `.git`, including in source archives.
-See the [documentation index](../README.md) for user, architecture, development
-and historical documents.
+Windows desktop builds use the GUI subsystem. Tests and benchmarks are console
+executables. make WINDOWS_CONSOLE=1 gui produces a separate console desktop.
+--version writes captured stdout; --smoke-test verifies all resources, starts and
+finishes a Session, checks executable-relative logs, and on Windows rejects loaded
+GTK/Cairo/GdkPixbuf modules. A log/resource failure returns 1. Linux symlinks resolve
+to the actual executable. Accepted Session commands survive log failure.
 
 ## Working conventions
 
-Public headers belong in `include/anteater`. Use `ac_` functions, `Ac` types, `AC_` constants. Application-private helpers may use `gui_`. Follow `.clang-format`, four spaces and the existing brace style. Prefer module-private helpers; expose operations that enforce invariants rather than internal transition machinery. Comments should explain a contract or reason. Keep gameplay definitions in rules, state/history in session, search caches in context, and widgets in GTK.
+Public headers belong in include/anteater with ac_/Ac/AC_ names and C++ linkage
+guards. Follow .clang-format. Explain ownership, contracts and non-obvious reasons
+in comments. Rules owns legality, Session owns transactions/history/clocks, AI
+owns search contexts, and desktop code owns presentation. New C files and
+core test_*.c files in existing module directories are discovered by CMake.
+Cross-file AI evaluation helpers use narrow private headers; heuristic attack
+estimates do not replace Rules legality. AI extraction must pass the immutable
+[reference fixture](../../tests/fixtures/ai-evaluation-baseline.txt).
 
-To add a module, declare its narrow interface, place implementation under the owning directory, and update [mk/modules.mk](../../mk/modules.mk) if adding a library. New `.c` files in an existing module are automatically discovered. Add `test_*.c` under `tests/rules`, `tests/session`, or `tests/ai`; Make discovers them. Use injected clocks and failure callbacks instead of sleeps. New special moves need generation, legality, apply/unmake, hash, request resolution and GUI regression coverage. Update the manual/spec when observable behavior/contracts change.
+New special moves need generation, legality, apply/unmake, hash, resolver and
+presentation coverage. Update observable contracts in the manual/spec. Preserve
+COPYRIGHT, team credit, original PDFs and historical regression fixtures.
 
-## Packages
+## Packages and verification
 
 ```sh
 make CONFIG=release package-source package
 python3 tools/packaging/verify.py
 ```
 
-`tar` aliases `package-source`; `tar-user` aliases `package`. Archives use `AnteaterChess-Reborn-<version>-source.tar.gz`, `...-windows-x64.zip`, or `...-linux-x64.tar.gz`, under `dist/`. The source package includes all development documents, historical PDFs, tests, Make modules and packaging tools, and can rebuild and repackage without Git. Binary packages contain the user manual, historical user PDF, COPYRIGHT and platform INSTALL instructions. Windows bundles recursively discovered non-system DLLs, GdkPixbuf SVG loader, schemas, icons, and third-party licenses/manifest. Linux uses system GTK 3.
+On Linux run the verifier under Xvfb if no display is available. tar aliases
+package-source; tar-user aliases package. Archives under dist/ contain source
+or the host runtime. Source rebuilds require no Git checkout and retain historical
+PDFs, tests, documentation and tools. Runtime packages retain COPYRIGHT, the user
+manual and historical user PDF. Windows uses windeployqt then recursively verifies
+non-system DLL imports and hashes, bundles package licenses, and rejects the retired
+GTK/Cairo/GdkPixbuf chain. Some MSYS2 Qt font dependencies use GLib indirectly;
+the manifest records those rather than claiming no GLib exists. Linux uses system
+Qt packages and records actual ldd/package versions.
 
-The package script compares all relevant input bytes with a saved manifest, including
-docs/templates/tools. Unchanged inputs reuse an archive; any input change rebuilds it.
-SHA256SUMS covers distribution archives. Verification selects the host's runtime and
-the source archive, extracts to a temporary directory with spaces and Chinese
-characters, rebuilds core and desktop sources, and checks repackaging invalidation.
-It verifies captured version output, concurrent and repeated sessions, executable-side
-logs, Linux symlink launches and blocked log directories. Windows validation also
-checks PE GUI/console subsystems and an independent console build. Runtime logs are
-excluded from archives. Packaging tests operate on temporary copies.
+Input byte hashes invalidate stale archives. SHA256SUMS covers all archives.
+The verifier extracts to a Unicode/spaces path, rebuilds core and desktop without
+Git, checks source-package invalidation and PDF bytes, then checks --version,
+concurrent logs, repeated sessions, different cwd, symlink launch on Linux and
+blocked log directories. Windows additionally tests GUI/console PE subsystems,
+manifest hashes, and execution with a PATH containing only the runtime/System32.
+This is dependency isolation on the local host, not a separately provisioned VM.
 
-## CI and formal release
+## CI and publication
 
-The workflow builds/test/packages on Ubuntu 24.04 and Windows UCRT64. Linux runs ASan/UBSan and GTK tests under Xvfb. Artifacts include runtime archives, source, checksums and performance output. Use one exact commit for both platforms. To release: confirm both jobs passed, download artifacts, verify hashes, create a draft release for the version tag, upload source and both runtimes plus combined SHA256SUMS, then publish only when the full set is present. `tools/packaging/release.py` performs the artifact checks and draft-to-published transition using authenticated `gh`. A failed upload/check leaves the release draft.
-
-No macOS release or automated push to the original repository is configured. COPYRIGHT is not replaced by a new license. See [validation](validation.md) for measured results and remaining limits.
+The workflow defines Ubuntu 24.04/Xvfb/sanitizer and Windows UCRT64 checks and
+candidate archives. Local successful runs do not prove the updated remote CI has
+run. Use the same commit for both release jobs; inspect hashes and validation,
+then publish the full set through the existing draft-release workflow. No release
+is automatically published by local packaging. No macOS acceptance is claimed.
+See [validation](validation.md) for exact evidence and outstanding human checks.

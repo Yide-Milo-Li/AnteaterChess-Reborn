@@ -248,3 +248,14 @@ Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replac
 - `test_turn_timer_counts_down_only_for_active_player`
 - `test_turn_timer_resets_after_switch_and_undo`
 - `test_turn_timer_disable_and_expiration_paths`
+
+## Qt presentation regression coverage
+
+Retired GTK/platform tests are replaced by tests/qt/test_desktop.cpp,
+test_runtime.cpp and Quick Test cases in tests/qt/qml/. They exercise copied models,
+all modes, real AI/hint completion, stale results on moves/undo/timeouts/replacement,
+cooperative close, promotion/cancellation, left/right clicks, coordinate fields,
+keyboard focus, F11/Escape and all embedded SVGs. The original C rule/session/AI
+fixtures remain, with an additional invalid difficulty test and immutable 27-position
+AI score/SEE/search reference. See the migration validation record for remaining
+physical-desktop and clean-machine acceptance.

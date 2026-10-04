@@ -1,3 +1,15 @@
+# Qt migration candidate (unpublished)
+
+C11 core retained, with a C++17 Qt 6/QML desktop and one CMake/Ninja graph behind
+Make commands. Models copy Session data; snapshot workers use atomic cancellation
+and stale-result/close guards. Existing SVG/dark theme, controls and variant policies
+remain. Experimental is removed; value 4 is invalid and Tournament remains 5.
+The GTK desktop, GLib adapters, GResource build and Cairo internal-function scan
+are retired. AI evaluation is split without tuning weights/search algorithms.
+
+See [validation](qt-migration-validation.md) for exact local coverage and external
+acceptance still required. Candidate archives are not a published release.
+
 # Unreleased layout and desktop runtime changes
 
 - Organize GTK sources by application, screens, UI and background tasks; separate

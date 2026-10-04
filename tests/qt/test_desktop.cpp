@@ -113,16 +113,35 @@ private slots:
         capture("menu"); a.newGame(); capture("modes"); a.chooseMode(0); capture("setup");
         QCOMPARE(a.start(config()),AC_OK); capture("gameplay");
         auto *field = window->findChild<QObject *>("fromEntry"); QVERIFY(field);
-        field->setProperty("text","E2");
-        a.setMoveFields("E2","");
         auto *item = qobject_cast<QQuickItem *>(field); QVERIFY(item); item->forceActiveFocus();
+        QTest::keyClick(window,Qt::Key_E); QTest::keyClick(window,Qt::Key_2);
+        QTRY_COMPARE(a.fromText().toUpper(),QString("E2"));
+        QString entered = field->property("text").toString();
         clock.ms += 1000; a.tick();
-        QCOMPARE(field->property("text").toString(),QString("E2")); QVERIFY(item->hasActiveFocus());
+        QCOMPARE(field->property("text").toString(),entered); QVERIFY(item->hasActiveFocus());
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
         QTest::keyClick(window,Qt::Key_F11);
         QTRY_COMPARE(window->visibility(),QWindow::FullScreen); capture("fullscreen");
         QTest::keyClick(window,Qt::Key_Escape);
         QTRY_COMPARE(window->visibility(),QWindow::Windowed);
-        a.finish(); capture("endgame"); window->close();
+        const char *moves[][2] = {{"E2","E4"},{"D7","D5"},{"E4","D5"},{"A7","A6"},
+            {"D5","D6"},{"A6","A5"},{"D6","C7"},{"A5","A4"}};
+        for (auto &move : moves) { a.setMoveFields(move[0],move[1]); QVERIFY(a.submitFields()); }
+        a.setMoveFields("C7","B8"); QVERIFY(!a.submitFields());
+        auto *promotion = window->findChild<QObject *>("promotionDialog"); QVERIFY(promotion);
+        QTRY_VERIFY(promotion->property("visible").toBool()); capture("promotion");
+        uint64_t before = a.snapshot().position.hash;
+        auto *cancel = window->findChild<QQuickItem *>("promotionCancel"); QVERIFY(cancel);
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,cancel->mapToScene(QPointF(cancel->width()/2,cancel->height()/2)).toPoint());
+        QTRY_VERIFY(!promotion->property("visible").toBool());
+        QCOMPARE(a.snapshot().position.hash,before);
+        auto *confirmation = window->findChild<QObject *>("confirmationDialog"); QVERIFY(confirmation);
+        confirmation->setProperty("action","finish");
+        QVERIFY(QMetaObject::invokeMethod(confirmation,"open")); capture("confirmation");
+        QVERIFY(QMetaObject::invokeMethod(confirmation,"reject")); QCOMPARE(a.page(),int(ac::SessionAdapter::Gameplay));
+        QVERIFY(QMetaObject::invokeMethod(confirmation,"open"));
+        QVERIFY(QMetaObject::invokeMethod(confirmation,"accept"));
+        QTRY_COMPARE(a.page(),int(ac::SessionAdapter::EndGame)); capture("endgame"); window->close();
     }
 };
 QTEST_MAIN(DesktopTest)

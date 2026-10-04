@@ -1,18 +1,18 @@
 # AnteaterChess Reborn
 
-A C11 / GTK 3 desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
+A C11 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
 
 ---
 
 ## Highlights & Features
 
 - **Modern Obsidian Slate UI**: Clean, minimalist dark theme (`#0e1017` / `#161922`) with refined ivory/walnut board squares, warm gold glow accents, and monospace coordinate grids.
-- **HiDPI Dynamic Piece Scaling**: Real-time adaptive SVG rasterization scales piece graphics dynamically ($32\text{px} \sim 160\text{px}$) with jitter filtering as the window resizes or toggles fullscreen.
-- **Pure C11 Core Engine**: Complete decoupling of core rules, board representation, and AI search from GTK/GLib. The core library compiles independently without desktop dependencies.
+- **HiDPI Dynamic Piece Scaling**: Real-time adaptive SVG rasterization scales piece graphics dynamically ($32\text{px} \sim 160\text{px}$) through Qt Quick as the window resizes or toggles fullscreen.
+- **Pure C11 Core Engine**: Complete decoupling of core rules, board representation, and AI search from Qt/GTK/GLib. The core library compiles independently without desktop dependencies.
 - **Interactive Architecture Diagram**: Explorable standalone HTML architecture map with guided views and component boundaries in [docs/architecture/architecture.html](docs/architecture/architecture.html).
 - **Multiple Game Modes**: Human vs Human, Human vs AI, and AI vs AI.
 - **Desktop Controls & Ergonomics**: Click-to-move and typed coordinate input, valid move and hint highlighting, multi-level undo, promotion pickers, turn clocks, Tournament time pools, and game diagnostic logs.
-- **Asynchronous AI Worker**: Background `GTask` thread isolation prevents UI freezing during deep search, with cooperative cancellation and session revision validation.
+- **Asynchronous AI Worker**: A snapshot-owning `QThread` worker keeps search off the UI thread, with cooperative cancellation and session revision validation.
 
 ---
 
@@ -22,12 +22,12 @@ Explore the full system architecture, module boundaries, and data paths in the [
 
 | Layer / Subsystem | Path | Responsibility |
 | --- | --- | --- |
-| **Desktop Shell** | `apps/gtk/{app,screens,ui,async}/` | Application commands, pages, reusable presentation, worker threads |
+| **Desktop Shell** | `apps/qt/{app,models,qml,async}/` | Application commands, pages, reusable presentation, worker threads |
 | **Session Engine** | `src/session/` | Transactional state management, revision tracking, undo history, clock ticking |
 | **Rules Engine** | `src/rules/` | Move generation, legality verification, 80-square board, Zobrist hashing |
 | **AI Search** | `src/ai/` | Iterative deepening, alpha-beta pruning, transposition tables, budget management |
-| **Platform Adapter** | `src/platform/{runtime,logging}/` | Runtime preparation, monotonic clocks and diagnostic logs |
-| **Assets** | `assets/{pieces,icons}/` | 14 chess pieces and 4 UI icons compiled into GResource |
+| **Platform Adapter** | `apps/qt/runtime/` | Executable paths, monotonic clocks and atomic diagnostic logs |
+| **Assets** | `assets/{pieces,icons}/` | 14 chess pieces and 4 UI icons compiled into Qt resources |
 
 ---
 
@@ -35,10 +35,12 @@ Explore the full system architecture, module boundaries, and data paths in the [
 
 ### Download Prebuilt Binaries
 
-Platform archives are available under [Releases](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases).
+Previously published archives are available under [Releases](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases).
 
 - **Windows x64**: Extract the ZIP package and launch `anteater-chess.exe` (keep accompanying DLLs in place).
-- **Ubuntu 24.04 x64**: Install runtime libraries (`sudo apt install libgtk-3-0t64 librsvg2-common`), extract, and run `./anteater-chess`.
+- **Ubuntu 24.04 x64**: Install runtime libraries (`sudo apt install libqt6quick6 libqt6quickcontrols2-6 libqt6svg6 qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-templates qml6-module-qtqml-workerscript`), extract, and run `./anteater-chess`.
+
+The Qt migration produces local candidates under `dist/`; see [validation](docs/development/validation.md) for their acceptance status.
 
 Extract to a writable directory. Windows game builds open without a console window.
 On both platforms, game logs are stored in `logs/` beside the actual executable.
@@ -51,7 +53,7 @@ On both platforms, game logs are stored in `logs/` beside the actual executable.
 
 ```sh
 sudo apt-get update
-sudo apt-get install build-essential pkg-config libgtk-3-dev librsvg2-common python3
+sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
 make -j4
 make test
 make test-gui
@@ -63,7 +65,7 @@ make run
 Install MSYS2 and run inside the **UCRT64** environment:
 
 ```sh
-pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-gtk3 mingw-w64-ucrt-x86_64-librsvg mingw-w64-ucrt-x86_64-python
+pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative mingw-w64-ucrt-x86_64-qt6-svg mingw-w64-ucrt-x86_64-python
 make -j4
 make test
 make test-gui
@@ -72,7 +74,7 @@ make run
 
 ### Headless & Release Builds
 
-- Build and test core logic without GTK: `make headless test`
+- Build and test core logic without Qt: `make headless test`
 - Release optimized binaries: `make CONFIG=release gui test test-gui`
 - Source & binary distribution packaging: `make CONFIG=release package-source package`
 

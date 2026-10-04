@@ -17,7 +17,42 @@ class DesktopTest : public QObject {
         AcGameConfig c{}; ac_init_game_config_for_mode(&c,mode); return c;
     }
 private slots:
+    void initTestCase() { QQuickStyle::setStyle("Basic"); }
     void resources() { QVERIFY(ac::verifyResources()); }
+    void fullscreenRestoration_data() {
+        QTest::addColumn<bool>("maximized");
+        QTest::addColumn<int>("exitKey");
+        QTest::newRow("ordinary-escape") << false << int(Qt::Key_Escape);
+        QTest::newRow("ordinary-f11") << false << int(Qt::Key_F11);
+        QTest::newRow("maximized-escape") << true << int(Qt::Key_Escape);
+        QTest::newRow("maximized-f11") << true << int(Qt::Key_F11);
+    }
+    void fullscreenRestoration() {
+        QFETCH(bool,maximized); QFETCH(int,exitKey);
+        Clock clock; auto o = options(clock); ac::SessionAdapter a(&o);
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend",&a);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        auto expected = maximized ? QWindow::Maximized : QWindow::Windowed;
+        if (maximized) window->showMaximized();
+        QTRY_COMPARE(window->visibility(),expected);
+        // Exercise both exit controls twice, so a later cycle cannot overwrite
+        // the saved maximized state with fullscreen or a transition state.
+        for (int cycle=0;cycle<2;++cycle) {
+            window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+            QTest::keyClick(window,Qt::Key_F11);
+            QTRY_COMPARE(window->visibility(),QWindow::FullScreen);
+            QTRY_VERIFY(window->property("isFullscreen").toBool());
+            window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+            QTest::keyClick(window,Qt::Key(exitKey));
+            QTRY_COMPARE(window->visibility(),expected);
+            QTRY_VERIFY(!window->property("isFullscreen").toBool());
+        }
+        window->close();
+    }
     void commandsAndOwnedModels() {
         Clock clock; auto o = options(clock); ac::SessionAdapter a(&o);
         QVERIFY(a.valid()); QCOMPARE(a.start(config()),AC_OK);
@@ -113,7 +148,6 @@ private slots:
     }
     void renderedPagesAndFocus() {
         Clock clock; auto o = options(clock); ac::SessionAdapter a(&o);
-        QQuickStyle::setStyle("Basic");
         QQmlApplicationEngine engine;
         engine.rootContext()->setContextProperty("backend",&a);
         engine.load(QUrl("qrc:/qml/Main.qml"));

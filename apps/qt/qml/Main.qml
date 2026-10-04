@@ -12,6 +12,7 @@ ApplicationWindow {
     color: Theme.background
     property int selectedMode: 0
     property bool isFullscreen: visibility === Window.FullScreen
+    property int windowedVisibility: Window.Windowed
     font.family: "Segoe UI"
     palette.window: Theme.background
     palette.windowText: Theme.text
@@ -20,9 +21,20 @@ ApplicationWindow {
     palette.button: "#1f2430"
     palette.base: Theme.inset
     palette.highlight: Theme.gold
-    function toggleFullscreen() { if (isFullscreen) showNormal(); else showFullScreen() }
+    function restoreWindowed() {
+        if (windowedVisibility === Window.Maximized) showMaximized()
+        else showNormal()
+    }
+    function toggleFullscreen() {
+        if (isFullscreen) restoreWindowed()
+        else {
+            // Fullscreen must retain the user's maximized/ordinary window choice.
+            windowedVisibility = visibility === Window.Maximized ? Window.Maximized : Window.Windowed
+            showFullScreen()
+        }
+    }
     Shortcut { sequence: "F11"; onActivated: window.toggleFullscreen() }
-    Shortcut { sequence: "Escape"; enabled: window.isFullscreen; onActivated: window.showNormal() }
+    Shortcut { sequence: "Escape"; enabled: window.isFullscreen; onActivated: window.restoreWindowed() }
     onClosing: function(close) { close.accepted = backend.requestClose() }
     Connections {
         target: backend

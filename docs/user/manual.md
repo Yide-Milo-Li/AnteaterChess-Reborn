@@ -23,7 +23,7 @@ The back rank, from A through J for either color, is Rook, Knight, Bishop, Antea
 
 ## Coordinates and input
 
-Files are A–J; ranks are 1–8. A1 is White's left corner; J8 is Black's right corner from White's viewpoint. Internally row 0 is rank 8. Left-click a friendly piece and right-click a highlighted destination, or enter From and To coordinates and submit. Typed input accepts lowercase and surrounding whitespace. Illegal selections, blocked moves, and moves leaving your king in check are rejected. F11 toggles fullscreen; Escape leaves fullscreen.
+Files are A–J; ranks are 1–8. A1 is White's left corner; J8 is Black's right corner from White's viewpoint. Internally row 0 is rank 8. Left-click a friendly piece and right-click a highlighted destination, or enter From and To coordinates and submit. Typed input accepts lowercase and surrounding whitespace. Illegal selections, blocked moves, and moves leaving your king in check are rejected. F11 toggles fullscreen; Escape leaves fullscreen. Both exits restore the ordinary or maximized window state used before entering fullscreen.
 
 ## Pieces and special moves
 

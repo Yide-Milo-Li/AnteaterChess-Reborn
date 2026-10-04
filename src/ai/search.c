@@ -519,7 +519,6 @@ int ac_search_depth(AcAIDifficulty difficulty) {
     case AC_DIFFICULTY_MEDIUM:
         return 10;
     case AC_DIFFICULTY_HARD:
-    case AC_DIFFICULTY_EXPERIMENTAL:
     case AC_DIFFICULTY_TOURNAMENT:
         return 24;
     case AC_DIFFICULTY_NONE:

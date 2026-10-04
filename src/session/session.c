@@ -114,10 +114,22 @@ static void end(AcSession *s, AcGameResult result) {
     s->result = result;
     s->finishedMs = now(s);
 }
+static int valid_difficulty(AcAIDifficulty difficulty) {
+    /* Enum membership matters now that the removed alias leaves a numeric hole. */
+    switch (difficulty) {
+    case AC_DIFFICULTY_NONE:
+    case AC_DIFFICULTY_EASY:
+    case AC_DIFFICULTY_MEDIUM:
+    case AC_DIFFICULTY_HARD:
+    case AC_DIFFICULTY_TOURNAMENT:
+        return 1;
+    default:
+        return 0;
+    }
+}
 AcStatus ac_session_start(AcSession *s, const AcGameConfig *c) {
     if (!s || !c || c->mode < AC_MODE_HUMAN_VS_HUMAN || c->mode > AC_MODE_COMPUTER_VS_COMPUTER ||
-        c->aiDifficultyWhite < AC_DIFFICULTY_NONE || c->aiDifficultyWhite > AC_DIFFICULTY_TOURNAMENT ||
-        c->aiDifficultyBlack < AC_DIFFICULTY_NONE || c->aiDifficultyBlack > AC_DIFFICULTY_TOURNAMENT ||
+        !valid_difficulty(c->aiDifficultyWhite) || !valid_difficulty(c->aiDifficultyBlack) ||
         (c->mode == AC_MODE_HUMAN_VS_COMPUTER && c->playerColor != AC_WHITE && c->playerColor != AC_BLACK) ||
         c->initialTimeSeconds < 0 || c->aiTimeLimit < 0 || (c->timerEnabled && c->initialTimeSeconds <= 0) ||
         !ac_is_ai_turn_timer_setting_valid(c))

@@ -46,7 +46,6 @@ int ac_get_default_ai_time_budget_ms(AcAIDifficulty difficulty) {
     case AC_DIFFICULTY_MEDIUM:
         return 2200;
     case AC_DIFFICULTY_HARD:
-    case AC_DIFFICULTY_EXPERIMENTAL:
         return 7000;
     case AC_DIFFICULTY_TOURNAMENT:
         return 14000;

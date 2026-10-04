@@ -81,12 +81,12 @@ int ac_is_promotion_special_move(AcSpecialMove type);
 typedef enum { AC_MODE_HUMAN_VS_HUMAN, AC_MODE_HUMAN_VS_COMPUTER, AC_MODE_COMPUTER_VS_COMPUTER } AcGameMode;
 
 typedef enum {
-    AC_DIFFICULTY_NONE,
-    AC_DIFFICULTY_EASY,
-    AC_DIFFICULTY_MEDIUM,
-    AC_DIFFICULTY_HARD,
-    AC_DIFFICULTY_EXPERIMENTAL,
-    AC_DIFFICULTY_TOURNAMENT
+    AC_DIFFICULTY_NONE = 0,
+    AC_DIFFICULTY_EASY = 1,
+    AC_DIFFICULTY_MEDIUM = 2,
+    AC_DIFFICULTY_HARD = 3,
+    /* Value 4 was Experimental and is no longer accepted. */
+    AC_DIFFICULTY_TOURNAMENT = 5
 } AcAIDifficulty;
 
 typedef struct {

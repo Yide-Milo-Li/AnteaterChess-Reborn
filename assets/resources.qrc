@@ -1,0 +1,22 @@
+<RCC>
+  <qresource prefix="/org/anteater/reborn">
+    <file alias="BlackAnt.svg">pieces/BlackAnt.svg</file>
+    <file alias="BlackAnteater.svg">pieces/BlackAnteater.svg</file>
+    <file alias="BlackBishop.svg">pieces/BlackBishop.svg</file>
+    <file alias="BlackKing.svg">pieces/BlackKing.svg</file>
+    <file alias="BlackKnight.svg">pieces/BlackKnight.svg</file>
+    <file alias="BlackQueen.svg">pieces/BlackQueen.svg</file>
+    <file alias="BlackRook.svg">pieces/BlackRook.svg</file>
+    <file alias="icon-alert-dark.svg">icons/icon-alert-dark.svg</file>
+    <file alias="icon-hint-dark.svg">icons/icon-hint-dark.svg</file>
+    <file alias="icon-history-dark.svg">icons/icon-history-dark.svg</file>
+    <file alias="icon-info-dark.svg">icons/icon-info-dark.svg</file>
+    <file alias="WhiteAnteater.svg">pieces/WhiteAnteater.svg</file>
+    <file alias="WhiteAntsvg.svg">pieces/WhiteAnt.svg</file>
+    <file alias="WhiteBishop.svg">pieces/WhiteBishop.svg</file>
+    <file alias="WhiteKing.svg">pieces/WhiteKing.svg</file>
+    <file alias="WhiteKnight.svg">pieces/WhiteKnight.svg</file>
+    <file alias="WhiteQueen.svg">pieces/WhiteQueen.svg</file>
+    <file alias="WhiteRook.svg">pieces/WhiteRook.svg</file>
+  </qresource>
+</RCC>

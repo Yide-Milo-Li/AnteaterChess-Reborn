@@ -2,6 +2,9 @@
 #define ANTEATER_TYPES_H
 #include <stdint.h>
 #include <stddef.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum { AC_ANT, AC_ROOK, AC_KNIGHT, AC_BISHOP, AC_QUEEN, AC_KING, AC_ANTEATER, AC_EMPTY_PIECE } AcPieceType;
 
@@ -161,4 +164,7 @@ typedef struct {
     int count;
     AcStatus status;
 } AcMoveList;
+#ifdef __cplusplus
+}
+#endif
 #endif

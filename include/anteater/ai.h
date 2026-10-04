@@ -1,6 +1,9 @@
 #ifndef ANTEATER_AI_H
 #define ANTEATER_AI_H
 #include "anteater/rules.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct {
     int remainingMs[2], poolMs[2];
 } AcAITimeManager;
@@ -28,4 +31,7 @@ void ac_search_destroy(AcSearchContext *context);
 AcStatus ac_search(AcSearchContext *context, const AcPosition *position, const AcSearchOptions *options,
                    AcSearchResult *result);
 int ac_search_depth(AcAIDifficulty difficulty);
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -1,6 +1,9 @@
 #ifndef ANTEATER_SESSION_H
 #define ANTEATER_SESSION_H
 #include "anteater/rules.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct AcSession AcSession;
 typedef enum { AC_SESSION_IDLE, AC_SESSION_ACTIVE, AC_SESSION_FINISHED } AcSessionPhase;
 typedef struct {
@@ -40,4 +43,7 @@ AcStatus ac_session_promotion(const AcSession *session, AcMoveRequest request, i
 int ac_session_is_ai(const AcGameConfig *config, AcColor color);
 int ac_session_ai_budget(const AcSession *session);
 const char *ac_status_message(AcStatus status);
+#ifdef __cplusplus
+}
+#endif
 #endif

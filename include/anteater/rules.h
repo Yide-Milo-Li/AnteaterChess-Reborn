@@ -1,6 +1,9 @@
 #ifndef ANTEATER_RULES_H
 #define ANTEATER_RULES_H
 #include "anteater/types.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 void ac_position_init(AcPosition *position);
 uint64_t ac_position_hash(const AcPosition *position);
 AcStatus ac_position_apply(AcPosition *position, AcMove move, AcUndo *undo);
@@ -29,4 +32,7 @@ AcMove *ac_get_move(AcMoveList *list, int index);
 int ac_get_move_count(AcMoveList *list);
 int ac_is_in_check(const AcPosition *position, AcColor color);
 int ac_is_insufficient_material(const AcPosition *position);
+#ifdef __cplusplus
+}
+#endif
 #endif

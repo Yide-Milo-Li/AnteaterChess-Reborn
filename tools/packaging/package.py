@@ -13,7 +13,7 @@ def files():
             yield path
         elif path.is_dir():
             yield from sorted(p for p in path.rglob('*') if p.is_file()
-                              and not {'__pycache__', 'logs'}.intersection(p.parts))
+                              and not {'__pycache__', 'logs'}.intersection(p.relative_to(ROOT).parts))
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -137,7 +137,7 @@ def main():
             for relative in ['COPYRIGHT', 'docs/user/manual.md', 'docs/legacy/Chess_UserManual.pdf']:
                 copy(ROOT/relative, stage/relative)
             copy(ROOT/'tools/packaging/templates/README.md', stage/'README.md')
-            copy(ROOT/f'tools/templates/INSTALL-{"windows" if windows else "linux"}.md', stage/'INSTALL.md')
+            copy(ROOT/f'tools/packaging/templates/INSTALL-{"windows" if windows else "linux"}.md', stage/'INSTALL.md')
             # Runtime manual links resolve within this archive.
             manual = stage/'docs/user/manual.md'
             manual.write_text(manual.read_text(encoding='utf-8').replace(

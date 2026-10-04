@@ -22,7 +22,7 @@
         "id": "platform-and-assets",
         "label": "Platform & Assets Integration",
         "focus": ["resources", "gtk-app", "platform", "session", "budget"],
-        "note": "Inspect src/platform/runtime and logging, with assets/pieces and icons compiled into GResource."
+        "note": "Inspect runtime paths and executable-side logs, with assets/pieces and icons compiled into GResource."
       }
     ]
   },

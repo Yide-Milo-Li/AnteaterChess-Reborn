@@ -68,7 +68,22 @@ Results contain the selected legal move, status, completed depth, node count and
 
 [gui_async.c](../../apps/gtk/async/gui_async.c) allocates a job containing copied position and hash history, cancellation object, options, result, session revision and GUI generation. GTask runs the search on a worker. Return-on-cancel is disabled: cancellation requests stop, and job memory remains alive until the worker exits and its main-context completion callback runs. The callback accepts a result only when page, generation, revision, and cancellation state still match. Closing cancels and drains outstanding tasks before releasing the session and log object.
 
-GTK owns pages, selection, highlighting, and widgets. No worker accesses widgets. [resources.xml](../../assets/resources.xml) embeds SVGs under `/org/anteater/reborn/`; resource lookup is independent of the startup directory. Platform logs use a user-writable directory and per-object file handles/paths.
+GTK owns pages, selection, highlighting, and widgets. No worker accesses widgets.
+[resources.xml](../../assets/resources.xml) embeds the categorized SVGs under
+`/org/anteater/reborn/` with stable aliases; resource lookup is independent of the
+startup directory. The private platform interface separates runtime preparation,
+executable-directory discovery, clocks and logging. Path discovery returns an
+allocated UTF-8 absolute directory (free with `g_free`), or NULL on failure.
+Windows uses `GetModuleFileNameW`; Linux resolves `/proc/self/exe`, so symlink
+launches follow the actual executable. Windows DLL/resource setup shares this resolver.
+
+Logs default to `<executable-directory>/logs/session-<UUID>.log`; an explicitly
+injected log directory remains available for fixtures. Each object owns its path
+and rotates files when the game ID changes. Directories are created on the first
+write. Path discovery failure keeps a diagnostic-only log object: its callback
+returns `AC_IO_ERROR` without changing the session command's result. Directory or
+file-write failures follow the same contract, with no working-directory or user-data
+fallback. A log is a current game snapshot, not a saved-game import format.
 
 Upstream API contracts: [GTask thread completion](https://docs.gtk.org/gio/method.Task.run_in_thread.html), [GResource](https://docs.gtk.org/gio/struct.Resource.html), [GTK Windows distribution](https://www.gtk.org/docs/installations/windows/).
 

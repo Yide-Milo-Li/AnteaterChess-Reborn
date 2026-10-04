@@ -1,5 +1,9 @@
 # Validation record
 
+For the current local directory and runtime changes, see the
+[layout/runtime validation](runtime-layout-validation.md). The evidence below is
+the earlier Reborn baseline and does not constitute CI acceptance of these changes.
+
 Baseline reference: original commit `fb6df82eba4d513bbc160d2d848ffe6abc41cd3e`.
 
 Windows local UCRT64: core tests, GUI compilation and GTK handler-driven integration tests passed. Initial variant perft depths 1–3 are **24, 576, 15,286**, generated from the original engine; the new engine matches these counts, a fixed 50-ply legal-move fingerprint sequence, and five focused fixture boards. Random 150-ply apply/unmake checks restore the exact original compact position and compare incremental/full hashes.

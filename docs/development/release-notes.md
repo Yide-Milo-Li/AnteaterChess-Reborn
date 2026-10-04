@@ -1,3 +1,17 @@
+# Unreleased layout and desktop runtime changes
+
+- Organize GTK sources by application, screens, UI and background tasks; separate
+  platform runtime and logging responsibilities. Categorize resources, documents
+  and tools while retaining core interfaces and embedded resource aliases.
+- Windows game builds use the GUI subsystem by default. `WINDOWS_CONSOLE=1`
+  selects a separate console build for debugging; tests remain console programs.
+- Both platforms store game snapshots in `logs/` beside the actual executable.
+  Old user-directory logs remain in place. Log failures remain diagnostics after
+  accepted game actions.
+- Extend adapter/resource tests and host-package verification to cover all assets,
+  Unicode/space paths, concurrent sessions, symlinks, subsystem flags and blocked
+  log directories. The existing release version is retained for these local builds.
+
 # 2.0.1 — UI Modernization & Fullscreen Typography
 
 This release introduces an enhanced, modern visual design and typography refinement while preserving all variant rules, C11 architectures, and performance guarantees:

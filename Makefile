@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := all
 include mk/config.mk
 include mk/modules.mk
-.PHONY: all gui headless tests test test-rules test-session test-ai test-gui run clean check help package package-source tar tar-user
+.PHONY: all gui headless tests test test-rules test-session test-ai test-platform test-gui run clean check help package package-source tar tar-user benchmark
 all: gui
 gui: $(APP)
 headless: $(LIBS)
@@ -14,7 +14,9 @@ test-session: $(filter $(BUILD)/tests/session/%,$(TEST_BINS))
 	@set -e; for t in $^; do "$$t"; done
 test-ai: $(filter $(BUILD)/tests/ai/%,$(TEST_BINS))
 	@set -e; for t in $^; do "$$t"; done
-test-gui: $(GUI_TEST)
+test-platform: $(PLATFORM_TESTS)
+	@set -e; for t in $^; do "$$t"; done
+test-gui: $(GUI_TEST) test-platform
 	$(GUI_TEST)
 run: gui
 	$(APP)
@@ -24,6 +26,7 @@ $(BUILD)/obj/%.o: %.c
 $(BUILD)/obj/apps/gtk/%.o: CPPFLAGS += $(GTK_CFLAGS) -Iapps/gtk -Isrc/platform
 $(BUILD)/obj/src/platform/%.o: CPPFLAGS += $(GLIB_CFLAGS) -Isrc/platform
 $(BUILD)/obj/tests/gtk/%.o: CPPFLAGS += $(GTK_CFLAGS) -Iapps/gtk -Isrc/platform
+$(BUILD)/obj/tests/platform/%.o: CPPFLAGS += $(GLIB_CFLAGS) -Isrc/platform
 $(BUILD)/resources.c: assets/resources.xml $(wildcard assets/pieces/*.svg assets/icons/*.svg)
 	@mkdir -p $(@D)
 	glib-compile-resources $< --sourcedir=assets --generate-source --target=$@
@@ -47,6 +50,13 @@ $(BUILD)/tests/%$(EXE): $(BUILD)/obj/tests/%.o $(LIBS)
 $(GUI_TEST): $(BUILD)/obj/tests/gtk/test_desktop.o $(filter-out %/main.o,$(GUI_OBJS)) $(PLATFORM_OBJS) $(BUILD)/resources.o $(LIBS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GTK_LIBS) -o $@
+$(BUILD)/tests/platform/test_runtime$(EXE): $(BUILD)/obj/tests/platform/test_runtime.o $(PLATFORM_OBJS) $(LIBS)
+	@mkdir -p $(@D)
+	$(CC) $(LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GLIB_LIBS) -o $@
+# This fixture substitutes only path discovery, exercising the real log/session code.
+$(BUILD)/tests/platform/test_path_failure$(EXE): $(BUILD)/obj/tests/platform/test_path_failure.o $(filter-out %/paths.o,$(PLATFORM_OBJS)) $(LIBS)
+	@mkdir -p $(@D)
+	$(CC) $(LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GLIB_LIBS) -o $@
 check:
 	$(PYTHON) tools/dev/check.py
 $(BUILD)/benchmark$(EXE): $(BUILD)/obj/tools/dev/benchmark.o $(LIBS)
@@ -60,7 +70,7 @@ package tar-user: gui
 clean:
 	$(PYTHON) tools/dev/clean.py
 help:
-	@echo 'make [gui|headless|test|test-rules|test-session|test-ai|test-gui|run|check|package|package-source|clean]'
+	@echo 'make [gui|headless|test|test-rules|test-session|test-ai|test-platform|test-gui|run|check|package|package-source|clean]'
 	@echo 'CONFIG=debug (default), release, or sanitize; CC, BUILD, CPPFLAGS, CFLAGS and LDFLAGS are overridable.'
 	@echo 'Windows game builds use the GUI subsystem; WINDOWS_CONSOLE=1 selects a separate console build directory.'
 -include $(shell find $(BUILD)/obj -name '*.d' 2>/dev/null)

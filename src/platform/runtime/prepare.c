@@ -58,14 +58,9 @@ static void ac_platform_fix_cairo_thread_data(void) {
 void ac_platform_prepare_runtime(void) {
 #ifdef _WIN32
     ac_platform_fix_cairo_thread_data();
-    wchar_t executable[32768];
-    if (!GetModuleFileNameW(NULL, executable, G_N_ELEMENTS(executable)))
+    char *base = ac_platform_executable_directory();
+    if (!base)
         return;
-    char *utf8 = g_utf16_to_utf8((const gunichar2 *)executable, -1, NULL, NULL, NULL);
-    if (!utf8)
-        return;
-    char *base = g_path_get_dirname(utf8);
-    g_free(utf8);
     char *cache = g_build_filename(base, "lib", "gdk-pixbuf-2.0", "2.10.0", "loaders.cache", NULL);
     if (g_file_test(cache, G_FILE_TEST_EXISTS))
         g_setenv("GDK_PIXBUF_MODULE_FILE", cache, TRUE);

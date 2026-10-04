@@ -15,18 +15,18 @@ AcPlatformLog *ac_platform_log_create(const char *directory) {
     if (directory)
         l->directory = g_strdup(directory);
     else {
-#ifdef _WIN32
-        const char *base = g_get_user_data_dir();
-#else
-        const char *base = g_get_user_state_dir();
-#endif
-        l->directory = g_build_filename(base, "AnteaterChess-Reborn", "logs", NULL);
+        char *base = ac_platform_executable_directory();
+        if (base) {
+            l->directory = g_build_filename(base, "logs", NULL);
+            g_free(base);
+        }
     }
     return l;
 }
 AcStatus ac_platform_log_write(void *context, const AcSnapshot *s) {
     AcPlatformLog *l = context;
-    if (!l || !s)
+    /* Path lookup failure is a diagnostic; accepted session commands stay applied. */
+    if (!l || !l->directory || !s)
         return AC_IO_ERROR;
     if (!l->path || l->lastGameId != s->gameId) {
         g_free(l->path);

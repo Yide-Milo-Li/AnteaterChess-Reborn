@@ -12,6 +12,7 @@ make test                    # core, no GTK required
 make test-rules
 make test-session
 make test-ai
+make test-platform           # GLib adapter tests, no display required
 make test-gui                # requires a desktop/display
 make check                   # documentation/resources/layout checks
 make CONFIG=sanitize test    # Linux: ASan + UBSan
@@ -31,6 +32,11 @@ The suffix also applies to Release console builds, keeping normal and console
 objects/executables separate. If overriding `BUILD`, choose a separate directory
 for each subsystem. `--version` supports captured stdout, and `--smoke-test`
 returns a process status for automated verification.
+
+`--smoke-test` checks all embedded pieces/icons and starts/finishes a minimal
+session to exercise the real executable-relative log path. It returns 1 if resources
+or logging fail. `make test-platform` includes a substituted path-discovery failure
+fixture verifying that accepted moves retain an I/O diagnostic.
 
 The GTK application keeps its entry point and shared private header in `apps/gtk/`.
 Its `app/` directory owns lifecycle, commands and navigation; `screens/` owns pages;
@@ -65,7 +71,15 @@ python3 tools/packaging/verify.py
 
 `tar` aliases `package-source`; `tar-user` aliases `package`. Archives use `AnteaterChess-Reborn-<version>-source.tar.gz`, `...-windows-x64.zip`, or `...-linux-x64.tar.gz`, under `dist/`. The source package includes all development documents, historical PDFs, tests, Make modules and packaging tools, and can rebuild and repackage without Git. Binary packages contain the user manual, historical user PDF, COPYRIGHT and platform INSTALL instructions. Windows bundles recursively discovered non-system DLLs, GdkPixbuf SVG loader, schemas, icons, and third-party licenses/manifest. Linux uses system GTK 3.
 
-The package script compares all relevant input bytes with a saved manifest, including docs/templates/tools. Unchanged inputs reuse an archive; any input change rebuilds it. SHA256SUMS covers distribution archives. Verification extracts to a temporary directory with spaces and non-ASCII characters, checks file lists/links, starts the program from another directory, rebuilds the source package and repackages it. Packaging tests operate on temporary copies.
+The package script compares all relevant input bytes with a saved manifest, including
+docs/templates/tools. Unchanged inputs reuse an archive; any input change rebuilds it.
+SHA256SUMS covers distribution archives. Verification selects the host's runtime and
+the source archive, extracts to a temporary directory with spaces and Chinese
+characters, rebuilds core and desktop sources, and checks repackaging invalidation.
+It verifies captured version output, concurrent and repeated sessions, executable-side
+logs, Linux symlink launches and blocked log directories. Windows validation also
+checks PE GUI/console subsystems and an independent console build. Runtime logs are
+excluded from archives. Packaging tests operate on temporary copies.
 
 ## CI and formal release
 

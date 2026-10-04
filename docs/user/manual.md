@@ -63,13 +63,26 @@ Checkmate wins; stalemate draws. The retained simplified insufficient-material d
 
 ## Logs and troubleshooting
 
-Logs are per-session text files under `AnteaterChess-Reborn/logs` in the user's data directory on Windows (normally `%LOCALAPPDATA%`), or state directory on Linux (`$XDG_STATE_HOME`, normally `~/.local/state`). They include configuration, moves, capture coordinates, elapsed time, and result. A write failure reports a diagnostic while the accepted game action remains applied. Old `bin/logs` files are not imported.
+Logs are per-session text files in `logs/` beside the actual executable on both
+Windows and Linux, named `session-<UUID>.log`. The directory is created when a game
+first writes a snapshot. Logs include configuration, moves, capture coordinates,
+elapsed time and result; updates to one game replace its snapshot, while a new
+game gets a separate file. Concurrent instances use distinct filenames.
+
+Shortcuts, different working directories and Linux symlink launches use the actual
+executable's directory. Move the whole program directory, including `logs/`, to
+carry existing logs with it. The program directory must be writable. If path lookup
+or writing fails, the interface reports a diagnostic while the accepted game action
+remains applied. It does not redirect logs elsewhere.
+
+Earlier `%LOCALAPPDATA%/AnteaterChess-Reborn/logs`, Linux user-state logs and
+`bin/logs` files remain where they were; new sessions use the program-side directory.
 
 - Missing DLL: re-extract the whole Windows archive; do not copy the executable alone.
 - No display on Linux: run in a graphical session; automated tests use Xvfb.
 - Invalid timer: increase the turn duration or disable it.
 - Move rejected: verify side to move, blockers, check, and Anteater path ambiguity.
 - Hint unavailable: wait for the AI/previous hint, return to a human turn, and ensure the game is active.
-- Unwritable log: check the user data directory's permissions; no administrator access is required.
+- Unwritable log: extract the program to a directory you can write to and check that `logs` is a directory.
 
 There is no networking or saved-game import/export. The [historical manual](../legacy/Chess_UserManual.pdf) is the original course submission; its standard-chess wording, paths, and old architecture are not authoritative for Reborn.

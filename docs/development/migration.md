@@ -33,3 +33,6 @@ Current documents move under `docs/{user,architecture,development}`; historical
 PDFs remain under `docs/legacy` with identical bytes. Tool paths are now
 `tools/{packaging,dev,legacy}`; direct script invocations use these locations.
 Make target names and the core public C interfaces are retained.
+
+New game logs now live in `logs/` beside the actual executable on both supported
+platforms. Earlier user-data/state logs remain in their original directories.

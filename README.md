@@ -40,6 +40,9 @@ Platform archives are available under [Releases](https://github.com/Yide-Milo-Li
 - **Windows x64**: Extract the ZIP package and launch `anteater-chess.exe` (keep accompanying DLLs in place).
 - **Ubuntu 24.04 x64**: Install runtime libraries (`sudo apt install libgtk-3-0t64 librsvg2-common`), extract, and run `./anteater-chess`.
 
+Extract to a writable directory. Windows game builds open without a console window.
+On both platforms, game logs are stored in `logs/` beside the actual executable.
+
 ---
 
 ## Build from Source

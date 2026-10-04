@@ -6,6 +6,8 @@ Use C11, C++17, CMake >= 3.21, Ninja, GCC/Clang, Python 3 and Qt >= 6.4.2.
 Qt modules are Core, Gui, Qml, Quick, QuickControls2, Svg, Test and QuickTest.
 [README](../../README.md) lists Ubuntu 24.04 and MSYS2 UCRT64 package commands.
 Windows packaging uses official windeployqt, objdump and pacman ownership records.
+The active MSYS2 mount is queried with cygpath; installation paths may contain
+spaces or use the CI runner's temporary directory.
 Dependency versions and deployed hashes are recorded in each candidate's
 DEPENDENCIES.json. Dependency upgrades require their own validation record.
 The source API baseline is Qt 6.4.2; a newer local Windows package is not a
@@ -20,7 +22,7 @@ make CONFIG=release gui test test-platform test-gui check
 make headless test              # no Qt required
 make test-rules test-session test-ai
 make CONFIG=sanitize test       # Linux ASan + UBSan
-ASAN_OPTIONS=detect_leaks=0 xvfb-run -a make CONFIG=sanitize test-gui
+QT_QPA_PLATFORM=xcb ASAN_OPTIONS=detect_leaks=0 xvfb-run -a make CONFIG=sanitize test-gui
 make CONFIG=release benchmark
 ```
 
@@ -34,6 +36,9 @@ ctest --test-dir build/local --output-on-failure
 
 Outputs live under build/<platform>-x64/<configuration>; override BUILD for an
 isolated tree. Debug, Release, Sanitize and Windows console builds stay separate.
+With the current Windows MSYS2 Qt tools, use an ASCII BUILD path if the source
+directory contains non-ASCII characters, for example BUILD=C:/ac-build/release.
+The source and deployed runtime can remain in the Unicode directory.
 Use CC/CXX or CMake cache variables to select compilers. C sources are always
 compiled as C; a C++ linkage test exercises the guarded public headers.
 Assertions remain enabled in Release tests. Each failing CTest result stops the
@@ -82,7 +87,8 @@ make CONFIG=release package-source package
 python3 tools/packaging/verify.py
 ```
 
-On Linux run the verifier under Xvfb if no display is available. tar aliases
+On Linux run the verifier with QT_QPA_PLATFORM=xcb under Xvfb if no display is
+available; this also prevents a WSLg Wayland session from bypassing Xvfb. tar aliases
 package-source; tar-user aliases package. Archives under dist/ contain source
 or the host runtime. Source rebuilds require no Git checkout and retain historical
 PDFs, tests, documentation and tools. Runtime packages retain COPYRIGHT, the user
@@ -90,9 +96,14 @@ manual and historical user PDF. Windows uses windeployqt then recursively verifi
 non-system DLL imports and hashes, bundles package licenses, and rejects the retired
 GTK/Cairo/GdkPixbuf chain. Some MSYS2 Qt font dependencies use GLib indirectly;
 the manifest records those rather than claiming no GLib exists. Linux uses system
-Qt packages and records actual ldd/package versions.
+Qt packages. Its manifest combines the Qt QML import scanner, QML payloads,
+WorkerScript, available GUI plugin families and their ELF dependency closures,
+with package ownership, versions and file hashes. Available styles/platform/image
+backends are recorded as capabilities, not as evidence that all were loaded.
 
-Input byte hashes invalidate stale archives. SHA256SUMS covers all archives.
+Input byte hashes invalidate stale archives. Linux also fingerprints its dependency
+manifest, so QML/plugin/library changes invalidate a cached runtime package even
+when the application executable is unchanged. SHA256SUMS covers all archives.
 The verifier extracts to a Unicode/spaces path, rebuilds core and desktop without
 Git, checks source-package invalidation and PDF bytes, then checks --version,
 concurrent logs, repeated sessions, different cwd, symlink launch on Linux and

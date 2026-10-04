@@ -50,6 +50,9 @@ target_link_libraries(ai_reference PRIVATE ac_session)
 add_test(NAME test_ai_reference COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/dev/compare_ai_reference.py"
     $<TARGET_FILE:ai_reference> "${CMAKE_SOURCE_DIR}/tests/fixtures/ai-evaluation-baseline.txt")
 set_tests_properties(test_ai_reference PROPERTIES LABELS "core;ai")
+add_test(NAME test_package_dependencies COMMAND ${Python3_EXECUTABLE}
+    "${CMAKE_SOURCE_DIR}/tests/packaging/test_dependencies.py")
+set_tests_properties(test_package_dependencies PROPERTIES LABELS packaging)
 add_executable(ac_benchmark tools/dev/benchmark.c)
 target_link_libraries(ac_benchmark PRIVATE ac_session)
 add_custom_target(check COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/dev/check.py")

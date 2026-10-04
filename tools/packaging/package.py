@@ -25,6 +25,21 @@ def copy(src, dst):
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
 
+def windows_package_owners(paths, prefix):
+    # The CI action installs MSYS2 under RUNNER_TEMP; cygpath knows its mounts.
+    mount = run('cygpath', '-u', str(prefix)).rstrip('/')
+    unix = [mount + '/' + p.relative_to(prefix).as_posix() for p in paths]
+    required = set(unix)
+    owners = {}
+    for line in run('pacman', '-Ql').splitlines():
+        owner, path = line.split(maxsplit=1)
+        if path in required:
+            owners[path] = owner
+    missing = required - owners.keys()
+    if missing:
+        raise RuntimeError('Unowned MSYS2 dependency: ' + ', '.join(sorted(missing)))
+    return {p.as_posix(): owners[path] for p, path in zip(paths, unix)}
+
 def windows_runtime(stage, executable):
     """Official Qt deployment plus recursive third-party import verification."""
     prefix = Path(run('qtpaths6', '--query', 'QT_INSTALL_PREFIX'))
@@ -74,19 +89,8 @@ def windows_runtime(stage, executable):
         entries.append({'path':relative.as_posix(),'sha256':digest(p),
                         'package':None,'source':str(origin) if origin else 'project'})
     # Query owners in one process; deployment includes hundreds of QML files.
-    unique = list(dict.fromkeys(p.as_posix() for p in resolved if p))
-    owner_map = {}
-    if unique:
-        unix = [p.replace('C:/msys64/ucrt64/','/ucrt64/') for p in unique]
-        required = set(unix)
-        package_paths = {}
-        # One package database traversal avoids per-file processes and repeated scans.
-        for line in run('pacman','-Ql').splitlines():
-            owner,path = line.split(maxsplit=1)
-            if path in required: package_paths[path] = owner
-        output = [package_paths[path] for path in unix]
-        if len(output) != len(unique): raise RuntimeError('Incomplete package ownership query')
-        owner_map = dict(zip(unique,output))
+    unique = list(dict.fromkeys(p for p in resolved if p))
+    owner_map = windows_package_owners(unique, prefix) if unique else {}
     for entry,origin in zip(entries,resolved):
         if origin:
             owner = owner_map[origin.as_posix()]
@@ -118,23 +122,74 @@ def windows_runtime(stage, executable):
     (stage/'DEPENDENCIES.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     return prefix
 
-def linux_runtime(stage, executable):
-    imports = run('ldd', str(executable))
-    paths = re.findall(r'=> (/\S+)', imports)
-    packages = {}
-    entries = []
-    for path in paths:
-        actual = Path(path).resolve()
-        query = subprocess.run(['dpkg-query','-S',path],capture_output=True,text=True)
-        if query.returncode:
-            query = subprocess.run(['dpkg-query','-S',str(actual)],capture_output=True,text=True)
-        owner = query.stdout.split(': ')[0] if query.returncode == 0 else None
-        if owner:
-            packages[owner] = run('dpkg-query','-W','-f=${Version}',owner)
-        entries.append({'path':path,'sha256':digest(actual),'package':owner})
-    (stage/'DEPENDENCIES.json').write_text(json.dumps({
-        'provider':'Ubuntu system packages','catalog':'https://packages.ubuntu.com/',
-        'packages':packages,'imports':imports,'files':entries},indent=2)+'\n',encoding='utf-8')
+def linux_dependencies(executable):
+    """Record ELF closure, imported QML payloads and available GUI plugin families.
+
+    Discovery is static so packaging also works without DISPLAY. Plugin families
+    include alternative platform/image backends; this is a runtime-capability
+    inventory, not a claim that every listed plugin was loaded in one smoke run.
+    """
+    qml = Path(run('qtpaths6', '--query', 'QT_INSTALL_QML'))
+    plugins = Path(run('qtpaths6', '--query', 'QT_INSTALL_PLUGINS'))
+    scanner = Path(run('qtpaths6', '--query', 'QT_INSTALL_LIBEXECS')) / 'qmlimportscanner'
+    scanned = json.loads(run(str(scanner), '-rootPath', str(ROOT/'apps/qt/qml'), '-importPath', str(qml)))
+    modules = {item['name']: Path(item['path']) for item in scanned
+               if item.get('type') == 'module' and item.get('path')
+               and (Path(item['path'])/'qmldir').is_file()}
+    # Ubuntu's Qt 6.4 QtQuick plugin loads WorkerScript through C++ even when
+    # the QtQml namespace has no qmldir for the import scanner to follow.
+    modules['QtQml.WorkerScript'] = qml/'QtQml/WorkerScript'
+    for name in ('QtQuick', 'QtQuick.Window', 'QtQuick.Controls',
+                 'QtQuick.Controls.Basic', 'QtQuick.Layouts', 'QtQuick.Templates', 'QtQml.WorkerScript'):
+        if name not in modules or not (modules[name]/'qmldir').is_file():
+            raise RuntimeError('Missing required QML runtime module: '+name)
+    paths = set()
+    for directory in modules.values():
+        # Nested modules have their own descriptors and are handled by the scanner.
+        for parent, directories, names in os.walk(directory):
+            directories[:] = [name for name in directories if not (Path(parent)/name/'qmldir').is_file()]
+            paths.update(Path(parent)/name for name in names if (Path(parent)/name).is_file())
+    families = ('platforms', 'platforminputcontexts', 'platformthemes', 'imageformats',
+                'iconengines', 'xcbglintegrations', 'egldeviceintegrations')
+    plugin_paths = sorted(p for family in families for p in (plugins/family).glob('*.so'))
+    paths.update(plugin_paths)
+    binaries = [executable, *sorted(p for p in paths if p.read_bytes()[:4] == b'\x7fELF')]
+    imports = {}
+    for binary in binaries:
+        output = run('ldd', str(binary))
+        if '=> not found' in output:
+            raise RuntimeError('Unresolved ELF dependency of '+str(binary)+'\n'+output)
+        # ldd includes ASLR addresses, which must not invalidate an unchanged package.
+        imports[str(binary)] = re.sub(r'\(0x[0-9a-fA-F]+\)', '(address omitted)', output)
+        paths.update(Path(target or loader) for target,loader in
+                     re.findall(r'=>\s+(\S+)|^\s*(/\S+)', output, re.M))
+    aliases = sorted({p for path in paths for p in (str(path), str(path.resolve()))})
+    query = subprocess.run(['dpkg-query', '-S', *aliases], capture_output=True, text=True)
+    owners = {}
+    for line in query.stdout.splitlines():
+        if ': ' in line:
+            owner, path = line.split(': ', 1)
+            # dpkg-query also emits diversion metadata for the merged-/usr loader.
+            if re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?', owner):
+                owners[path] = owner
+    entries = {}
+    for path in sorted(paths):
+        actual = path.resolve()
+        owner = owners.get(str(path)) or owners.get(str(actual))
+        if not owner:
+            raise RuntimeError('Unowned Ubuntu dependency: '+str(path))
+        entries[str(actual)] = {'path':str(actual), 'sha256':digest(actual), 'package':owner}
+    packages = {owner:run('dpkg-query', '-W', '-f=${Version}', owner)
+                for owner in sorted({entry['package'] for entry in entries.values()})}
+    return {'provider':'Ubuntu system packages', 'catalog':'https://packages.ubuntu.com/',
+            'packages':packages, 'imports':imports,
+            'qmlModules':{name:str(path) for name,path in sorted(modules.items())},
+            'qtPlugins':[str(path) for path in plugin_paths],
+            'files':[entries[path] for path in sorted(entries)]}
+
+def linux_runtime(stage, executable, dependencies=None):
+    manifest = dependencies if dependencies is not None else linux_dependencies(executable)
+    (stage/'DEPENDENCIES.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
 
 
 def main():
@@ -153,10 +208,14 @@ def main():
     archive = dist/(name+suffix)
     inputs = {str(p.relative_to(ROOT)):digest(p) for p in files()}
     executable = ROOT/(args.build or f'build/{platform}/release')/('bin/anteater-chess.exe' if windows else 'bin/anteater-chess')
+    dependencies = None
     if args.kind == 'binary':
         inputs['executable'] = digest(executable)
         if windows:
             inputs['packages'] = run('pacman', '-Q')
+        else:
+            dependencies = linux_dependencies(executable)
+            inputs['dependencies'] = hashlib.sha256(json.dumps(dependencies,sort_keys=True).encode()).hexdigest()
     manifest = dist/(name+'.inputs.json')
     if archive.exists() and manifest.exists() and json.loads(manifest.read_text(encoding='utf-8')) == inputs:
         print(f'Unchanged: {archive.name}')
@@ -181,7 +240,7 @@ def main():
             if windows:
                 windows_runtime(stage, executable)
             else:
-                linux_runtime(stage, executable)
+                linux_runtime(stage, executable, dependencies)
         pending = Path(temporary)/(name+suffix)
         if suffix == '.zip':
             with zipfile.ZipFile(pending, 'w', zipfile.ZIP_DEFLATED) as z:

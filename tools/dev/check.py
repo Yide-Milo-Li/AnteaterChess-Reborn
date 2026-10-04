@@ -1,6 +1,6 @@
 """Check local Markdown links, embedded resources and maintained layout."""
 from pathlib import Path
-import re, sys, xml.etree.ElementTree as ET
+import re, subprocess, sys, xml.etree.ElementTree as ET
 root = Path(__file__).resolve().parents[2]
 errors=[]
 for directory in ['include/anteater', 'src/rules', 'src/session', 'src/ai',
@@ -29,4 +29,5 @@ for module in ['rules','session','ai']:
             errors.append('Desktop dependency in core: '+str(path.relative_to(root)))
 if errors:
     sys.exit('\n'.join(errors))
+subprocess.run([sys.executable, root/'tests/packaging/test_dependencies.py'], check=True)
 print('Documentation links, resources and maintained layout: OK')

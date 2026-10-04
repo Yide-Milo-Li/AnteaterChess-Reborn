@@ -37,7 +37,8 @@ all 14 pieces and four icons at 32/96/160 pixels.
 
 Rendered inspection includes Windows and WSLg main menu, modes, setup and gameplay.
 The board/side panel are kept separate and the existing dark palette/SVGs retained.
-Further DPI/software, packaging and sanitizer evidence is recorded below when run.
+Further DPI/software and packaging evidence is recorded below. Core sanitizer
+checks keep leak detection enabled; desktop checks disable it for system Qt caches.
 
 ## Acceptance limits
 
@@ -73,3 +74,33 @@ The verifier therefore keeps the archive and core-only build under the Unicode
 path, while placing the desktop CMake build tree in a sibling path containing
 spaces but only ASCII characters. This preserves the Unicode extraction/runtime
 check and records the toolchain limitation instead of silently calling it clean.
+
+## Completion audit follow-up
+
+The follow-up fixes three independently identified gaps: fixed-install-path MSYS2
+ownership lookup, fullscreen restoration from maximized windows, and missing Linux
+QML/plugin dependencies. MSYS2 paths now use the active cygpath mount. Isolated
+regressions cover the normal installation, a runner temporary directory and spaces;
+they do not claim that a second physical MSYS2 installation was provisioned.
+
+Desktop regression rows cover ordinary/maximized windows, F11/Escape exits, and
+two consecutive cycles. Both Release trees passed all 22 CTest targets (the
+previous 21 plus a packaging regression target). Logs are
+build/qt-migration/audit-fixes-windows-tests.log and audit-fixes-linux-tests.log.
+Linux Xvfb runs explicitly select xcb so an inherited WSLg Wayland environment
+cannot bypass the virtual display or invalidate keyboard-activation checks.
+
+Linux discovery now records imported QML payloads, WorkerScript, available Qt GUI
+plugin families and their ELF closures, with package versions, ownership and
+hashes. Styles/platform/image alternatives are a capability inventory; listed
+plugins are not all claimed to load during a single smoke test. Unresolved ELF,
+unowned files and missing required modules fail packaging. QML/library payload
+changes invalidate runtime archives; changing ldd ASLR addresses does not.
+make check runs the isolated packaging regressions, and the archive verifier checks
+the Linux dependency file hashes as well as the existing Windows inventory.
+
+Candidates for this follow-up are generated and checked with the documented
+package/verify commands. Their evidence lives under build/qt-migration/ in
+audit-fixes-*-package.log and audit-fixes-*-verify.log. The external acceptance
+limits above remain open; these fixes do not substitute for remote CI, fresh hosts
+or human native-desktop acceptance.

@@ -17,19 +17,19 @@ jobs:
       - name: Release and desktop tests
         run: |
           make -j4 CONFIG=release test gui test-platform check
-          xvfb-run -a make CONFIG=release test-gui
+          QT_QPA_PLATFORM=xcb xvfb-run -a make CONFIG=release test-gui
       - name: Sanitizers
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           make -j4 CONFIG=sanitize test
-          ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 xvfb-run -a make -j4 CONFIG=sanitize test-gui
+          QT_QPA_PLATFORM=xcb ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 xvfb-run -a make -j4 CONFIG=sanitize test-gui
       - name: Packages and rebuild
         run: |
           make -s CONFIG=release benchmark > build/performance.txt
           make CONFIG=release package-source package
-          xvfb-run -a python3 tools/packaging/verify.py
+          QT_QPA_PLATFORM=xcb xvfb-run -a python3 tools/packaging/verify.py
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64

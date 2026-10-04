@@ -1,6 +1,7 @@
 """Verify host archives, source rebuilds, GUI subsystems and portable log behavior."""
 from pathlib import Path
 import hashlib
+import json
 import os
 import re
 import struct
@@ -95,11 +96,19 @@ def main():
             assert subsystem(exe) == 2
             forbidden = ('libgtk', 'libgdk', 'libcairo', 'libpango', 'libatk', 'libpixbuf')
             assert not any(p.name.lower().startswith(forbidden) for p in runtime.rglob('*.dll'))
-            import json
             manifest = json.loads((runtime/'DEPENDENCIES.json').read_text(encoding='utf-8'))
             for relative,checksum in manifest['inventory'].items():
                 assert hashlib.sha256((runtime/relative).read_bytes()).hexdigest() == checksum
             assert set(manifest['inventory']) == {p.relative_to(runtime).as_posix() for p in runtime.rglob('*') if p.is_file()} - {'DEPENDENCIES.json'}
+        else:
+            manifest = json.loads((runtime/'DEPENDENCIES.json').read_text(encoding='utf-8'))
+            assert any(name.startswith('qml6-module-') for name in manifest['packages'])
+            for name in ('QtQuick.Controls.Basic', 'QtQuick.Templates', 'QtQml.WorkerScript'):
+                assert name in manifest['qmlModules']
+            assert any('/platforms/' in path for path in manifest['qtPlugins'])
+            for entry in manifest['files']:
+                assert entry['package'] in manifest['packages']
+                assert hashlib.sha256(Path(entry['path']).read_bytes()).hexdigest() == entry['sha256']
         assert run([str(exe), '--version'], work, environment).strip() == f'AnteaterChess Reborn {version}'
         logs = runtime / 'logs'
         assert not logs.exists()

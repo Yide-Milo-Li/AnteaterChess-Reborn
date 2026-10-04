@@ -2,7 +2,7 @@
 
 /*
  * Alignment assumptions for future extensions:
- * - error.h and error_code.h are the truth source for this module's public contract.
+ * - AcErrorCode in gui_internal.h defines this application-private contract.
  * - This file only maps AcErrorCode values to stable user-facing messages.
  * - Richer error context, payload, and GUI presentation remain outside this module for now.
  */

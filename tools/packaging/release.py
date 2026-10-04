@@ -1,7 +1,7 @@
 """Publish only a complete, green CI build. Upload failures leave a draft."""
 from pathlib import Path
 import argparse, hashlib, json, subprocess, tempfile
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 def gh(*args):
     return subprocess.check_output(['gh',*args,'--repo','Yide-Milo-Li/AnteaterChess-Reborn'],cwd=ROOT,text=True,encoding='utf-8').strip()
 parser=argparse.ArgumentParser()
@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='release-',dir=ROOT/'build') as temp:
         assert existing['isDraft'], 'Refusing to replace a published release'
     except subprocess.CalledProcessError:
         gh('release','create',tag,'--target',head,'--draft','--title',f'AnteaterChess Reborn {version}',
-           '--notes-file',str(ROOT/'docs/RELEASE-NOTES.md'))
+           '--notes-file',str(ROOT/'docs/development/release-notes.md'))
     gh('release','upload',tag,*[str(p) for p in archives],str(checksum),'--clobber')
     remote=json.loads(gh('release','view',tag,'--json','assets'))
     assert {a['name'] for a in remote['assets']}==expected|{'SHA256SUMS'}

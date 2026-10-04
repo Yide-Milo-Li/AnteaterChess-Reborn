@@ -1,6 +1,6 @@
 from pathlib import Path
 import shutil
-root=Path(__file__).resolve().parents[1]
+root=Path(__file__).resolve().parents[2]
 for name in ('build','dist'):
     raw=root/name
     target=raw.resolve()

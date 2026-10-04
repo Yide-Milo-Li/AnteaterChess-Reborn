@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse, hashlib, json, os, re, shutil, subprocess, tarfile, tempfile, zipfile
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ['.clang-format', '.gitignore', 'COPYRIGHT', 'README.md', 'AGENTS.md', 'VERSION',
           'Makefile', 'include', 'src', 'apps', 'assets', 'tests', 'docs', 'mk', 'tools', '.github']
 
@@ -12,7 +12,8 @@ def files():
         if path.is_file():
             yield path
         elif path.is_dir():
-            yield from sorted(p for p in path.rglob('*') if p.is_file() and '__pycache__' not in p.parts)
+            yield from sorted(p for p in path.rglob('*') if p.is_file()
+                              and not {'__pycache__', 'logs'}.intersection(p.parts))
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -133,15 +134,15 @@ def main():
                 copy(p, stage/p.relative_to(ROOT))
         else:
             copy(executable, stage/executable.name)
-            for relative in ['COPYRIGHT', 'docs/Chess_UserManual.md', 'docs/legacy/Chess_UserManual.pdf']:
+            for relative in ['COPYRIGHT', 'docs/user/manual.md', 'docs/legacy/Chess_UserManual.pdf']:
                 copy(ROOT/relative, stage/relative)
-            copy(ROOT/'tools/templates/README.md', stage/'README.md')
+            copy(ROOT/'tools/packaging/templates/README.md', stage/'README.md')
             copy(ROOT/f'tools/templates/INSTALL-{"windows" if windows else "linux"}.md', stage/'INSTALL.md')
             # Runtime manual links resolve within this archive.
-            manual = stage/'docs/Chess_UserManual.md'
+            manual = stage/'docs/user/manual.md'
             manual.write_text(manual.read_text(encoding='utf-8').replace(
-                '[Development](DEVELOPMENT.md)',
-                '[Development](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/blob/main/docs/DEVELOPMENT.md)'), encoding='utf-8')
+                '[Development](../development/guide.md)',
+                '[Development](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/blob/main/docs/development/guide.md)'), encoding='utf-8')
             if windows:
                 windows_runtime(stage, executable)
         pending = Path(temporary)/(name+suffix)

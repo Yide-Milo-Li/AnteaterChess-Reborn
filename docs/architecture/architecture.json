@@ -22,7 +22,7 @@
         "id": "platform-and-assets",
         "label": "Platform & Assets Integration",
         "focus": ["resources", "gtk-app", "platform", "session", "budget"],
-        "note": "Observe decoupled platform injection, runtime clocks, logs, and compiled vector resources."
+        "note": "Inspect src/platform/runtime and logging, with assets/pieces and icons compiled into GResource."
       }
     ]
   },
@@ -39,7 +39,7 @@
       "id": "resources",
       "type": "frontend",
       "label": "Compiled GResource",
-      "sublabel": "18 Vector SVGs + CSS",
+      "sublabel": "14 Pieces + 4 Icons",
       "pos": [240, 90],
       "size": [150, 60]
     },
@@ -47,7 +47,7 @@
       "id": "gtk-app",
       "type": "frontend",
       "label": "GTK 3 Desktop Shell",
-      "sublabel": "Window, Screens, Render",
+      "sublabel": "app / screens / ui / async",
       "pos": [240, 270],
       "size": [150, 60],
       "tag": "C11 + GTK 3"
@@ -56,7 +56,7 @@
       "id": "platform",
       "type": "security",
       "label": "Platform Runtime",
-      "sublabel": "Monotonic Clock & Log",
+      "sublabel": "runtime / logging",
       "pos": [240, 450],
       "size": [150, 60]
     },

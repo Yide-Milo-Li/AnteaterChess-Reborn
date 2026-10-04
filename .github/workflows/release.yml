@@ -21,4 +21,4 @@ jobs:
           BUILD_RUN: ${{ inputs.run_id }}
         run: |
           mkdir -p build
-          python3 tools/release.py "$BUILD_RUN"
+          python3 tools/packaging/release.py "$BUILD_RUN"

@@ -1,4 +1,4 @@
-#include "../src/ai/internal.h"
+#include "../../src/ai/internal.h"
 #include <stdio.h>
 #include <time.h>
 static int64_t clock_ms(void *unused) {

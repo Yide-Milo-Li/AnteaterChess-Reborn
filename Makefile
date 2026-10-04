@@ -24,7 +24,7 @@ $(BUILD)/obj/%.o: %.c
 $(BUILD)/obj/apps/gtk/%.o: CPPFLAGS += $(GTK_CFLAGS) -Iapps/gtk -Isrc/platform
 $(BUILD)/obj/src/platform/%.o: CPPFLAGS += $(GLIB_CFLAGS) -Isrc/platform
 $(BUILD)/obj/tests/gtk/%.o: CPPFLAGS += $(GTK_CFLAGS) -Iapps/gtk -Isrc/platform
-$(BUILD)/resources.c: assets/resources.xml $(wildcard assets/*.svg)
+$(BUILD)/resources.c: assets/resources.xml $(wildcard assets/pieces/*.svg assets/icons/*.svg)
 	@mkdir -p $(@D)
 	glib-compile-resources $< --sourcedir=assets --generate-source --target=$@
 $(BUILD)/resources.o: $(BUILD)/resources.c
@@ -48,17 +48,17 @@ $(GUI_TEST): $(BUILD)/obj/tests/gtk/test_desktop.o $(filter-out %/main.o,$(GUI_O
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $(filter %.o,$^) $(GROUP_LIBS) $(GTK_LIBS) -o $@
 check:
-	$(PYTHON) tools/check.py
-$(BUILD)/benchmark$(EXE): $(BUILD)/obj/tools/benchmark.o $(LIBS)
+	$(PYTHON) tools/dev/check.py
+$(BUILD)/benchmark$(EXE): $(BUILD)/obj/tools/dev/benchmark.o $(LIBS)
 	$(CC) $(LDFLAGS) $< $(GROUP_LIBS) -o $@
 benchmark: $(BUILD)/benchmark$(EXE)
 	$<
 package-source tar:
-	$(PYTHON) tools/package.py source
+	$(PYTHON) tools/packaging/package.py source
 package tar-user: gui
-	$(PYTHON) tools/package.py binary --build $(BUILD)
+	$(PYTHON) tools/packaging/package.py binary --build $(BUILD)
 clean:
-	$(PYTHON) tools/clean.py
+	$(PYTHON) tools/dev/clean.py
 help:
 	@echo 'make [gui|headless|test|test-rules|test-session|test-ai|test-gui|run|check|package|package-source|clean]'
 	@echo 'CONFIG=debug (default), release, or sanitize; CC, BUILD, CPPFLAGS, CFLAGS and LDFLAGS are overridable.'

@@ -32,10 +32,28 @@ static void pump(void) {
     }
 }
 
+static void test_resources(void) {
+    const int sizes[] = {32, 96, 160};
+    const char *icons[] = {"icon-alert-dark.svg", "icon-hint-dark.svg",
+                           "icon-history-dark.svg", "icon-info-dark.svg"};
+    /* Physical asset moves must preserve every existing GResource alias. */
+    for (size_t i = 0; i < G_N_ELEMENTS(sizes); ++i) {
+        for (int color = AC_WHITE; color <= AC_BLACK; ++color)
+            for (int type = AC_ANT; type <= AC_ANTEATER; ++type)
+                assert(gui_get_piece_pixbuf(ac_create_piece((AcPieceType)type, (AcColor)color), sizes[i]));
+        for (size_t k = 0; k < G_N_ELEMENTS(icons); ++k) {
+            GdkPixbuf *pixbuf = gui_get_ui_icon_pixbuf(icons[k], sizes[i]);
+            assert(pixbuf);
+            g_object_unref(pixbuf);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     test_platform();
     Gui *g = gui_create(&argc, &argv);
     assert(g);
+    test_resources();
     gui_sync(g);
     gtk_widget_show_all(g->window);
     pump();

@@ -1,7 +1,7 @@
 """Verify archives in temporary copies, including rebuild and invalidation."""
 from pathlib import Path
 import hashlib, os, shutil, subprocess, sys, tarfile, tempfile, zipfile
-root=Path(__file__).resolve().parents[1]
+root=Path(__file__).resolve().parents[2]
 dist=root/'dist'
 def run(args,cwd,env=None):
     subprocess.run(args,cwd=cwd,env=env,check=True,timeout=240)
@@ -14,17 +14,17 @@ with tempfile.TemporaryDirectory(prefix='verify-',dir=root/'build',ignore_cleanu
         elif archive.name.endswith('.tar.gz'):
             with tarfile.open(archive) as t:t.extractall(work,filter='data')
     source=next(work.glob('*-source'))
-    run([sys.executable,'tools/check.py'],source)
+    run([sys.executable,'tools/dev/check.py'],source)
     run(['make','-s','-j4','test','headless','GTK_CFLAGS=','GTK_LIBS=','GLIB_CFLAGS='],source)
-    run([sys.executable,'tools/package.py','source'],source)
+    run([sys.executable,'tools/packaging/package.py','source'],source)
     packed=next((source/'dist').glob('*.tar.gz'))
     previous=hashlib.sha256(packed.read_bytes()).digest()
     with (source/'README.md').open('a',encoding='utf-8') as f:f.write('\nTemporary packaging invalidation check.\n')
-    run([sys.executable,'tools/package.py','source'],source)
+    run([sys.executable,'tools/packaging/package.py','source'],source)
     assert hashlib.sha256(packed.read_bytes()).digest()!=previous
     for platform in ['windows-x64','linux-x64']:
         for runtime in work.glob('*-'+platform):
-            assert (runtime/'docs/Chess_UserManual.md').exists()
+            assert (runtime/'docs/user/manual.md').exists()
             assert (runtime/'docs/legacy/Chess_UserManual.pdf').exists()
             exe=runtime/('anteater-chess.exe' if platform.startswith('windows') else 'anteater-chess')
             env=os.environ.copy()

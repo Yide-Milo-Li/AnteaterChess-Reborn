@@ -2,7 +2,7 @@
 
 ## Install and launch
 
-Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install `libgtk-3-0t64 librsvg2-common` with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported release target. Building from source is described in [Development](DEVELOPMENT.md).
+Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install `libgtk-3-0t64 librsvg2-common` with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported release target. Building from source is described in [Development](../development/guide.md).
 
 Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their `lib`, `share`, and configuration directories with the executable.
 
@@ -69,4 +69,4 @@ Logs are per-session text files under `AnteaterChess-Reborn/logs` in the user's 
 - Hint unavailable: wait for the AI/previous hint, return to a human turn, and ensure the game is active.
 - Unwritable log: check the user data directory's permissions; no administrator access is required.
 
-There is no networking or saved-game import/export. The [historical manual](legacy/Chess_UserManual.pdf) is the original course submission; its standard-chess wording, paths, and old architecture are not authoritative for Reborn.
+There is no networking or saved-game import/export. The [historical manual](../legacy/Chess_UserManual.pdf) is the original course submission; its standard-chess wording, paths, and old architecture are not authoritative for Reborn.

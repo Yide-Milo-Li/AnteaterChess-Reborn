@@ -21,18 +21,13 @@ a.out
 # =========================
 # Binary output
 # =========================
-bin/**
-!bin/
-!bin/.gitkeep
-!bin/logs/
-!bin/logs/.gitkeep
-!bin/tests/
-!bin/tests/.gitkeep
+bin/
 
 # =========================
 # Logs
 # =========================
 *.log
+logs/
 
 # =========================
 # Test outputs

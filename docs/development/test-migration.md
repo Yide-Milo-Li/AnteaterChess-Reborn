@@ -1,6 +1,6 @@
 # Original test migration inventory
 
-All 19 baseline test programs and their named scenarios are retained in [the machine-readable inventory](../tests/fixtures/legacy-scenarios.json). The table records scenario disposition; removed controller/queue/FSM mechanics are deliberately not compatibility requirements. New aggregate tests cover related behavior together.
+All 19 baseline test programs and their named scenarios are retained in [the machine-readable inventory](../../tests/fixtures/legacy-scenarios.json). The table records scenario disposition; removed controller/queue/FSM mechanics are deliberately not compatibility requirements. New aggregate tests cover related behavior together.
 
 ## test_ai.c
 

@@ -1,8 +1,10 @@
 RULE_SRCS := $(wildcard src/rules/*.c)
 SESSION_SRCS := $(wildcard src/session/*.c)
 AI_SRCS := $(wildcard src/ai/*.c)
-GUI_SRCS := $(wildcard apps/gtk/*.c)
-PLATFORM_SRCS := $(wildcard src/platform/*.c)
+GUI_DIRS := apps/gtk apps/gtk/app apps/gtk/screens apps/gtk/ui apps/gtk/async
+PLATFORM_DIRS := src/platform/runtime src/platform/logging
+GUI_SRCS := $(foreach directory,$(GUI_DIRS),$(wildcard $(directory)/*.c))
+PLATFORM_SRCS := $(foreach directory,$(PLATFORM_DIRS),$(wildcard $(directory)/*.c))
 RULE_OBJS := $(RULE_SRCS:%.c=$(BUILD)/obj/%.o)
 SESSION_OBJS := $(SESSION_SRCS:%.c=$(BUILD)/obj/%.o)
 AI_OBJS := $(AI_SRCS:%.c=$(BUILD)/obj/%.o)

@@ -1,9 +1,13 @@
 """Check local Markdown links, embedded resources and maintained layout."""
 from pathlib import Path
 import re, sys, xml.etree.ElementTree as ET
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 errors=[]
-for directory in ['include/anteater','src/rules','src/session','src/ai','apps/gtk','docs/legacy']:
+for directory in ['include/anteater', 'src/rules', 'src/session', 'src/ai',
+                  'src/platform/runtime', 'src/platform/logging', 'apps/gtk/app',
+                  'apps/gtk/screens', 'apps/gtk/ui', 'apps/gtk/async', 'assets/pieces',
+                  'assets/icons', 'docs/user', 'docs/architecture', 'docs/development',
+                  'docs/legacy', 'tools/packaging', 'tools/dev', 'tools/legacy']:
     if not (root/directory).is_dir(): errors.append('Missing '+directory)
 for path in [*root.glob('*.md'), * (root/'docs').rglob('*.md')]:
     text=path.read_text(encoding='utf-8')

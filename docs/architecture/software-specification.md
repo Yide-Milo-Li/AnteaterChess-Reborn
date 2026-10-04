@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Public interfaces: [types](../include/anteater/types.h), [rules](../include/anteater/rules.h), [session](../include/anteater/session.h), [AI](../include/anteater/ai.h). All public library symbols use `ac_`, `Ac`, or `AC_`. GTK internals are private to the application.
+Public interfaces: [types](../../include/anteater/types.h), [rules](../../include/anteater/rules.h), [session](../../include/anteater/session.h), [AI](../../include/anteater/ai.h). All public library symbols use `ac_`, `Ac`, or `AC_`. GTK internals are private to the application.
 
 ```mermaid
 flowchart TD
@@ -50,25 +50,25 @@ Start validates configuration and resets history, position, clocks, diagnostics,
 
 Move processing: parse coordinates → resolve canonical special move/path → apply to a temporary position → determine terminal state → append history and undo → publish a new revision → write the diagnostic log. A move's status reports whether the command applied. Log failure is separately available as snapshot `diagnostic`, so callers never retry an already accepted move merely because logging failed.
 
-Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.c](../src/ai/budget.c).
+Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.c](../../src/ai/budget.c).
 
 ## Rule engine
 
-[movegen.c](../src/rules/movegen.c) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.c](../src/rules/resolver.c) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.c](../src/rules/position.c) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.c](../src/rules/endgame.c) determines check, no-legal-move outcomes, and the retained material policy. The [manual](Chess_UserManual.md) is the rules reference.
+[movegen.c](../../src/rules/movegen.c) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.c](../../src/rules/resolver.c) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.c](../../src/rules/position.c) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.c](../../src/rules/endgame.c) determines check, no-legal-move outcomes, and the retained material policy. The [manual](../user/manual.md) is the rules reference.
 
 Hashes include pieces, side, castling rights, and a capturable en-passant file. Numeric keys intentionally differ from the old engine. They support repetition and transposition identity; they are not a persistent storage format or cryptographic guarantee.
 
 ## Search
 
-[search.c](../src/ai/search.c) retains iterative deepening, aspiration windows, principal-variation alpha-beta, null-move pruning, late-move reductions, and quiescence. [evaluation.c](../src/ai/evaluation.c) owns piece-square/material evaluation; [ordering.c](../src/ai/ordering.c) owns captures, killer/history ordering and static exchange analysis; [table.c](../src/ai/table.c) owns context-local transpositions. Hard and Experimental select the same implementation.
+[search.c](../../src/ai/search.c) retains iterative deepening, aspiration windows, principal-variation alpha-beta, null-move pruning, late-move reductions, and quiescence. [evaluation.c](../../src/ai/evaluation.c) owns piece-square/material evaluation; [ordering.c](../../src/ai/ordering.c) owns captures, killer/history ordering and static exchange analysis; [table.c](../../src/ai/table.c) owns context-local transpositions. Hard and Experimental select the same implementation.
 
 Results contain the selected legal move, status, completed depth, node count and elapsed milliseconds. Budget exhaustion returns the best available legal move; cooperative cancellation returns `AC_CANCELLED`. Candidate overflow aborts with `AC_CAPACITY`. No legal root move returns `AC_UNAVAILABLE`. Cancellation is checked at search boundaries; elapsed time is checked periodically, so budgets are not hard real-time deadlines.
 
 ## Desktop tasks and resources
 
-[gui_async.c](../apps/gtk/gui_async.c) allocates a job containing copied position and hash history, cancellation object, options, result, session revision and GUI generation. GTask runs the search on a worker. Return-on-cancel is disabled: cancellation requests stop, and job memory remains alive until the worker exits and its main-context completion callback runs. The callback accepts a result only when page, generation, revision, and cancellation state still match. Closing cancels and drains outstanding tasks before releasing the session and log object.
+[gui_async.c](../../apps/gtk/async/gui_async.c) allocates a job containing copied position and hash history, cancellation object, options, result, session revision and GUI generation. GTask runs the search on a worker. Return-on-cancel is disabled: cancellation requests stop, and job memory remains alive until the worker exits and its main-context completion callback runs. The callback accepts a result only when page, generation, revision, and cancellation state still match. Closing cancels and drains outstanding tasks before releasing the session and log object.
 
-GTK owns pages, selection, highlighting, and widgets. No worker accesses widgets. [resources.xml](../assets/resources.xml) embeds SVGs under `/org/anteater/reborn/`; resource lookup is independent of the startup directory. Platform logs use a user-writable directory and per-object file handles/paths.
+GTK owns pages, selection, highlighting, and widgets. No worker accesses widgets. [resources.xml](../../assets/resources.xml) embeds SVGs under `/org/anteater/reborn/`; resource lookup is independent of the startup directory. Platform logs use a user-writable directory and per-object file handles/paths.
 
 Upstream API contracts: [GTask thread completion](https://docs.gtk.org/gio/method.Task.run_in_thread.html), [GResource](https://docs.gtk.org/gio/struct.Resource.html), [GTK Windows distribution](https://www.gtk.org/docs/installations/windows/).
 
@@ -76,4 +76,4 @@ Upstream API contracts: [GTask thread completion](https://docs.gtk.org/gio/metho
 
 Commands use `AcStatus`: success, invalid argument, illegal move, allocation failure, capacity, cancellation, stale result, unavailable operation, and external I/O failure. Boolean predicates and selection enums explicitly have their own return conventions. Borrowed pointers are never freed by callers. Core APIs do not terminate the process. GLib's ordinary allocation behavior still applies inside the desktop/platform adapters.
 
-See [test migration](TEST-MIGRATION.md) and [validation](VALIDATION.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require byte-identical restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. GTK tests exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.
+See [test migration](../development/test-migration.md) and [validation](../development/validation.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require byte-identical restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. GTK tests exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.

@@ -1,6 +1,11 @@
 #ifndef AC_AI_INTERNAL_H
 #define AC_AI_INTERNAL_H
 #include "anteater/ai.h"
+#include "score_constants.h"
+#include "evaluation.h"
+#include "piece_tables.h"
+#include "move_facts.h"
+#include "see.h"
 #include "../rules/internal.h"
 #include <stdlib.h>
 #include <string.h>
@@ -9,11 +14,8 @@
 typedef struct {
     uint64_t value;
 } AcHashState;
-#define AI_INF 100000000       // Infinity
-#define AI_MATE 1000000        // Mate score
 #define AI_Q_DEPTH 8           // Quiescence search depth
 #define AI_MAX_PLY 48          // Maximum number of ply
-#define AI_MAX_PHASE 28        // 28 for initial, 0 for final stage
 #define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
@@ -73,53 +75,6 @@ static inline int derive_hash(const AcPosition *s, AcHashState *h) {
     h->value = s->hash;
     return 0;
 }
-int ac_ai_piece_value(AcPieceType type);
-int ac_ai_phase_value(AcPieceType type);
-int ac_ai_mobility_weight(AcPieceType type);
-int ac_ai_board_row_for_pst(AcColor color, int row);
-int ac_ai_king_pst_bonus(AcPiece piece, int row, int col, int phase);
-int ac_ai_pst_bonus(AcPiece piece, int row, int col, int phase);
-int ac_ai_is_promotion_move(const AcMove *move);
-int ac_ai_is_noisy_move(const AcMove *move);
-int ac_ai_is_quiet_move(const AcMove *move);
-int ac_ai_square_index(AcSquare pos);
-int ac_ai_absolute_value(int value);
-int ac_ai_is_irreversible_move(const AcMove *move);
-int ac_ai_is_path_clear_for_attack(const AcBoard *board, AcSquare from, AcSquare target);
-int ac_ai_ant_attacks_square(AcSquare from, AcPiece piece, AcSquare target);
-int ac_ai_rook_attacks_square(const AcBoard *board, AcSquare from, AcSquare target);
-int ac_ai_bishop_attacks_square(const AcBoard *board, AcSquare from, AcSquare target);
-int ac_ai_knight_attacks_square(AcSquare from, AcSquare target);
-int ac_ai_king_attacks_square(AcSquare from, AcSquare target);
-int ac_ai_anteater_attacks_piece_for_see(const AcBoard *board, AcSquare from, AcPiece piece, AcSquare target,
-                                         AcPiece targetPiece);
-int ac_ai_piece_attacks_square_for_see(const AcBoard *board, AcSquare from, AcPiece piece, AcSquare target,
-                                       AcPiece targetPiece);
-int ac_ai_square_is_attacked_for_king(const AcBoard *board, AcSquare target, AcColor attackingColor);
-AcPiece ac_ai_piece_after_see_capture(AcPiece piece, AcSquare target);
-void ac_ai_apply_move_to_board_for_see(AcBoard *board, AcMove move);
-int ac_ai_king_capture_is_legal_for_see(const AcBoard *board, AcSquare from, AcPiece piece, AcSquare target);
-int ac_ai_find_least_valuable_attacker(const AcBoard *board, AcSquare target, AcColor side, AcSquare *fromOut,
-                                       AcPiece *pieceOut, int *valueOut);
-int ac_ai_see_initial_gain(const AcMove *move);
-int ac_ai_see_move_score(const AcPosition *state, const AcMove *move);
-int ac_ai_count_sliding_mobility(const AcBoard *board, AcSquare from, AcPiece piece, int rowStep, int colStep);
-int ac_ai_count_ant_mobility(const AcBoard *board, AcSquare from, AcPiece piece);
-int ac_ai_count_knight_mobility(const AcBoard *board, AcSquare from, AcPiece piece);
-int ac_ai_count_anteater_mobility(const AcBoard *board, AcSquare from, AcPiece piece);
-int ac_ai_count_king_mobility(const AcBoard *board, AcSquare from, AcPiece piece);
-int ac_ai_piece_mobility(const AcBoard *board, AcSquare from, AcPiece piece);
-int ac_ai_ant_supports_square(const AcBoard *board, AcColor color, AcSquare target);
-int ac_ai_enemy_ant_can_attack_square(const AcBoard *board, AcColor color, AcSquare target);
-int ac_ai_evaluate_pawns(const AcPosition *state, AcColor color, const int antFiles[2][AC_COLS], int phase);
-int ac_ai_evaluate_rook_and_queen_files(const AcPosition *state, AcColor color, const int antFiles[2][AC_COLS],
-                                        int phase);
-int ac_ai_evaluate_king_safety(const AcPosition *state, AcColor color, AcSquare kingPos, int phase);
-int ac_ai_evaluate_development(const AcPosition *state, AcColor color, int phase);
-int ac_ai_evaluate_anteater_threats(const AcBoard *board, AcColor color);
-int ac_ai_evaluate_outposts(const AcBoard *board, AcColor color, int phase);
-int ac_ai_evaluate_absolute(const AcPosition *state);
-int ac_ai_evaluate_relative(const AcPosition *state);
 int ac_ai_clamp_int(int value, int minValue, int maxValue);
 int ac_ai_color_time_index(AcColor color);
 int ac_ai_elapsed_ms(const AcSearchContext *ctx);

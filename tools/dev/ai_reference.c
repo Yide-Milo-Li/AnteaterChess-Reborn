@@ -1,7 +1,11 @@
 /* Captures independent deterministic behavior before evaluation extraction. */
-#include "internal.h"
+#include "anteater/ai.h"
+#include "evaluation.h"
+#include "see.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static uint64_t fold(uint64_t hash, int value) {
     return (hash ^ (uint32_t)value) * UINT64_C(1099511628211);

@@ -65,3 +65,11 @@ is present through Qt's HarfBuzz/font dependency chain, while GTK/Cairo/GdkPixbu
 files and loaded modules are rejected. Linux records system package/ldd details.
 The old application/platform sources, GResource manifest and Make graph are removed;
 the fixed Git baseline remains the rollback reference.
+
+The source archive also rebuilt successfully from a Unicode path on both hosts.
+On Windows, the current MSYS2 Qt `moc` executable cannot create its autogen output
+under a non-ASCII build path even though the compiler and runtime support that path.
+The verifier therefore keeps the archive and core-only build under the Unicode
+path, while placing the desktop CMake build tree in a sibling path containing
+spaces but only ASCII characters. This preserves the Unicode extraction/runtime
+check and records the toolchain limitation instead of silently calling it clean.

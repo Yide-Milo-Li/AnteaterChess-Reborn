@@ -53,15 +53,23 @@ def main():
 
         source = next(work.glob('*-source'))
         runtime = next(work.glob('*-' + PLATFORM))
+        # Qt's Windows moc in the MSYS2 toolchain still creates autogen files
+        # through the active ANSI code page. Keep the source archive and runtime
+        # under the Unicode path, but place the desktop build tree beside it at
+        # an ASCII path. Core-only compilation remains at the Unicode path.
+        desktop_build = Path(temporary) / 'desktop-build'
         run([sys.executable, 'tools/dev/check.py'], source)
         run(['make', '-s', '-j4', 'CONFIG=release', 'test', 'headless'], source)
-        run(['make', '-s', '-j4', 'CONFIG=release', 'gui', 'test-platform'], source)
+        run(['make', '-s', '-j4', 'CONFIG=release', f'BUILD={desktop_build}',
+             'gui', 'test-platform'], source)
         if os.name == 'nt':
-            assert subsystem(source / 'build/windows-x64/release/bin/anteater-chess.exe') == 2
-            for test in (source / 'build/windows-x64/release/tests').rglob('*.exe'):
+            assert subsystem(desktop_build / 'bin/anteater-chess.exe') == 2
+            for test in (desktop_build / 'tests').rglob('*.exe'):
                 assert subsystem(test) == 3
-            run(['make', '-s', '-j4', 'CONFIG=release', 'WINDOWS_CONSOLE=1', 'gui'], source)
-            assert subsystem(source / 'build/windows-x64/release-console/bin/anteater-chess.exe') == 3
+            console_build = Path(temporary) / 'desktop-console-build'
+            run(['make', '-s', '-j4', 'CONFIG=release', f'BUILD={console_build}',
+                 'WINDOWS_CONSOLE=1', 'gui'], source)
+            assert subsystem(console_build / 'bin/anteater-chess.exe') == 3
 
         run([sys.executable, 'tools/packaging/package.py', 'source'], source)
         packed = next((source / 'dist').glob('*.tar.gz'))

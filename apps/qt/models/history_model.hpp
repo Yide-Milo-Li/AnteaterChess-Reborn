@@ -1,11 +1,14 @@
 #pragma once
 #include "anteater/session.hpp"
 #include <QAbstractListModel>
+#include <QtQml/qqmlregistration.h>
 #include <vector>
 
 namespace ac {
 class HistoryModel : public QAbstractListModel {
     Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Owned by ApplicationController")
   public:
     explicit HistoryModel(QObject *parent = nullptr) : QAbstractListModel(parent) {
     }

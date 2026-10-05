@@ -82,6 +82,7 @@ does not replace current repository documentation before the environment gate.
 
 ## Current status
 
-Baseline confirmed clean. Environment gate blocked: v143 installation needs
-elevation; the UAC retry failed with cancellation. No migration commit started.
-See `REPORT.md` and the adjacent logs for actual evidence.
+The environment gate and build, rules, Session, policy, search and desktop stages
+passed locally. Distribution, cleanup and final candidate verification are next.
+See [the validation ledger](validation.md) for current evidence. Earlier blocked
+installer reports remain historical attachments, not the current status.

@@ -6,7 +6,7 @@ Public interfaces: [types](../../include/anteater/types.hpp), [rules](../../incl
 
 ```mermaid
 flowchart TD
-    QML[QML pages and input] --> Adapter[Session adapter commands]
+    QML[Typed QML pages and input] --> Adapter[ApplicationController commands]
     Adapter --> Session[ac::Session]
     Adapter --> Models[Copied board and history models]
     Models --> QML
@@ -85,10 +85,12 @@ storage is released. Results require matching page, gameId, generation and revis
 and an open, uncancelled desktop. Close disables commands, cancels work, then
 waits for cooperative exit before freeing Session/log/model storage.
 
-[session_adapter.cpp](../../apps/qt/app/session_adapter.cpp) is the only live
+[application_controller.cpp](../../apps/qt/app/application_controller.cpp) is the only live
 Session owner. It executes commands, ticks every 100 ms using injected monotonic
 time, queries Rules for selections and legality, and publishes copied projections.
-Board/history models own their values; temporary input spans never reach
+Settings drafts, input, board, history, clocks and status have separate registered
+models and change notifications. Ordinary ticks update only clocks. Board/history
+models own their values; temporary input spans never reach
 QML or workers. Getters do not mutate game state or navigation. QML pages own
 controls and layouts; a clock tick or ordinary move does not recreate the page.
 

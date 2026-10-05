@@ -30,7 +30,7 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Session ownership | Passed locally | Owning snapshots, resource lifetime, moves and progressive allocation failures; four 24/24 runs |
 | Transaction and budget policy isolation | Passed locally | Independent policy module; Tournament and timeout failure matrix; four 25/25 runs |
 | Search ownership | Passed locally | RAII contexts/requests, stop tokens, progressive failures and frozen output; four 26/26 runs |
-| Desktop | Pending | Narrow models, lifecycle and interaction checks |
+| Desktop | Passed locally | Four 26/26 runs; native Windows/Xvfb software rendering at 100/150/200% |
 | Distribution and cleanup | Pending | CPack, dependency and license manifests |
 | Remote CI | Not run | Must be bound to the final tested commit |
 | Clean Windows and manual acceptance | Pending | No new VM is provisioned |
@@ -134,3 +134,23 @@ and queued-completion lifecycle tests pass. QThread tasks use stop_source/stop_t
 Windows/Linux Debug and Release passed 26/26, Linux ASan/UBSan 23/23, with all
 immutable score/SEE/legal/chosen/depth/node references unchanged on both compilers.
 Desktop model/type registration and distribution remain pending.
+
+## Desktop verification
+
+ApplicationController owns Session and publishes separate registered settings,
+input, board, history, clock and status models. QML uses required typed properties
+and named enums. The CMake QML module generates registration, resources and its
+import plugin; the retired hand-written QML manifest is archived in attachments.
+Ordinary 100 ms ticks emit only changed clock values, allocate no Session data,
+and preserve input focus and history position. A deferred follow-end callback now
+checks the reader's current scroll policy before repositioning the history.
+
+Windows/Linux Debug and Release passed 26/26. Six additional desktop runs passed
+at scale factors 1, 1.5 and 2, with software rendering, the native Windows backend
+and Linux Xvfb/xcb. Screenshots include menus, setup, gameplay, promotion,
+confirmation, fullscreen and endgame. Native screenshots were visually inspected.
+Windows offscreen screenshots had missing font glyphs and are retained as failed
+visual evidence, not accepted screenshots. Tests cover maximized and ordinary
+F11/Escape restoration, input, promotion, focus, scrolling and task lifecycles.
+All 27 protected files remain unchanged. These automated local checks do not
+replace independent clean Windows or human desktop acceptance.

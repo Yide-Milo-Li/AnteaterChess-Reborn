@@ -1,8 +1,10 @@
+import AnteaterChess.Reborn 1.0
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 ColumnLayout {
     id: root
+    required property ApplicationController controller
     property bool fullscreen: false
     signal fullscreenRequested()
     signal leaveRequested()
@@ -15,9 +17,9 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 Label { text: "AnteaterChess Reborn"; font.pixelSize: 22; font.bold: true; color: Theme.text }
-                Label { text: backend.modeText; color: Theme.muted }
+                Label { text: controller.game.modeText; color: Theme.muted }
             }
-            Label { text: backend.turnText; color: Theme.gold; font.pixelSize: 16; font.bold: true }
+            Label { text: controller.game.turnText; color: Theme.gold; font.pixelSize: 16; font.bold: true }
             ActionButton { text: "New Game"; onClicked: root.newGameRequested() }
             ActionButton { text: root.fullscreen ? "Windowed" : "Fullscreen"; onClicked: root.fullscreenRequested() }
         }
@@ -30,14 +32,14 @@ ColumnLayout {
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Label { text: backend.blackTimer; color: Theme.text; font.family: "monospace"; Layout.fillWidth: true }
-                    Label { text: backend.whiteTimer; color: Theme.text; font.family: "monospace" }
+                    Label { text: controller.clocks.black; color: Theme.text; font.family: "monospace"; Layout.fillWidth: true }
+                    Label { text: controller.clocks.white; color: Theme.text; font.family: "monospace" }
                 }
                 Board {
                     objectName: "board"
                     Layout.fillWidth: true; Layout.fillHeight: true
-                    boardModel: backend.boardModel
-                    onSquareClicked: function(row,column,button) { backend.selectSquare(row,column,button) }
+                    boardModel: controller.boardModel
+                    onSquareClicked: function(row,column,button) { controller.selectSquare(row,column,button) }
                 }
                 Label { text: "Left click selects · Right click moves · Files A–J, ranks 1–8"; color: Theme.muted; Layout.alignment: Qt.AlignHCenter }
             }
@@ -55,25 +57,25 @@ ColumnLayout {
                     RowLayout {
                         MoveField {
                             id: from; objectName: "fromEntry"; placeholderText: "From · E2"
-                            Layout.fillWidth: true; enabled: backend.humanTurn
+                            Layout.fillWidth: true; enabled: controller.game.humanTurn
                             Layout.minimumWidth: 0
-                            text: backend.fromText; validInput: backend.fromValid
-                            onTextEdited: backend.setMoveFields(text,to.text)
-                            onAccepted: backend.submitFields()
+                            text: controller.input.fromText; validInput: controller.input.fromValid
+                            onTextEdited: controller.setMoveFields(text,to.text)
+                            onAccepted: controller.submitFields()
                         }
                         MoveField {
                             id: to; objectName: "toEntry"; placeholderText: "To · E4"
-                            Layout.fillWidth: true; enabled: backend.humanTurn
+                            Layout.fillWidth: true; enabled: controller.game.humanTurn
                             Layout.minimumWidth: 0
-                            text: backend.toText; validInput: backend.toValid
-                            onTextEdited: backend.setMoveFields(from.text,text)
-                            onAccepted: backend.submitFields()
+                            text: controller.input.toText; validInput: controller.input.toValid
+                            onTextEdited: controller.setMoveFields(from.text,text)
+                            onAccepted: controller.submitFields()
                         }
                     }
-                    ActionButton { objectName: "submitMove"; text: backend.humanTurn ? "Submit Move" : "AI thinking…"; primary: true; enabled: backend.humanTurn; Layout.fillWidth: true; onClicked: backend.submitFields() }
+                    ActionButton { objectName: "submitMove"; text: controller.game.humanTurn ? "Submit Move" : "AI thinking…"; primary: true; enabled: controller.game.humanTurn; Layout.fillWidth: true; onClicked: controller.submitFields() }
                     RowLayout {
-                        ActionButton { text: "Undo"; enabled: backend.canUndo; Layout.fillWidth: true; onClicked: backend.undo() }
-                        ActionButton { text: "Hint"; enabled: backend.canHint; Layout.fillWidth: true; onClicked: backend.hint() }
+                        ActionButton { text: "Undo"; enabled: controller.game.canUndo; Layout.fillWidth: true; onClicked: controller.undo() }
+                        ActionButton { text: "Hint"; enabled: controller.game.canHint; Layout.fillWidth: true; onClicked: controller.hint() }
                     }
                 }
             }
@@ -83,13 +85,13 @@ ColumnLayout {
                     RowLayout {
                         Image { source: "qrc:/org/anteater/reborn/icon-history-dark.svg"; sourceSize.width: 20; sourceSize.height: 20 }
                         Label { text: "Move History"; color: Theme.text; font.bold: true; Layout.fillWidth: true }
-                        Label { text: backend.clockText; color: Theme.gold; font.family: "monospace" }
+                        Label { text: controller.clocks.elapsed; color: Theme.gold; font.family: "monospace" }
                     }
-                    Label { text: backend.aiSummary; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Label { text: controller.game.aiSummary; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     ListView {
                         id: history; objectName: "historyView"
                         Layout.fillWidth: true; Layout.fillHeight: true
-                        clip: true; model: backend.historyModel
+                        clip: true; model: controller.historyModel
                         ScrollBar.vertical: ScrollBar {}
                         delegate: Label {
                             required property string moveText
@@ -100,7 +102,10 @@ ColumnLayout {
                         // Follow new moves only if the reader was already at the end.
                         property bool followEnd: true
                         onMovementEnded: followEnd = atYEnd
-                        onCountChanged: if (followEnd) Qt.callLater(positionViewAtEnd)
+                        onCountChanged: if (followEnd) Qt.callLater(function() {
+                            // A user can scroll before this deferred layout callback runs.
+                            if (history.followEnd) history.positionViewAtEnd()
+                        })
                     }
                 }
             }
@@ -108,8 +113,8 @@ ColumnLayout {
                 Layout.fillWidth: true
                 contentItem: ColumnLayout {
                     RowLayout {
-                        Image { source: backend.statusError ? "qrc:/org/anteater/reborn/icon-alert-dark.svg" : "qrc:/org/anteater/reborn/icon-info-dark.svg"; sourceSize.width: 20; sourceSize.height: 20 }
-                        Label { text: backend.status; color: backend.statusError ? "#fee2e2" : backend.busy ? "#dcfce7" : Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                        Image { source: controller.game.error ? "qrc:/org/anteater/reborn/icon-alert-dark.svg" : "qrc:/org/anteater/reborn/icon-info-dark.svg"; sourceSize.width: 20; sourceSize.height: 20 }
+                        Label { text: controller.game.message; color: controller.game.error ? "#fee2e2" : controller.busy ? "#dcfce7" : Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     }
                     ActionButton { text: "End Game"; destructive: true; Layout.fillWidth: true; onClicked: root.leaveRequested() }
                 }

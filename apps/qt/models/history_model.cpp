@@ -1,4 +1,4 @@
-#include "history_model.h"
+#include "history_model.hpp"
 
 using namespace ac;
 namespace ac {
@@ -26,7 +26,8 @@ void HistoryModel::update(const SessionSnapshot &s) {
     // Append incrementally; ticking clocks must not reset delegates or scroll.
     if (gameId_ != s.gameId || s.historyCount < rowCount()) {
         std::vector<Move> prepared;
-        if (!s.history.empty()) prepared.assign(s.history.begin(), s.history.end());
+        if (!s.history.empty())
+            prepared.assign(s.history.begin(), s.history.end());
         beginResetModel();
         moves_.swap(prepared);
         gameId_ = s.gameId;

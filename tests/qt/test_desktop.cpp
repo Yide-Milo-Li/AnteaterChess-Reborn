@@ -1,4 +1,5 @@
-#include "app/session_adapter.h"
+#include "app/application_controller.hpp"
+#include "../core/failing_resource.hpp"
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -27,6 +28,94 @@ class DesktopTest : public QObject {
         return c;
     }
   private slots:
+    void ordinaryTicksNotifyOnlyClocks() {
+        Clock clock;
+        FailingResource resource;
+        auto injected = options(clock);
+        injected.resource = &resource;
+        ApplicationController controller(&injected);
+        auto c = config();
+        c.timerEnabled = true;
+        c.initialTimeSeconds = 10;
+        QCOMPARE(controller.start(c), Status::Ok);
+        controller.setMoveFields("E2", "E4");
+        QSignalSpy board(controller.boardModel(), &QAbstractItemModel::dataChanged);
+        QSignalSpy history(controller.historyModel(), &QAbstractItemModel::modelReset);
+        QSignalSpy rows(controller.historyModel(), &QAbstractItemModel::rowsInserted);
+        QSignalSpy fields(controller.input(), &InputModel::fieldsChanged);
+        QSignalSpy validity(controller.input(), &InputModel::validityChanged);
+        QSignalSpy availability(controller.game(), &StatusModel::availabilityChanged);
+        QSignalSpy messages(controller.game(), &StatusModel::messageChanged);
+        QSignalSpy turn(controller.game(), &StatusModel::turnChanged);
+        QSignalSpy page(&controller, &ApplicationController::pageChanged);
+        QSignalSpy elapsed(controller.clocks(), &ClockModel::elapsedChanged);
+        const auto attempts = resource.attempts;
+        const auto revision = controller.state().revision;
+        for (int tick = 0; tick < 20; ++tick) {
+            clock.ms += 100;
+            controller.tick();
+        }
+        QCOMPARE(elapsed.count(), 2);
+        QCOMPARE(board.count() + history.count() + rows.count() + fields.count() + validity.count() +
+                     availability.count() + messages.count() + turn.count() + page.count(),
+                 0);
+        QCOMPARE(resource.attempts, attempts);
+        QCOMPARE(controller.state().revision, revision);
+        QCOMPARE(controller.fromText(), QString("E2"));
+    }
+    void settingsDraftValidation() {
+        ApplicationController controller;
+        controller.chooseMode(GameEnums::HumanVsComputer);
+        controller.settings()->setPlayerColor(GameEnums::Black);
+        controller.settings()->setWhiteDifficulty(GameEnums::Tournament);
+        const auto before = controller.state();
+        QCOMPARE(before.phase, SessionPhase::Idle);
+        controller.settings()->setWhiteDifficulty(static_cast<GameEnums::Level>(4));
+        QVERIFY(!controller.startDraft());
+        QCOMPARE(controller.state().revision, before.revision);
+        controller.settings()->setWhiteDifficulty(GameEnums::Easy);
+        QVERIFY(controller.startDraft());
+        QCOMPARE(controller.state().config.playerColor, Color::Black);
+        QCOMPARE(controller.state().config.aiDifficultyWhite, Difficulty::Easy);
+        QCOMPARE(controller.state().config.aiDifficultyBlack, Difficulty::None);
+        controller.requestClose();
+    }
+    void historyScrollSurvivesTicks() {
+        Clock clock;
+        auto injected = options(clock);
+        ApplicationController controller(&injected);
+        QQmlApplicationEngine engine;
+        engine.addImportPath("qrc:/qt/qml");
+        engine.setInitialProperties({
+            {"controller", QVariant::fromValue(&controller)}
+        });
+        engine.load(QUrl("qrc:/qt/qml/AnteaterChess/Reborn/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        QCOMPARE(controller.start(config()), Status::Ok);
+        const char *from[] = {"B1", "B8", "C3", "C6"};
+        const char *to[] = {"C3", "C6", "B1", "B8"};
+        for (int ply = 0; ply < 32; ++ply) {
+            controller.setMoveFields(from[ply % 4], to[ply % 4]);
+            QVERIFY(controller.submitFields());
+        }
+        auto *history = window->findChild<QQuickItem *>("historyView");
+        QVERIFY(history);
+        QTRY_VERIFY(history->property("contentHeight").toReal() > history->height() + 100);
+        history->setProperty("followEnd", false);
+        history->setProperty("contentY", 80.0);
+        QTRY_COMPARE(history->property("contentY").toReal(), qreal(80.0));
+        const auto scrolled = history->property("contentY");
+        for (int tick = 0; tick < 20; ++tick) {
+            clock.ms += 100;
+            controller.tick();
+        }
+        QTest::qWait(150);
+        QCOMPARE(history->property("contentY"), scrolled);
+        QCOMPARE(controller.historyCount(), 32);
+        window->close();
+    }
     void initTestCase() {
         QQuickStyle::setStyle("Basic");
     }
@@ -46,10 +135,13 @@ class DesktopTest : public QObject {
         QFETCH(int, exitKey);
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QQmlApplicationEngine engine;
-        engine.rootContext()->setContextProperty("backend", &a);
-        engine.load(QUrl("qrc:/qml/Main.qml"));
+        engine.addImportPath("qrc:/qt/qml");
+        engine.setInitialProperties({
+            {"controller", QVariant::fromValue(&a)}
+        });
+        engine.load(QUrl("qrc:/qt/qml/AnteaterChess/Reborn/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
@@ -77,7 +169,7 @@ class DesktopTest : public QObject {
     void commandsAndOwnedModels() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QVERIFY(a.valid());
         QCOMPARE(a.start(config()), Status::Ok);
         a.setMoveFields(" e2 ", "e4");
@@ -90,9 +182,9 @@ class DesktopTest : public QObject {
         a.undo();
         QCOMPARE(a.historyCount(), 0);
         QCOMPARE(history->rowCount(), 0);
-        a.selectSquare(6, 4, 1);
+        a.selectSquare(6, 4, Qt::LeftButton);
         QCOMPARE(a.fromText(), QString("E2"));
-        a.selectSquare(4, 4, 2);
+        a.selectSquare(4, 4, Qt::RightButton);
         QCOMPARE(a.historyCount(), 1);
         auto before = a.state();
         a.setMoveFields("A9", "E9");
@@ -102,7 +194,7 @@ class DesktopTest : public QObject {
     void promotionCancellation() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QCOMPARE(a.start(config()), Status::Ok);
         const char *moves[][2] = {
             {"E2", "E4"},
@@ -118,7 +210,7 @@ class DesktopTest : public QObject {
             a.setMoveFields(move[0], move[1]);
             QVERIFY(a.submitFields());
         }
-        QSignalSpy requested(&a, &ac::SessionAdapter::promotionRequested);
+        QSignalSpy requested(&a, &ac::ApplicationController::promotionRequested);
         a.setMoveFields("C7", "B8");
         QVERIFY(!a.submitFields());
         QCOMPARE(requested.count(), 1);
@@ -126,14 +218,14 @@ class DesktopTest : public QObject {
         a.cancelPromotion();
         QCOMPARE(a.state().position.hash, hash);
         QVERIFY(!a.submitFields());
-        QVERIFY(a.submitFields(value(PromotionChoice::Knight)));
+        QVERIFY(a.submitFields(GameEnums::PromoteKnight));
         auto promoted = a.state();
         QCOMPARE(get_piece(&promoted.position.board, {0, 1}).type, PieceType::Knight);
     }
     void hintInvalidatedByMoveAndUndo() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QCOMPARE(a.start(config()), Status::Ok);
         QVERIFY(a.hint());
         QVERIFY(a.busy());
@@ -150,7 +242,7 @@ class DesktopTest : public QObject {
     void timeoutRejectsQueuedResult() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         auto c = config(GameMode::HumanVsComputer);
         c.playerColor = Color::Black;
         c.aiDifficultyWhite = Difficulty::Easy;
@@ -169,7 +261,7 @@ class DesktopTest : public QObject {
     void replacementNavigationAndClose() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         auto c = config(GameMode::ComputerVsComputer);
         c.aiDifficultyWhite = c.aiDifficultyBlack = Difficulty::Hard;
         QCOMPARE(a.start(c), Status::Ok);
@@ -181,10 +273,10 @@ class DesktopTest : public QObject {
         QCOMPARE(a.start(c), Status::Ok);
         a.back();
         QTRY_VERIFY_WITH_TIMEOUT(!a.busy(), 5000);
-        QCOMPARE(a.page(), int(ac::SessionAdapter::MainMenu));
+        QCOMPARE(a.page(), int(ac::ApplicationController::MainMenu));
         QCOMPARE(a.start(c), Status::Ok);
         QVERIFY(a.busy());
-        QSignalSpy ready(&a, &ac::SessionAdapter::closeReady);
+        QSignalSpy ready(&a, &ac::ApplicationController::closeReady);
         QVERIFY(!a.requestClose());
         QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 1, 5000);
         QVERIFY(a.requestClose());
@@ -193,7 +285,7 @@ class DesktopTest : public QObject {
     void queuedCompletionAfterShutdown() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QCOMPARE(a.start(config()), Status::Ok);
         ac::SearchJobs jobs;
         QSignalSpy completed(&jobs, &ac::SearchJobs::completed);
@@ -216,7 +308,7 @@ class DesktopTest : public QObject {
     void actualAiAndHintResults() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         auto c = config(GameMode::HumanVsComputer);
         QCOMPARE(a.start(c), Status::Ok);
         a.setMoveFields("E2", "E4");
@@ -236,10 +328,13 @@ class DesktopTest : public QObject {
     void renderedPagesAndFocus() {
         Clock clock;
         auto o = options(clock);
-        ac::SessionAdapter a(&o);
+        ac::ApplicationController a(&o);
         QQmlApplicationEngine engine;
-        engine.rootContext()->setContextProperty("backend", &a);
-        engine.load(QUrl("qrc:/qml/Main.qml"));
+        engine.addImportPath("qrc:/qt/qml");
+        engine.setInitialProperties({
+            {"controller", QVariant::fromValue(&a)}
+        });
+        engine.load(QUrl("qrc:/qt/qml/AnteaterChess/Reborn/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
@@ -257,7 +352,7 @@ class DesktopTest : public QObject {
         capture("menu");
         a.newGame();
         capture("modes");
-        a.chooseMode(0);
+        a.chooseMode(GameEnums::HumanVsHuman);
         capture("setup");
         QCOMPARE(a.start(config()), Status::Ok);
         capture("gameplay");
@@ -314,10 +409,10 @@ class DesktopTest : public QObject {
         QVERIFY(QMetaObject::invokeMethod(confirmation, "open"));
         capture("confirmation");
         QVERIFY(QMetaObject::invokeMethod(confirmation, "reject"));
-        QCOMPARE(a.page(), int(ac::SessionAdapter::Gameplay));
+        QCOMPARE(a.page(), int(ac::ApplicationController::Gameplay));
         QVERIFY(QMetaObject::invokeMethod(confirmation, "open"));
         QVERIFY(QMetaObject::invokeMethod(confirmation, "accept"));
-        QTRY_COMPARE(a.page(), int(ac::SessionAdapter::EndGame));
+        QTRY_COMPARE(a.page(), int(ac::ApplicationController::EndGame));
         capture("endgame");
         window->close();
     }

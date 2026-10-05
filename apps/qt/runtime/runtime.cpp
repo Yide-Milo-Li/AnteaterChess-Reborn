@@ -1,4 +1,4 @@
-#include "runtime.h"
+#include "runtime.hpp"
 #include <QDir>
 #include <QFileInfo>
 #include <QImage>

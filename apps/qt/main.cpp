@@ -1,4 +1,4 @@
-#include "app/session_adapter.h"
+#include "app/application_controller.hpp"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -22,12 +22,15 @@ int main(int argc, char **argv) {
     QGuiApplication app(argc, argv);
     app.setOrganizationName("DeepAnteater");
     app.setApplicationName("AnteaterChess Reborn");
-    ac::SessionAdapter backend;
+    ac::ApplicationController backend;
     if (!backend.valid())
         return 1;
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("backend", &backend);
-    engine.load(QUrl("qrc:/qml/Main.qml"));
+    engine.addImportPath("qrc:/qt/qml");
+    engine.setInitialProperties({
+        {"controller", QVariant::fromValue(&backend)}
+    });
+    engine.load(QUrl("qrc:/qt/qml/AnteaterChess/Reborn/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
     if (app.arguments().contains("--smoke-test")) {

@@ -16,7 +16,7 @@ for path in [*root.glob('*.md'), * (root/'docs').rglob('*.md')]:
         if not target or '://' in target or target.startswith('mailto:'): continue
         if not (path.parent/target).exists(): errors.append(f'{path.relative_to(root)}: {link}')
 aliases = set()
-for manifest in ['assets/resources.qrc','apps/qt/qml/qml.qrc']:
+for manifest in ['assets/resources.qrc']:
     for resource in ET.parse(root/manifest).iter('qresource'):
         for item in resource.iter('file'):
             if not ((root/manifest).parent/item.text).is_file(): errors.append('Missing resource '+item.text)

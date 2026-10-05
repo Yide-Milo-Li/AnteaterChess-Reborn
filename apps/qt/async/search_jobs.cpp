@@ -1,5 +1,5 @@
-#include "search_jobs.h"
-#include "runtime/runtime.h"
+#include "search_jobs.hpp"
+#include "runtime/runtime.hpp"
 #include <algorithm>
 namespace ac {
 SearchJobs::~SearchJobs() {

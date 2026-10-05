@@ -1,3 +1,4 @@
+import AnteaterChess.Reborn 1.0
 import QtQuick
 import QtQuick.Controls
 TextField {

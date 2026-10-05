@@ -1,20 +1,21 @@
 import QtQuick
 import QtTest
-import "qrc:/qml" as UI
+import AnteaterChess.Reborn 1.0 as UI
 TestCase {
     name: "DesktopComponents"
     when: windowShown
     visible: true
     width: 900; height: 700
-    UI.SetupPage { id: setup; width: 900; height: 700; visible: false; mode: 2 }
-    UI.Board { id: board; width: 800; height: 640; boardModel: backend.boardModel }
+    UI.ApplicationController { id: testController }
+    UI.SetupPage { id: setup; width: 900; height: 700; visible: false; controller: testController }
+    UI.Board { id: board; width: 800; height: 640; boardModel: testController.boardModel }
     SignalSpy { id: clicked; target: board; signalName: "squareClicked" }
     function test_difficultyValues() {
         compare(setup.difficulties.length,4)
-        compare(setup.difficultyValue(0),1)
-        compare(setup.difficultyValue(1),2)
-        compare(setup.difficultyValue(2),3)
-        compare(setup.difficultyValue(3),5)
+        compare(setup.difficulties[0].value,1)
+        compare(setup.difficulties[1].value,2)
+        compare(setup.difficulties[2].value,3)
+        compare(setup.difficulties[3].value,5)
     }
     function test_coordinateMouseMapping() {
         clicked.clear()

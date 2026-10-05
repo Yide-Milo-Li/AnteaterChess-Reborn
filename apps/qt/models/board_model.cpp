@@ -1,5 +1,5 @@
-#include "board_model.h"
-#include "runtime/runtime.h"
+#include "board_model.hpp"
+#include "runtime/runtime.hpp"
 
 using namespace ac;
 namespace ac {

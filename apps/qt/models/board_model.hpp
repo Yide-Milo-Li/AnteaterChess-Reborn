@@ -1,11 +1,14 @@
 #pragma once
 #include "anteater/rules.hpp"
 #include <QAbstractListModel>
+#include <QtQml/qqmlregistration.h>
 #include <array>
 
 namespace ac {
 class BoardModel : public QAbstractListModel {
     Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Owned by ApplicationController")
   public:
     enum Role { Row = Qt::UserRole + 1, Column, Coordinate, Asset, Selected, Legal, HintFrom, HintTo };
     explicit BoardModel(QObject *parent = nullptr);

@@ -1,5 +1,5 @@
-#include "runtime/runtime.h"
-#include "app/session_adapter.h"
+#include "runtime/runtime.hpp"
+#include "app/application_controller.hpp"
 #include "../core/failing_resource.hpp"
 #include <QFile>
 #include <QTemporaryDir>
@@ -50,7 +50,7 @@ class RuntimeTest : public QObject {
             {ac::monotonicMilliseconds, nullptr}
         };
         QTemporaryDir directory;
-        SessionAdapter controller(&options, nullptr, SessionLog(directory.path()), &resource);
+        ApplicationController controller(&options, nullptr, SessionLog(directory.path()), &resource);
         GameConfig config{};
         init_game_config_for_mode(&config, GameMode::ComputerVsComputer);
         QCOMPARE(controller.start(config), Status::Ok);
@@ -74,7 +74,7 @@ class RuntimeTest : public QObject {
             {ac::monotonicMilliseconds, nullptr},
             &resource
         };
-        SessionAdapter controller(&options);
+        ApplicationController controller(&options);
         QVERIFY(controller.valid());
         GameConfig config{};
         init_default_game_config(&config);
@@ -121,7 +121,7 @@ class RuntimeTest : public QObject {
         ac::SessionLog log("");
         SessionOptions options{};
         options.clock = {ac::monotonicMilliseconds, nullptr};
-        SessionAdapter controller(&options, nullptr, std::move(log));
+        ApplicationController controller(&options, nullptr, std::move(log));
         QVERIFY(controller.valid());
         GameConfig c{};
         init_default_game_config(&c);

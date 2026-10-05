@@ -1,8 +1,9 @@
+import AnteaterChess.Reborn 1.0
 import QtQuick
 import QtQuick.Window
 Item {
     id: root
-    property var boardModel
+    property BoardModel boardModel
     signal squareClicked(int row, int column, int button)
     readonly property real cellSize: Math.max(24, Math.floor(Math.min((width-52)/10, (height-52)/8)))
     Rectangle {

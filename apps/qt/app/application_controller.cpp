@@ -1,118 +1,53 @@
-#include "session_adapter.h"
+#include "application_controller.hpp"
 #include <algorithm>
 #include <memory>
 
 using namespace ac;
 namespace ac {
-static QString difficulty(Difficulty d) {
-    switch (d) {
-    case Difficulty::Easy:
-        return "Easy";
-    case Difficulty::Medium:
-        return "Medium";
-    case Difficulty::Hard:
-        return "Hard";
-    case Difficulty::Tournament:
-        return "Tournament";
-    default:
-        return "Human";
-    }
-}
 static QString coordinate(Square s) {
     return QString(QChar('A' + s.col)) + QString::number(8 - s.row);
 }
-static QString duration(int64_t seconds) {
-    return QString("%1:%2:%3")
-        .arg(seconds / 3600, 2, 10, QChar('0'))
-        .arg(seconds / 60 % 60, 2, 10, QChar('0'))
-        .arg(seconds % 60, 2, 10, QChar('0'));
+ApplicationController::ApplicationController(QObject *parent) : ApplicationController(nullptr, parent) {
 }
-SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent, SessionLog log,
-                               std::pmr::memory_resource *searchResource)
+ApplicationController::ApplicationController(const SessionOptions *options, QObject *parent, SessionLog log,
+                                             std::pmr::memory_resource *searchResource)
     : QObject(parent), log_(std::move(log)), jobs_(nullptr, searchResource) {
     SessionOptions defaults{};
     defaults.clock = {monotonicMilliseconds, nullptr};
     auto created = Session::create(options ? *options : defaults);
     if (auto *owner = std::get_if<Session>(&created))
         session_.emplace(std::move(*owner));
-    connect(&jobs_, &SearchJobs::completed, this, &SessionAdapter::searchCompleted);
-    connect(&jobs_, &SearchJobs::busyChanged, this, &SessionAdapter::stateChanged);
-    connect(&timer_, &QTimer::timeout, this, &SessionAdapter::tick);
+    connect(&jobs_, &SearchJobs::completed, this, &ApplicationController::searchCompleted);
+    connect(&jobs_, &SearchJobs::busyChanged, this, [this] {
+        emit busyChanged();
+        publishStatus();
+    });
+    connect(&timer_, &QTimer::timeout, this, &ApplicationController::tick);
     refresh();
     timer_.start(100);
 }
-SessionAdapter::~SessionAdapter() {
+ApplicationController::~ApplicationController() {
+    closing_ = true;
     timer_.stop();
     jobs_.shutdown();
 }
-SessionState SessionAdapter::state() const {
+SessionState ApplicationController::state() const {
     return session_ ? session_->state() : SessionState{};
 }
-bool SessionAdapter::humanTurn() const {
-    return page_ == Gameplay && state_.phase == SessionPhase::Active &&
-           !is_ai_turn(&state_.config, state_.position.currentTurn) && !closing_;
+void ApplicationController::report(Status status) {
+    game_.setMessage(status_message(status), status != Status::Ok);
 }
-bool SessionAdapter::canUndo() const {
-    return page_ == Gameplay && state_.historyCount > 0 && !closing_;
+void ApplicationController::publishStatus() {
+    game_.update(state_, page_ == Gameplay, busy(), closing_, promotionPending_);
 }
-bool SessionAdapter::canHint() const {
-    return humanTurn() && !busy() && !promotionPending_;
+void ApplicationController::setPage(Page page) {
+    if (page_ == page)
+        return;
+    page_ = page;
+    emit pageChanged();
+    publishStatus();
 }
-QString SessionAdapter::turnText() const {
-    return QString(state_.position.currentTurn == Color::White ? "White" : "Black") + " to move";
-}
-QString SessionAdapter::clockText() const {
-    return duration(state_.elapsedMs / 1000);
-}
-QString SessionAdapter::timerText(Color color) const {
-    QString prefix = color == Color::White ? "White" : "Black";
-    Difficulty d = color == Color::White ? state_.config.aiDifficultyWhite : state_.config.aiDifficultyBlack;
-    if (d == Difficulty::Tournament)
-        return prefix + " pool  " + duration((state_.tournamentRemainingMs[enum_index(color)] + 999) / 1000);
-    if (!state_.config.timerEnabled)
-        return prefix + "  —";
-    return prefix + "  " + duration(state_.remaining[enum_index(color)]);
-}
-QString SessionAdapter::whiteTimer() const {
-    return timerText(Color::White);
-}
-QString SessionAdapter::blackTimer() const {
-    return timerText(Color::Black);
-}
-QString SessionAdapter::modeText() const {
-    switch (state_.config.mode) {
-    case GameMode::HumanVsComputer:
-        return "Human vs AI";
-    case GameMode::ComputerVsComputer:
-        return "AI vs AI";
-    default:
-        return "Human vs Human";
-    }
-}
-QString SessionAdapter::aiSummary() const {
-    return "White: " + difficulty(state_.config.aiDifficultyWhite) +
-           "  ·  Black: " + difficulty(state_.config.aiDifficultyBlack);
-}
-QString SessionAdapter::resultText() const {
-    switch (state_.result) {
-    case GameResult::WhiteWin:
-        return "White wins";
-    case GameResult::BlackWin:
-        return "Black wins";
-    case GameResult::Draw:
-        return "Draw";
-    case GameResult::TerminatedByUser:
-        return "Game ended";
-    default:
-        return {};
-    }
-}
-void SessionAdapter::report(Status s) {
-    status_ = status_message(s);
-    error_ = s != Status::Ok;
-    emit stateChanged();
-}
-void SessionAdapter::invalidate() {
+void ApplicationController::invalidate() {
     ++generation_;
     jobs_.cancel();
     board_.hint(nullptr);
@@ -122,81 +57,68 @@ void SessionAdapter::invalidate() {
         emit promotionDismissed();
     }
 }
-void SessionAdapter::newGame() {
+void ApplicationController::newGame() {
     if (closing_)
         return;
     invalidate();
     session_->finish();
-    page_ = ModeMenu;
+    setPage(ModeMenu);
     report(Status::Ok);
     refresh();
 }
-void SessionAdapter::chooseMode(int mode) {
+void ApplicationController::chooseMode(GameEnums::Mode mode) {
     if (closing_ || mode < value(GameMode::HumanVsHuman) || mode > value(GameMode::ComputerVsComputer))
         return;
     invalidate();
-    page_ = Setup;
+    settings_.chooseMode(mode);
+    setPage(Setup);
     report(Status::Ok);
     refresh();
 }
-void SessionAdapter::back() {
+void ApplicationController::back() {
     if (closing_)
         return;
     invalidate();
     session_->finish();
-    page_ = page_ == Setup ? ModeMenu : MainMenu;
+    setPage(page_ == Setup ? ModeMenu : MainMenu);
     report(Status::Ok);
     refresh();
 }
-Status SessionAdapter::start(const GameConfig &c) {
+Status ApplicationController::start(const GameConfig &c) {
     if (closing_ || !session_)
         return Status::Unavailable;
     Status s = session_->start(c);
     if (s == Status::Ok) {
         invalidate();
-        page_ = Gameplay;
-        from_.clear();
-        to_.clear();
+        setPage(Gameplay);
+        input_.setFields({}, {});
         updateHighlights();
     }
     report(s);
     refresh();
     return s;
 }
-bool SessionAdapter::startConfigured(int mode, int color, int white, int black, bool enabled, int seconds,
-                                     int aiSeconds) {
-    GameConfig c{};
-    init_game_config_for_mode(&c, GameMode(mode));
-    c.playerColor = Color(color);
-    c.aiDifficultyWhite = Difficulty(white);
-    c.aiDifficultyBlack = Difficulty(black);
-    if (mode == value(GameMode::HumanVsHuman))
-        c.aiDifficultyWhite = c.aiDifficultyBlack = Difficulty::None;
-    if (mode == value(GameMode::HumanVsComputer)) {
-        if (color == value(Color::White))
-            c.aiDifficultyWhite = Difficulty::None;
-        else
-            c.aiDifficultyBlack = Difficulty::None;
+bool ApplicationController::startDraft() {
+    auto status = settings_.validate();
+    if (status != Status::Ok) {
+        report(status);
+        return false;
     }
-    c.timerEnabled = enabled;
-    c.initialTimeSeconds = seconds;
-    c.aiTimeLimit = aiSeconds;
-    return start(c) == Status::Ok;
+    return start(settings_.config()) == Status::Ok;
 }
-void SessionAdapter::setMoveFields(const QString &from, const QString &to) {
+void ApplicationController::setMoveFields(const QString &from, const QString &to) {
     if (closing_)
         return;
-    from_ = from;
-    to_ = to;
+    input_.setFields(from, to);
     board_.hint(nullptr);
     updateHighlights();
 }
-void SessionAdapter::updateHighlights() {
+void ApplicationController::updateHighlights() {
     std::array<bool, Rows * Columns> legal{};
-    Square from = parse_position(from_.toUtf8().constData());
-    fromValid_ = humanTurn() && validate_selection(&state_.position, from) == SelectionResult::Valid;
+    Square from = parse_position(input_.fromText().toUtf8().constData());
+    bool fromValid = humanTurn() && validate_selection(&state_.position, from) == SelectionResult::Valid;
     try {
-        if (fromValid_) {
+        if (fromValid) {
             auto moves = std::make_unique<MoveList>();
             Status status = generate_legal_moves_for_position(&state_.position, from, moves.get());
             if (status == Status::Ok) {
@@ -210,37 +132,37 @@ void SessionAdapter::updateHighlights() {
     } catch (const std::bad_alloc &) {
         report(Status::OutOfMemory);
     }
-    Square to = parse_position(to_.toUtf8().constData());
-    toValid_ = is_valid_position(to) && legal[size_t(to.row * Columns + to.col)];
-    board_.highlights(fromValid_ ? from : Square{-1, -1}, legal);
-    emit moveFieldsChanged();
+    Square to = parse_position(input_.toText().toUtf8().constData());
+    bool toValid = is_valid_position(to) && legal[size_t(to.row * Columns + to.col)];
+    board_.highlights(fromValid ? from : Square{-1, -1}, legal);
+    input_.setValidity(fromValid, toValid);
 }
-void SessionAdapter::selectSquare(int row, int column, int button) {
+void ApplicationController::selectSquare(int row, int column, Qt::MouseButton button) {
     Square square{row, column};
     if (!humanTurn() || !is_valid_position(square)) {
         report(Status::Unavailable);
         return;
     }
     // Retain the GTK left-selection/right-destination interaction.
-    if (button == 1)
+    if (button == Qt::LeftButton)
         setMoveFields(coordinate(square), {});
-    else if (button == 2) {
-        setMoveFields(from_, coordinate(square));
-        if (toValid_)
+    else if (button == Qt::RightButton) {
+        setMoveFields(input_.fromText(), coordinate(square));
+        if (input_.toValid())
             submitFields();
         else
             report(Status::IllegalMove);
     }
 }
-bool SessionAdapter::submitFields(int promotion) {
+bool ApplicationController::submitFields(GameEnums::Promotion promotion) {
     if (!humanTurn()) {
         report(Status::Unavailable);
         return false;
     }
     MoveRequest request{};
     PromotionChoice choice = promotion ? PromotionChoice(promotion) : PromotionChoice::Queen;
-    if (parse_move_request_fields(from_.toUtf8().constData(), to_.toUtf8().constData(), choice, &request) !=
-        Status::Ok) {
+    if (parse_move_request_fields(input_.fromText().toUtf8().constData(), input_.toText().toUtf8().constData(), choice,
+                                  &request) != Status::Ok) {
         report(Status::InvalidArgument);
         return false;
     }
@@ -253,7 +175,7 @@ bool SessionAdapter::submitFields(int promotion) {
         promotionPending_ = true;
         promotionRevision_ = state_.revision;
         emit promotionRequested();
-        emit stateChanged();
+        publishStatus();
         return false;
     }
     if (promotionPending_ && promotionRevision_ != state().revision) {
@@ -264,20 +186,19 @@ bool SessionAdapter::submitFields(int promotion) {
     invalidate();
     Status s = session_->submit(request);
     if (s == Status::Ok) {
-        from_.clear();
-        to_.clear();
+        input_.setFields({}, {});
     }
     report(s);
     refresh();
     updateHighlights();
     return s == Status::Ok;
 }
-void SessionAdapter::cancelPromotion() {
+void ApplicationController::cancelPromotion() {
     promotionPending_ = false;
     emit promotionDismissed();
-    emit stateChanged();
+    publishStatus();
 }
-void SessionAdapter::undo() {
+void ApplicationController::undo() {
     if (closing_)
         return;
     invalidate();
@@ -285,7 +206,7 @@ void SessionAdapter::undo() {
     refresh();
     updateHighlights();
 }
-bool SessionAdapter::hint() {
+bool ApplicationController::hint() {
     if (!canHint()) {
         report(Status::Unavailable);
         return false;
@@ -302,50 +223,57 @@ bool SessionAdapter::hint() {
     if (!started)
         report(status);
     if (started) {
-        status_ = "Hint thinking…";
-        error_ = false;
-        emit stateChanged();
+        game_.setMessage("Hint thinking…", false);
+        publishStatus();
     }
     return started;
 }
-void SessionAdapter::finish() {
+void ApplicationController::finish() {
     if (closing_)
         return;
     invalidate();
     report(session_->finish());
     refresh();
 }
-bool SessionAdapter::requestClose() {
+bool ApplicationController::requestClose() {
     if (!closing_) {
         closing_ = true;
         timer_.stop();
         invalidate();
         session_->finish();
         refresh();
-        emit stateChanged();
+        publishStatus();
     }
     return !busy();
 }
-void SessionAdapter::tick() {
+void ApplicationController::tick() {
     if (closing_ || !session_)
         return;
-    SessionState previous = state();
+    const auto before = state_.revision;
     session_->tick();
-    if (state().revision != previous.revision)
+    auto current = state();
+    if (current.revision != before) {
         invalidate();
-    refresh();
+        refresh();
+    } else {
+        state_ = current;
+        clocks_.update(current);
+    }
 }
-void SessionAdapter::refresh() {
+void ApplicationController::refresh() {
     if (!session_) {
         report(Status::OutOfMemory);
         return;
     }
     SessionState s = state();
     bool changed = s.revision != state_.revision;
-    board_.update(s.position);
+    if (changed || state_.position.hash != s.position.hash)
+        board_.update(s.position);
     state_ = s;
+    clocks_.update(s);
+    publishStatus();
     if (page_ == Gameplay && s.phase == SessionPhase::Finished) {
-        page_ = EndGame;
+        setPage(EndGame);
         invalidate();
     }
     if (changed) {
@@ -384,8 +312,7 @@ void SessionAdapter::refresh() {
                     const auto started =
                         jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth_limit(d));
                     if (started == Status::Ok) {
-                        status_ = "AI thinking…";
-                        error_ = false;
+                        game_.setMessage("AI thinking…", false);
                     } else {
                         failedCount_ = s.historyCount;
                         failedTurn_ = s.position.currentTurn;
@@ -402,9 +329,9 @@ void SessionAdapter::refresh() {
             }
         }
     }
-    emit stateChanged();
+    publishStatus();
 }
-void SessionAdapter::searchCompleted() {
+void ApplicationController::searchCompleted() {
     const SearchOutcome out = jobs_.outcome();
     SessionState s = state();
     bool current = !closing_ && page_ == Gameplay && out.gameId == s.gameId && out.generation == generation_ &&
@@ -412,8 +339,8 @@ void SessionAdapter::searchCompleted() {
     if (current && out.result.status == Status::Ok) {
         if (out.hint) {
             board_.hint(&out.result.move);
-            status_ = "Hint: " + coordinate(out.result.move.from) + " → " + coordinate(out.result.move.to);
-            error_ = false;
+            game_.setMessage("Hint: " + coordinate(out.result.move.from) + " → " + coordinate(out.result.move.to),
+                             false);
         } else
             report(session_->submit_ai(out.result.move, out.revision, out.budgetMs, out.result.elapsedMs));
     } else if (current && out.result.status != Status::Cancelled) {

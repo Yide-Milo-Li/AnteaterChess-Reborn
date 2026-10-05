@@ -1,3 +1,4 @@
+import AnteaterChess.Reborn 1.0
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
@@ -10,7 +11,7 @@ ApplicationWindow {
     minimumWidth: 900; minimumHeight: 700
     title: "AnteaterChess Reborn"
     color: Theme.background
-    property int selectedMode: 0
+    required property ApplicationController controller
     property bool isFullscreen: visibility === Window.FullScreen
     property int windowedVisibility: Window.Windowed
     font.family: "Segoe UI"
@@ -35,16 +36,16 @@ ApplicationWindow {
     }
     Shortcut { sequence: "F11"; onActivated: window.toggleFullscreen() }
     Shortcut { sequence: "Escape"; enabled: window.isFullscreen; onActivated: window.restoreWindowed() }
-    onClosing: function(close) { close.accepted = backend.requestClose() }
+    onClosing: function(close) { close.accepted = controller.requestClose() }
     Connections {
-        target: backend
+        target: controller
         function onCloseReady() { window.close() }
     }
     Loader {
         id: pages
         objectName: "pageLoader"
         anchors.fill: parent; anchors.margins: 24
-        sourceComponent: backend.page === 0 ? menu : backend.page === 1 ? modes : backend.page === 2 ? setup : backend.page === 3 ? game : ended
+        sourceComponent: controller.page === ApplicationController.MainMenu ? menu : controller.page === ApplicationController.ModeMenu ? modes : controller.page === ApplicationController.Setup ? setup : controller.page === ApplicationController.Gameplay ? game : ended
     }
     Component {
         id: menu
@@ -55,7 +56,7 @@ ApplicationWindow {
                     spacing: 20
                     Label { text: "AnteaterChess Reborn"; color: Theme.text; font.pixelSize: 26; font.bold: true; Layout.alignment: Qt.AlignHCenter }
                     Label { text: "8 × 10 · Ants & Anteaters"; color: Theme.muted; Layout.alignment: Qt.AlignHCenter }
-                    ActionButton { objectName: "newGame"; text: "New Game"; primary: true; Layout.fillWidth: true; onClicked: backend.newGame() }
+                    ActionButton { objectName: "newGame"; text: "New Game"; primary: true; Layout.fillWidth: true; onClicked: controller.newGame() }
                     ActionButton { text: "Quit Game"; Layout.fillWidth: true; onClicked: { confirmation.action = "quit"; confirmation.open() } }
                     Label { text: "Team 22 · DeepAnteater"; color: Theme.muted; Layout.alignment: Qt.AlignHCenter }
                 }
@@ -71,15 +72,15 @@ ApplicationWindow {
                     spacing: 16
                     Label { text: "Choose Game Mode"; color: Theme.text; font.pixelSize: 22; font.bold: true }
                     Repeater {
-                        model: ["Human vs Human", "Human vs AI", "AI vs AI"]
+                        model: [{text:"Human vs Human",value:Game.HumanVsHuman},{text:"Human vs AI",value:Game.HumanVsComputer},{text:"AI vs AI",value:Game.ComputerVsComputer}]
                         ActionButton {
                             required property int index
-                            required property string modelData
-                            text: modelData; Layout.fillWidth: true
-                            onClicked: { window.selectedMode = index; backend.chooseMode(index) }
+                            required property var modelData
+                            text: modelData.text; Layout.fillWidth: true
+                            onClicked: controller.chooseMode(modelData.value)
                         }
                     }
-                    ActionButton { text: "Back"; Layout.fillWidth: true; onClicked: backend.back() }
+                    ActionButton { text: "Back"; Layout.fillWidth: true; onClicked: controller.back() }
                 }
             }
         }
@@ -87,14 +88,15 @@ ApplicationWindow {
     Component {
         id: setup
         SetupPage {
-            mode: window.selectedMode
-            onStartRequested: function(color,white,black,timer,seconds,budget) { backend.startConfigured(mode,color,white,black,timer,seconds,budget) }
-            onBackRequested: backend.back()
+            controller: window.controller
+            onStartRequested: window.controller.startDraft()
+            onBackRequested: controller.back()
         }
     }
     Component {
         id: game
         GameplayPage {
+            controller: window.controller
             fullscreen: window.isFullscreen
             onFullscreenRequested: window.toggleFullscreen()
             onLeaveRequested: { confirmation.action = "finish"; confirmation.open() }
@@ -108,11 +110,11 @@ ApplicationWindow {
                 anchors.centerIn: parent; width: 430
                 contentItem: ColumnLayout {
                     spacing: 18
-                    Label { text: backend.resultText; color: Theme.gold; font.pixelSize: 28; font.bold: true }
-                    Label { text: backend.historyCount+" half-moves · "+backend.clockText; color: Theme.muted }
-                    Label { text: backend.statusError ? backend.status : ""; color: "#fee2e2"; wrapMode: Text.Wrap; Layout.fillWidth: true }
-                    ActionButton { text: "New Game"; primary: true; Layout.fillWidth: true; onClicked: backend.newGame() }
-                    ActionButton { text: "Main Menu"; Layout.fillWidth: true; onClicked: backend.back() }
+                    Label { text: controller.game.resultText; color: Theme.gold; font.pixelSize: 28; font.bold: true }
+                    Label { text: controller.game.historyCount+" half-moves · "+controller.clocks.elapsed; color: Theme.muted }
+                    Label { text: controller.game.error ? controller.game.message : ""; color: "#fee2e2"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    ActionButton { text: "New Game"; primary: true; Layout.fillWidth: true; onClicked: controller.newGame() }
+                    ActionButton { text: "Main Menu"; Layout.fillWidth: true; onClicked: controller.back() }
                     ActionButton { text: "Exit"; Layout.fillWidth: true; onClicked: { confirmation.action="quit"; confirmation.open() } }
                 }
             }
@@ -133,7 +135,7 @@ ApplicationWindow {
             onRejected: confirmation.reject()
         }
         Label { text: "Are you sure?"; color: Theme.text }
-        onAccepted: { if (action === "quit") window.close(); else if (action === "new") backend.newGame(); else backend.finish() }
+        onAccepted: { if (action === "quit") window.close(); else if (action === "new") controller.newGame(); else controller.finish() }
     }
     Dialog {
         id: promotion
@@ -141,20 +143,20 @@ ApplicationWindow {
         anchors.centerIn: parent; modal: true; title: "Choose promotion piece"
         ColumnLayout {
             Repeater {
-                model: ["Queen","Rook","Bishop","Knight"]
+                model: [{text:"Queen",value:Game.PromoteQueen},{text:"Rook",value:Game.PromoteRook},{text:"Bishop",value:Game.PromoteBishop},{text:"Knight",value:Game.PromoteKnight}]
                 ActionButton {
                     required property int index
-                    required property string modelData
-                    text: modelData; Layout.fillWidth: true
-                    onClicked: { backend.submitFields(index+1); promotion.close() }
+                    required property var modelData
+                    text: modelData.text; Layout.fillWidth: true
+                    onClicked: { controller.submitFields(modelData.value); promotion.close() }
                 }
             }
-            ActionButton { objectName: "promotionCancel"; text: "Cancel"; Layout.fillWidth: true; onClicked: { backend.cancelPromotion(); promotion.close() } }
+            ActionButton { objectName: "promotionCancel"; text: "Cancel"; Layout.fillWidth: true; onClicked: { controller.cancelPromotion(); promotion.close() } }
         }
-        onRejected: backend.cancelPromotion()
+        onRejected: controller.cancelPromotion()
     }
     Connections {
-        target: backend
+        target: controller
         function onPromotionRequested() { promotion.open() }
         function onPromotionDismissed() { promotion.close() }
     }

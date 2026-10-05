@@ -7,36 +7,41 @@
 #include <QTimer>
 #include <cstdio>
 
+using namespace ac;
+
 int main(int argc, char **argv) {
     if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--version") {
-        std::printf("AnteaterChess Reborn %s\n",AC_VERSION);
+        std::printf("AnteaterChess Reborn %s\n", AC_VERSION);
         return 0;
     }
     QQuickStyle::setStyle("Basic");
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) == "--smoke-test")
         qInstallMessageHandler([](QtMsgType, const QMessageLogContext &, const QString &message) {
-            std::fprintf(stderr,"%s\n",message.toUtf8().constData());
+            std::fprintf(stderr, "%s\n", message.toUtf8().constData());
         });
-    QGuiApplication app(argc,argv);
+    QGuiApplication app(argc, argv);
     app.setOrganizationName("DeepAnteater");
     app.setApplicationName("AnteaterChess Reborn");
     ac::SessionAdapter backend;
-    if (!backend.valid()) return 1;
+    if (!backend.valid())
+        return 1;
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("backend",&backend);
+    engine.rootContext()->setContextProperty("backend", &backend);
     engine.load(QUrl("qrc:/qml/Main.qml"));
-    if (engine.rootObjects().isEmpty()) return 1;
+    if (engine.rootObjects().isEmpty())
+        return 1;
     if (app.arguments().contains("--smoke-test")) {
-        QTimer::singleShot(200,&app,[&] {
+        QTimer::singleShot(200, &app, [&] {
             bool resources = ac::verifyResources();
             bool retired = ac::retiredRuntimeLoaded();
             bool ok = resources && !retired;
-            if (!ok) std::fprintf(stderr,"Resource check=%d, retired runtime loaded=%d\n",resources,retired);
-            AcGameConfig config{};
-            ac_init_default_game_config(&config);
-            ok = backend.start(config) == AC_OK && ok;
+            if (!ok)
+                std::fprintf(stderr, "Resource check=%d, retired runtime loaded=%d\n", resources, retired);
+            GameConfig config{};
+            init_default_game_config(&config);
+            ok = backend.start(config) == Status::Ok && ok;
             backend.finish();
-            ok = backend.snapshot().diagnostic == AC_OK && ok;
+            ok = backend.snapshot().diagnostic == Status::Ok && ok;
             backend.requestClose();
             app.exit(ok ? 0 : 1);
         });

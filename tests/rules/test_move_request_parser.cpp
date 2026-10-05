@@ -1,48 +1,50 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <assert.h>
 #include <stddef.h>
 
-static void test_parse_move_request_fields_accepts_standard_fields(void) {
-    AcMoveRequest request;
+using namespace ac;
 
-    assert(ac_parse_move_request_fields("E2", "E4", AC_PROMOTION_CHOICE_QUEEN, &request) == 0);
-    assert(ac_position_equal(request.from, ac_create_position(6, 4)) == 1);
-    assert(ac_position_equal(request.to, ac_create_position(4, 4)) == 1);
-    assert(request.promotion == AC_PROMOTION_CHOICE_QUEEN);
+static void test_parse_move_request_fields_accepts_standard_fields(void) {
+    MoveRequest request;
+
+    assert(parse_move_request_fields("E2", "E4", PromotionChoice::Queen, &request) == Status::Ok);
+    assert(position_equal(request.from, create_position(6, 4)) == 1);
+    assert(position_equal(request.to, create_position(4, 4)) == 1);
+    assert(request.promotion == PromotionChoice::Queen);
 }
 
 static void test_parse_move_request_fields_accepts_trimmed_lowercase_fields(void) {
-    AcMoveRequest request;
+    MoveRequest request;
 
-    assert(ac_parse_move_request_fields("  e2  ", "  e4", AC_PROMOTION_CHOICE_ROOK, &request) == 0);
-    assert(ac_position_equal(request.from, ac_create_position(6, 4)) == 1);
-    assert(ac_position_equal(request.to, ac_create_position(4, 4)) == 1);
-    assert(request.promotion == AC_PROMOTION_CHOICE_ROOK);
+    assert(parse_move_request_fields("  e2  ", "  e4", PromotionChoice::Rook, &request) == Status::Ok);
+    assert(position_equal(request.from, create_position(6, 4)) == 1);
+    assert(position_equal(request.to, create_position(4, 4)) == 1);
+    assert(request.promotion == PromotionChoice::Rook);
 }
 
 static void test_parse_move_request_fields_rejects_invalid_coordinates(void) {
-    AcMoveRequest request;
+    MoveRequest request;
 
-    assert(ac_parse_move_request_fields("K2", "E4", AC_PROMOTION_CHOICE_QUEEN, &request) != 0);
-    assert(ac_position_equal(request.from, ac_create_position(-1, -1)) == 1);
-    assert(ac_position_equal(request.to, ac_create_position(-1, -1)) == 1);
-    assert(request.promotion == AC_PROMOTION_CHOICE_NONE);
+    assert(parse_move_request_fields("K2", "E4", PromotionChoice::Queen, &request) != Status::Ok);
+    assert(position_equal(request.from, create_position(-1, -1)) == 1);
+    assert(position_equal(request.to, create_position(-1, -1)) == 1);
+    assert(request.promotion == PromotionChoice::None);
 
-    assert(ac_parse_move_request_fields("E2", "E 4", AC_PROMOTION_CHOICE_QUEEN, &request) != 0);
-    assert(ac_parse_move_request_fields(NULL, "E4", AC_PROMOTION_CHOICE_QUEEN, &request) != 0);
+    assert(parse_move_request_fields("E2", "E 4", PromotionChoice::Queen, &request) != Status::Ok);
+    assert(parse_move_request_fields(NULL, "E4", PromotionChoice::Queen, &request) != Status::Ok);
 }
 
 static void test_parse_move_request_fields_rejects_invalid_promotion(void) {
-    AcMoveRequest request;
+    MoveRequest request;
 
-    assert(ac_parse_move_request_fields("E2", "E4", (AcPromotionChoice)99, &request) != 0);
-    assert(ac_position_equal(request.from, ac_create_position(-1, -1)) == 1);
-    assert(ac_position_equal(request.to, ac_create_position(-1, -1)) == 1);
-    assert(request.promotion == AC_PROMOTION_CHOICE_NONE);
+    assert(parse_move_request_fields("E2", "E4", (PromotionChoice)99, &request) != Status::Ok);
+    assert(position_equal(request.from, create_position(-1, -1)) == 1);
+    assert(position_equal(request.to, create_position(-1, -1)) == 1);
+    assert(request.promotion == PromotionChoice::None);
 }
 
 static void test_parse_move_request_fields_rejects_null_output(void) {
-    assert(ac_parse_move_request_fields("E2", "E4", AC_PROMOTION_CHOICE_QUEEN, NULL) != 0);
+    assert(parse_move_request_fields("E2", "E4", PromotionChoice::Queen, NULL) != Status::Ok);
 }
 
 int main(void) {

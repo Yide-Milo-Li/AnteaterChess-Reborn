@@ -2,9 +2,11 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
+
+using namespace ac;
 class RuntimeTest : public QObject {
     Q_OBJECT
-private slots:
+  private slots:
     void pathsAndMonotonic() {
         QVERIFY(QDir::isAbsolutePath(ac::executableDirectory()));
         int64_t before = ac::monotonicMilliseconds(nullptr);
@@ -14,43 +16,48 @@ private slots:
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
         ac::SessionLog a(directory.path()), b(directory.path());
-        AcSnapshot snapshot{};
+        Snapshot snapshot{};
         snapshot.gameId = 1;
-        QCOMPARE(a.write(snapshot),AC_OK);
-        QCOMPARE(b.write(snapshot),AC_OK);
+        QCOMPARE(a.write(snapshot), Status::Ok);
+        QCOMPARE(b.write(snapshot), Status::Ok);
         QVERIFY(a.path() != b.path());
         QString first = a.path();
         snapshot.elapsedMs = 42;
-        QCOMPARE(a.write(snapshot),AC_OK);
-        QCOMPARE(a.path(),first);
-        QFile file(first); QVERIFY(file.open(QIODevice::ReadOnly));
-        QVERIFY(file.readAll().contains("Elapsed ms: 42")); file.close();
+        QCOMPARE(a.write(snapshot), Status::Ok);
+        QCOMPARE(a.path(), first);
+        QFile file(first);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("Elapsed ms: 42"));
+        file.close();
         ++snapshot.gameId;
-        QCOMPARE(a.write(snapshot),AC_OK);
+        QCOMPARE(a.write(snapshot), Status::Ok);
         QVERIFY(a.path() != first);
         ac::SessionLog blocked(first);
-        QCOMPARE(blocked.write(snapshot),AC_IO_ERROR);
+        QCOMPARE(blocked.write(snapshot), Status::IoError);
         QVERIFY(file.open(QIODevice::ReadOnly));
         QVERIFY(file.readAll().contains("Elapsed ms: 42"));
     }
     void diagnosticOnlyFailure() {
         // A failed path resolver remains a real log object; moves stay accepted.
         ac::SessionLog log("");
-        AcSessionOptions options{};
-        options.clock = {ac::monotonicMilliseconds,nullptr};
-        options.log = ac::SessionLog::writeCallback; options.logContext = &log;
-        AcSession *s = ac_session_create(&options);
+        SessionOptions options{};
+        options.clock = {ac::monotonicMilliseconds, nullptr};
+        options.log = ac::SessionLog::writeCallback;
+        options.logContext = &log;
+        Session *s = session_create(&options);
         QVERIFY(s);
-        AcGameConfig c{}; ac_init_default_game_config(&c);
-        QCOMPARE(ac_session_start(s,&c),AC_OK);
-        AcMoveRequest request{};
-        QCOMPARE(ac_parse_move_request_fields("E2","E4",AC_PROMOTION_CHOICE_NONE,&request),0);
-        QCOMPARE(ac_session_submit(s,request),AC_OK);
-        AcSnapshot snapshot{}; ac_session_snapshot(s,&snapshot);
-        QCOMPARE(snapshot.historyCount,1);
-        QCOMPARE(snapshot.diagnostic,AC_IO_ERROR);
+        GameConfig c{};
+        init_default_game_config(&c);
+        QCOMPARE(session_start(s, &c), Status::Ok);
+        MoveRequest request{};
+        QCOMPARE(parse_move_request_fields("E2", "E4", PromotionChoice::None, &request), Status::Ok);
+        QCOMPARE(session_submit(s, request), Status::Ok);
+        Snapshot snapshot{};
+        session_snapshot(s, &snapshot);
+        QCOMPARE(snapshot.historyCount, 1);
+        QCOMPARE(snapshot.diagnostic, Status::IoError);
         QVERIFY(log.path().isEmpty());
-        ac_session_destroy(s);
+        session_destroy(s);
     }
 };
 QTEST_GUILESS_MAIN(RuntimeTest)

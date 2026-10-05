@@ -1,9 +1,11 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 
 #include <limits.h>
 #include <stddef.h>
 
-void ac_init_game_config_for_mode(AcGameConfig *config, AcGameMode mode) {
+namespace ac {
+
+void init_game_config_for_mode(GameConfig *config, GameMode mode) {
     if (config == NULL) {
         return;
     }
@@ -14,48 +16,48 @@ void ac_init_game_config_for_mode(AcGameConfig *config, AcGameMode mode) {
     config->initialTimeSeconds = 0;
 
     switch (mode) {
-    case AC_MODE_HUMAN_VS_HUMAN:
-        config->playerColor = AC_WHITE;
-        config->aiDifficultyWhite = AC_DIFFICULTY_NONE;
-        config->aiDifficultyBlack = AC_DIFFICULTY_NONE;
+    case GameMode::HumanVsHuman:
+        config->playerColor = Color::White;
+        config->aiDifficultyWhite = Difficulty::None;
+        config->aiDifficultyBlack = Difficulty::None;
         break;
-    case AC_MODE_HUMAN_VS_COMPUTER:
-        config->playerColor = AC_WHITE;
-        config->aiDifficultyWhite = AC_DIFFICULTY_NONE;
-        config->aiDifficultyBlack = AC_DIFFICULTY_EASY;
+    case GameMode::HumanVsComputer:
+        config->playerColor = Color::White;
+        config->aiDifficultyWhite = Difficulty::None;
+        config->aiDifficultyBlack = Difficulty::Easy;
         break;
-    case AC_MODE_COMPUTER_VS_COMPUTER:
-        config->playerColor = AC_EMPTY_COLOR;
-        config->aiDifficultyWhite = AC_DIFFICULTY_EASY;
-        config->aiDifficultyBlack = AC_DIFFICULTY_EASY;
+    case GameMode::ComputerVsComputer:
+        config->playerColor = Color::Empty;
+        config->aiDifficultyWhite = Difficulty::Easy;
+        config->aiDifficultyBlack = Difficulty::Easy;
         break;
     default:
-        ac_init_game_config_for_mode(config, AC_MODE_HUMAN_VS_HUMAN);
+        init_game_config_for_mode(config, GameMode::HumanVsHuman);
         break;
     }
 }
 
-void ac_init_default_game_config(AcGameConfig *config) {
-    ac_init_game_config_for_mode(config, AC_MODE_HUMAN_VS_HUMAN);
+void init_default_game_config(GameConfig *config) {
+    init_game_config_for_mode(config, GameMode::HumanVsHuman);
 }
 
-int ac_get_default_ai_time_budget_ms(AcAIDifficulty difficulty) {
+int get_default_ai_time_budget_ms(Difficulty difficulty) {
     switch (difficulty) {
-    case AC_DIFFICULTY_EASY:
+    case Difficulty::Easy:
         return 350;
-    case AC_DIFFICULTY_MEDIUM:
+    case Difficulty::Medium:
         return 2200;
-    case AC_DIFFICULTY_HARD:
+    case Difficulty::Hard:
         return 7000;
-    case AC_DIFFICULTY_TOURNAMENT:
+    case Difficulty::Tournament:
         return 14000;
-    case AC_DIFFICULTY_NONE:
+    case Difficulty::None:
     default:
         return 0;
     }
 }
 
-int ac_get_ai_time_budget_ms(const AcGameConfig *config, AcAIDifficulty difficulty) {
+int get_ai_time_budget_ms(const GameConfig *config, Difficulty difficulty) {
     if (config != NULL && config->aiTimeLimit > 0) {
         if (config->aiTimeLimit > INT_MAX / 1000) {
             return INT_MAX;
@@ -63,7 +65,7 @@ int ac_get_ai_time_budget_ms(const AcGameConfig *config, AcAIDifficulty difficul
         return config->aiTimeLimit * 1000;
     }
 
-    return ac_get_default_ai_time_budget_ms(difficulty);
+    return get_default_ai_time_budget_ms(difficulty);
 }
 
 static int max_int(int left, int right) {
@@ -85,26 +87,26 @@ static int required_seconds_for_budget_ms(int budgetMs) {
     return (paddedBudgetMs + 999) / 1000;
 }
 
-int ac_get_required_ai_turn_timer_seconds(const AcGameConfig *config) {
+int get_required_ai_turn_timer_seconds(const GameConfig *config) {
     int maxBudgetMs = 0;
 
-    if (config == NULL || config->mode == AC_MODE_HUMAN_VS_HUMAN) {
+    if (config == NULL || config->mode == GameMode::HumanVsHuman) {
         return 0;
     }
 
     switch (config->mode) {
-    case AC_MODE_HUMAN_VS_COMPUTER:
-        if (config->playerColor == AC_WHITE) {
-            maxBudgetMs = ac_get_ai_time_budget_ms(config, config->aiDifficultyBlack);
+    case GameMode::HumanVsComputer:
+        if (config->playerColor == Color::White) {
+            maxBudgetMs = get_ai_time_budget_ms(config, config->aiDifficultyBlack);
         } else {
-            maxBudgetMs = ac_get_ai_time_budget_ms(config, config->aiDifficultyWhite);
+            maxBudgetMs = get_ai_time_budget_ms(config, config->aiDifficultyWhite);
         }
         break;
-    case AC_MODE_COMPUTER_VS_COMPUTER:
-        maxBudgetMs = max_int(ac_get_ai_time_budget_ms(config, config->aiDifficultyWhite),
-                              ac_get_ai_time_budget_ms(config, config->aiDifficultyBlack));
+    case GameMode::ComputerVsComputer:
+        maxBudgetMs = max_int(get_ai_time_budget_ms(config, config->aiDifficultyWhite),
+                              get_ai_time_budget_ms(config, config->aiDifficultyBlack));
         break;
-    case AC_MODE_HUMAN_VS_HUMAN:
+    case GameMode::HumanVsHuman:
     default:
         break;
     }
@@ -112,13 +114,15 @@ int ac_get_required_ai_turn_timer_seconds(const AcGameConfig *config) {
     return required_seconds_for_budget_ms(maxBudgetMs);
 }
 
-int ac_is_ai_turn_timer_setting_valid(const AcGameConfig *config) {
+int is_ai_turn_timer_setting_valid(const GameConfig *config) {
     int requiredSeconds;
 
     if (config == NULL || !config->timerEnabled) {
         return 1;
     }
 
-    requiredSeconds = ac_get_required_ai_turn_timer_seconds(config);
+    requiredSeconds = get_required_ai_turn_timer_seconds(config);
     return requiredSeconds <= 0 || config->initialTimeSeconds >= requiredSeconds;
 }
+
+} // namespace ac

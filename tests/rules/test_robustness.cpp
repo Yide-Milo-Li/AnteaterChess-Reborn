@@ -1,11 +1,13 @@
-#include "anteater/rules.h"
-#include "anteater/session.h"
-#include "anteater/ai.h"
+#include "anteater/rules.hpp"
+#include "anteater/session.hpp"
+#include "anteater/ai.hpp"
 #include <assert.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+using namespace ac;
 
 /* Simple LCG pseudo-random number generator for reproducible fuzzing */
 static uint32_t fuzz_rand(uint32_t *state) {
@@ -16,28 +18,48 @@ static uint32_t fuzz_rand(uint32_t *state) {
 /* 1. Audit Coordinate and Move Request Parser Robustness against Malformed Inputs */
 static void audit_parser_fuzzing(void) {
     uint32_t rng = 0xDEADBEEF;
-    AcMoveRequest req;
+    MoveRequest req;
     char buffer[128];
 
     /* Basic boundary inputs */
-    assert(ac_parse_position(NULL).row == -1);
-    assert(ac_parse_move_request_fields(NULL, "E4", AC_PROMOTION_CHOICE_NONE, &req) != 0);
-    assert(ac_parse_move_request_fields("E2", NULL, AC_PROMOTION_CHOICE_NONE, &req) != 0);
-    assert(ac_parse_move_request_fields("E2", "E4", (AcPromotionChoice)999, &req) != 0);
+    assert(parse_position(NULL).row == -1);
+    assert(parse_move_request_fields(NULL, "E4", PromotionChoice::None, &req) != Status::Ok);
+    assert(parse_move_request_fields("E2", NULL, PromotionChoice::None, &req) != Status::Ok);
+    assert(parse_move_request_fields("E2", "E4", (PromotionChoice)999, &req) != Status::Ok);
 
     /* Mutated strings fuzzing */
-    static const char *const corpus[] = {
-        "", " ", "\t\r\n", "A", "1", "A0", "A9", "K1", "J0", "J9",
-        "E2E4", "E 2", "E2\0extra", "E2 ", " E2", "  E2  ",
-        "A1", "J8", "a1", "j8", "e2", "e4",
-        "%s%s%s%s%s%s%s%s%n", "\xFF\xFE\xFD", "棋子", "E\xFF"
-    };
+    static const char *const corpus[] = {"",
+                                         " ",
+                                         "\t\r\n",
+                                         "A",
+                                         "1",
+                                         "A0",
+                                         "A9",
+                                         "K1",
+                                         "J0",
+                                         "J9",
+                                         "E2E4",
+                                         "E 2",
+                                         "E2\0extra",
+                                         "E2 ",
+                                         " E2",
+                                         "  E2  ",
+                                         "A1",
+                                         "J8",
+                                         "a1",
+                                         "j8",
+                                         "e2",
+                                         "e4",
+                                         "%s%s%s%s%s%s%s%s%n",
+                                         "\xFF\xFE\xFD",
+                                         "棋子",
+                                         "E\xFF"};
 
     for (size_t i = 0; i < sizeof(corpus) / sizeof(corpus[0]); ++i) {
-        AcSquare sq = ac_parse_position(corpus[i]);
+        Square sq = parse_position(corpus[i]);
         (void)sq;
         for (size_t j = 0; j < sizeof(corpus) / sizeof(corpus[0]); ++j) {
-            int ret = ac_parse_move_request_fields(corpus[i], corpus[j], AC_PROMOTION_CHOICE_NONE, &req);
+            Status ret = parse_move_request_fields(corpus[i], corpus[j], PromotionChoice::None, &req);
             (void)ret;
         }
     }
@@ -50,57 +72,56 @@ static void audit_parser_fuzzing(void) {
         }
         buffer[len] = '\0';
 
-        AcSquare sq = ac_parse_position(buffer);
-        if (ac_is_valid_position(sq)) {
-            assert(sq.row >= 0 && sq.row < AC_ROWS);
-            assert(sq.col >= 0 && sq.col < AC_COLS);
+        Square sq = parse_position(buffer);
+        if (is_valid_position(sq)) {
+            assert(sq.row >= 0 && sq.row < Rows);
+            assert(sq.col >= 0 && sq.col < Columns);
         }
 
         int promo = (int)(fuzz_rand(&rng) % 10) - 2;
-        int ret = ac_parse_move_request_fields(buffer, buffer, (AcPromotionChoice)promo, &req);
+        Status ret = parse_move_request_fields(buffer, buffer, (PromotionChoice)promo, &req);
         (void)ret;
     }
 }
 
 /* 2. Audit MoveList Capacity and Bound Invariants */
 static void audit_movelist_bounds(void) {
-    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
+    MoveList *list = static_cast<MoveList *>(malloc(sizeof(*list)));
     assert(list);
 
-    ac_init_move_list(list);
+    init_move_list(list);
     assert(list->count == 0);
-    assert(list->status == AC_OK);
+    assert(list->status == Status::Ok);
 
-    AcMove dummy = ac_create_move(ac_create_position(1, 1), ac_create_position(2, 1),
-                                  ac_create_piece(AC_ANT, AC_WHITE));
+    Move dummy = create_move(create_position(1, 1), create_position(2, 1), create_piece(PieceType::Ant, Color::White));
 
-    for (int i = 0; i < AC_MAX_MOVES; ++i) {
-        assert(ac_add_move(list, dummy) == AC_OK);
+    for (int i = 0; i < MaxMoves; ++i) {
+        assert(add_move(list, dummy) == Status::Ok);
         assert(list->count == i + 1);
-        assert(list->status == AC_OK);
+        assert(list->status == Status::Ok);
     }
 
-    /* 1025th move must fail with AC_CAPACITY */
-    assert(ac_add_move(list, dummy) == AC_CAPACITY);
-    assert(list->count == AC_MAX_MOVES);
-    assert(list->status == AC_CAPACITY);
+    /* 1025th move must fail with Status::Capacity */
+    assert(add_move(list, dummy) == Status::Capacity);
+    assert(list->count == MaxMoves);
+    assert(list->status == Status::Capacity);
 
     /* Stickiness: even after removing a move, additions must continue to fail until re-init */
-    assert(ac_remove_last_move(list) == AC_OK);
-    assert(list->count == AC_MAX_MOVES - 1);
-    assert(ac_add_move(list, dummy) == AC_CAPACITY);
-    assert(list->status == AC_CAPACITY);
+    assert(remove_last_move(list) == Status::Ok);
+    assert(list->count == MaxMoves - 1);
+    assert(add_move(list, dummy) == Status::Capacity);
+    assert(list->status == Status::Capacity);
 
     /* Re-init resets sticky status */
-    ac_init_move_list(list);
-    assert(list->status == AC_OK);
-    assert(ac_add_move(list, dummy) == AC_OK);
+    init_move_list(list);
+    assert(list->status == Status::Ok);
+    assert(add_move(list, dummy) == Status::Ok);
 
     /* Out of bounds accessors */
-    assert(ac_get_move(list, -1) == NULL);
-    assert(ac_get_move(list, 0) != NULL);
-    assert(ac_get_move(list, 1) == NULL);
-    assert(ac_get_move(list, AC_MAX_MOVES) == NULL);
+    assert(get_move(list, -1) == NULL);
+    assert(get_move(list, 0) != NULL);
+    assert(get_move(list, 1) == NULL);
+    assert(get_move(list, MaxMoves) == NULL);
 
     free(list);
 }
@@ -111,90 +132,90 @@ static void audit_movelist_bounds(void) {
 
 /* 3. Audit Time Budget and Tournament Arithmetic Boundaries */
 static void audit_budget_arithmetic(void) {
-    AcAITimeManager tm;
-    ac_init_ai_time_manager(&tm);
+    AITimeManager tm;
+    init_ai_time_manager(&tm);
 
     /* Base tournament values */
-    int budgetW = ac_get_ai_tournament_budget_ms(&tm, AC_WHITE);
+    int budgetW = get_ai_tournament_budget_ms(&tm, Color::White);
     assert(budgetW >= TEST_AI_MIN_MOVE_BUDGET_MS && budgetW <= TEST_AI_TOURNAMENT_MAX_MS);
 
     /* Extreme elapsed time: larger than remaining */
-    ac_update_ai_tournament_time(&tm, AC_WHITE, budgetW, 1000000);
+    update_ai_tournament_time(&tm, Color::White, budgetW, 1000000);
     assert(tm.remainingMs[0] == 0);
-    assert(ac_is_ai_tournament_time_expired(&tm, AC_WHITE));
+    assert(is_ai_tournament_time_expired(&tm, Color::White));
 
     /* Check budget when expired */
-    budgetW = ac_get_ai_tournament_budget_ms(&tm, AC_WHITE);
+    budgetW = get_ai_tournament_budget_ms(&tm, Color::White);
     assert(budgetW == TEST_AI_MIN_MOVE_BUDGET_MS);
 
     /* Check negative and boundary values */
-    ac_update_ai_tournament_time(&tm, AC_BLACK, -100, -500);
+    update_ai_tournament_time(&tm, Color::Black, -100, -500);
     assert(tm.remainingMs[1] == TEST_AI_TOURNAMENT_TOTAL_MS);
 
     /* GameConfig turn timer required seconds with extreme limit */
-    AcGameConfig cfg;
-    ac_init_game_config_for_mode(&cfg, AC_MODE_HUMAN_VS_COMPUTER);
+    GameConfig cfg;
+    init_game_config_for_mode(&cfg, GameMode::HumanVsComputer);
     cfg.timerEnabled = 1;
     cfg.aiTimeLimit = INT_MAX / 1000 + 500;
-    int budgetMs = ac_get_ai_time_budget_ms(&cfg, AC_DIFFICULTY_HARD);
+    int budgetMs = get_ai_time_budget_ms(&cfg, Difficulty::Hard);
     assert(budgetMs == INT_MAX);
 
-    int reqSec = ac_get_required_ai_turn_timer_seconds(&cfg);
+    int reqSec = get_required_ai_turn_timer_seconds(&cfg);
     assert(reqSec > 0);
 }
 
 /* 4. Audit Deep Random Playout: Hash Consistency & Apply/Unmake Invariants */
 static void audit_random_playout_invariants(void) {
     uint32_t rng = 0x12345678;
-    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
+    MoveList *moves = static_cast<MoveList *>(malloc(sizeof(*moves)));
     assert(moves);
 
     for (int game = 0; game < 20; ++game) {
-        AcPosition pos;
-        ac_position_init(&pos);
+        Position pos;
+        position_init(&pos);
 
-        AcUndo undoStack[200];
+        Undo undoStack[200];
         int plyCount = 0;
 
         for (int ply = 0; ply < 150; ++ply) {
-            assert(ac_generate_legal_moves(&pos, moves) == AC_OK);
+            assert(generate_legal_moves(&pos, moves) == Status::Ok);
             if (moves->count == 0) {
                 break;
             }
 
             /* Pick random move */
             int choice = (int)(fuzz_rand(&rng) % (uint32_t)moves->count);
-            AcMove move = moves->moves[choice];
+            Move move = moves->moves[choice];
 
             /* Validate move validation agreement */
-            assert(ac_validate_move(&pos, move));
+            assert(validate_move(&pos, move));
 
-            AcUndo undo;
-            assert(ac_position_apply(&pos, move, &undo) == AC_OK);
+            Undo undo;
+            assert(position_apply(&pos, move, &undo) == Status::Ok);
 
             /* Crucial Invariant: Incremental XOR Hash MUST equal Full Recomputed Hash */
-            assert(pos.hash == ac_position_hash(&pos));
+            assert(pos.hash == position_hash(&pos));
 
             undoStack[plyCount++] = undo;
 
             /* Check terminal result does not crash */
-            AcGameResult res;
-            assert(ac_position_result(&pos, &res) == AC_OK);
-            if (res != AC_RESULT_NONE) {
+            GameResult res;
+            assert(position_result(&pos, &res) == Status::Ok);
+            if (res != GameResult::None) {
                 break;
             }
         }
 
         /* Unmake all moves back to root and assert byte-exact match */
-        AcPosition root;
-        ac_position_init(&root);
+        Position root;
+        position_init(&root);
 
         for (int ply = plyCount - 1; ply >= 0; --ply) {
-            assert(ac_position_unmake(&pos, &undoStack[ply]) == AC_OK);
-            assert(pos.hash == ac_position_hash(&pos));
+            assert(position_unmake(&pos, &undoStack[ply]) == Status::Ok);
+            assert(pos.hash == position_hash(&pos));
         }
 
-        assert(memcmp(&pos, &root, sizeof(AcPosition)) == 0);
+        assert((pos == root));
     }
 
     free(moves);
@@ -211,17 +232,17 @@ static int64_t mock_clock(void *ctx) {
     return ((MockEnv *)ctx)->nowMs;
 }
 
-static AcStatus mock_log(void *ctx, const AcSnapshot *snap) {
+static Status mock_log(void *ctx, const Snapshot *snap) {
     (void)snap;
     MockEnv *env = static_cast<MockEnv *>(ctx);
     ++env->logCount;
-    return env->logFail ? AC_IO_ERROR : AC_OK;
+    return env->logFail ? Status::IoError : Status::Ok;
 }
 
 /* 5. Audit Session Transactions and Stale Result Rejection */
 static void audit_session_robustness(void) {
     MockEnv env = {.nowMs = 1000, .logFail = 0, .logCount = 0};
-    AcSessionOptions opts = {
+    SessionOptions opts = {
         .clock = {mock_clock, &env},
         .log = mock_log,
         .logContext = &env,
@@ -230,44 +251,44 @@ static void audit_session_robustness(void) {
         .allocatorContext = NULL
     };
 
-    AcSession *session = ac_session_create(&opts);
+    Session *session = session_create(&opts);
     assert(session);
 
-    AcGameConfig cfg;
-    ac_init_game_config_for_mode(&cfg, AC_MODE_HUMAN_VS_HUMAN);
+    GameConfig cfg;
+    init_game_config_for_mode(&cfg, GameMode::HumanVsHuman);
     cfg.timerEnabled = 1;
     cfg.initialTimeSeconds = 10;
-    assert(ac_session_start(session, &cfg) == AC_OK);
+    assert(session_start(session, &cfg) == Status::Ok);
 
-    AcSnapshot snap;
-    assert(ac_session_snapshot(session, &snap) == AC_OK);
+    Snapshot snap;
+    assert(session_snapshot(session, &snap) == Status::Ok);
     uint64_t rev = snap.revision;
 
     /* Move validation */
-    AcMoveRequest req;
-    assert(ac_parse_move_request_fields("E2", "E4", AC_PROMOTION_CHOICE_NONE, &req) == 0);
+    MoveRequest req;
+    assert(parse_move_request_fields("E2", "E4", PromotionChoice::None, &req) == Status::Ok);
 
     /* Simulate turn timeout: advance clock by 11 seconds */
     env.nowMs += 11000;
 
     /* Submit move on timed out position: must reject as stale because tick updated the turn */
-    assert(ac_session_submit(session, req) == AC_STALE_RESULT);
+    assert(session_submit(session, req) == Status::StaleResult);
 
     /* Verify session switched turn cleanly without corrupting position */
-    assert(ac_session_snapshot(session, &snap) == AC_OK);
-    assert(snap.position.currentTurn == AC_BLACK);
+    assert(session_snapshot(session, &snap) == Status::Ok);
+    assert(snap.position.currentTurn == Color::Black);
     assert(snap.revision > rev);
 
     /* Verify diagnostic decoupling: log write failure does not roll back move */
     env.logFail = 1;
-    assert(ac_parse_move_request_fields("E7", "E5", AC_PROMOTION_CHOICE_NONE, &req) == 0);
-    assert(ac_session_submit(session, req) == AC_OK);
+    assert(parse_move_request_fields("E7", "E5", PromotionChoice::None, &req) == Status::Ok);
+    assert(session_submit(session, req) == Status::Ok);
 
-    assert(ac_session_snapshot(session, &snap) == AC_OK);
+    assert(session_snapshot(session, &snap) == Status::Ok);
     assert(snap.historyCount == 1);
-    assert(snap.diagnostic == AC_IO_ERROR); /* Diagnostic records failure */
+    assert(snap.diagnostic == Status::IoError); /* Diagnostic records failure */
 
-    ac_session_destroy(session);
+    session_destroy(session);
 }
 
 int main(void) {

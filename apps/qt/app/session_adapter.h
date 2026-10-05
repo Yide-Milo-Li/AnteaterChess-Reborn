@@ -1,5 +1,5 @@
 #pragma once
-#include "anteater/session.h"
+#include "anteater/session.hpp"
 #include "async/search_jobs.h"
 #include "models/board_model.h"
 #include "models/history_model.h"
@@ -7,7 +7,7 @@
 #include <QTimer>
 
 namespace ac {
-// Commands mutate AcSession; getters read the last published projection only.
+// Commands mutate Session; getters read the last published projection only.
 class SessionAdapter : public QObject {
     Q_OBJECT
     Q_PROPERTY(QObject *boardModel READ boardModel CONSTANT)
@@ -31,20 +31,32 @@ class SessionAdapter : public QObject {
     Q_PROPERTY(QString toText READ toText NOTIFY moveFieldsChanged)
     Q_PROPERTY(bool fromValid READ fromValid NOTIFY moveFieldsChanged)
     Q_PROPERTY(bool toValid READ toValid NOTIFY moveFieldsChanged)
-public:
+  public:
     enum Page { MainMenu, ModeMenu, Setup, Gameplay, EndGame };
     Q_ENUM(Page)
-    explicit SessionAdapter(const AcSessionOptions *options = nullptr, QObject *parent = nullptr);
+    explicit SessionAdapter(const SessionOptions *options = nullptr, QObject *parent = nullptr);
     ~SessionAdapter() override;
-    bool valid() const { return session_ != nullptr; }
-    QObject *boardModel() { return &board_; }
-    QObject *historyModel() { return &history_; }
-    int page() const { return page_; }
-    bool busy() const { return jobs_.busy(); }
+    bool valid() const {
+        return session_ != nullptr;
+    }
+    QObject *boardModel() {
+        return &board_;
+    }
+    QObject *historyModel() {
+        return &history_;
+    }
+    int page() const {
+        return page_;
+    }
+    bool busy() const {
+        return jobs_.busy();
+    }
     bool humanTurn() const;
     bool canUndo() const;
     bool canHint() const;
-    int historyCount() const { return state_.historyCount; }
+    int historyCount() const {
+        return state_.historyCount;
+    }
     QString turnText() const;
     QString clockText() const;
     QString whiteTimer() const;
@@ -52,14 +64,26 @@ public:
     QString modeText() const;
     QString aiSummary() const;
     QString resultText() const;
-    QString status() const { return status_; }
-    bool statusError() const { return error_; }
-    QString fromText() const { return from_; }
-    QString toText() const { return to_; }
-    bool fromValid() const { return fromValid_; }
-    bool toValid() const { return toValid_; }
-    AcSnapshot snapshot() const;
-    AcStatus start(const AcGameConfig &config);
+    QString status() const {
+        return status_;
+    }
+    bool statusError() const {
+        return error_;
+    }
+    QString fromText() const {
+        return from_;
+    }
+    QString toText() const {
+        return to_;
+    }
+    bool fromValid() const {
+        return fromValid_;
+    }
+    bool toValid() const {
+        return toValid_;
+    }
+    Snapshot snapshot() const;
+    Status start(const GameConfig &config);
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void chooseMode(int mode);
     Q_INVOKABLE void back();
@@ -74,32 +98,33 @@ public:
     Q_INVOKABLE void finish();
     Q_INVOKABLE bool requestClose();
     void tick();
-signals:
+  signals:
     void stateChanged();
     void moveFieldsChanged();
     void promotionRequested();
     void promotionDismissed();
     void closeReady();
-private:
+
+  private:
     void refresh();
     void invalidate();
     void updateHighlights();
     void searchCompleted();
-    void report(AcStatus status);
-    QString timerText(AcColor color) const;
-    AcSession *session_ = nullptr;
+    void report(Status status);
+    QString timerText(Color color) const;
+    Session *session_ = nullptr;
     SessionLog log_;
     BoardModel board_;
     HistoryModel history_;
     SearchJobs jobs_;
     QTimer timer_;
-    AcSnapshot state_{}; // History/hash pointers are cleared after projection.
+    Snapshot state_{}; // History/hash pointers are cleared after projection.
     Page page_ = MainMenu;
     uint64_t generation_ = 0, promotionRevision_ = 0;
     int failedCount_ = -1;
-    AcColor failedTurn_ = AC_EMPTY_COLOR;
+    Color failedTurn_ = Color::Empty;
     bool closing_ = false, promotionPending_ = false, error_ = false;
     bool fromValid_ = false, toValid_ = false;
     QString status_ = "Ready", from_, to_;
 };
-}
+} // namespace ac

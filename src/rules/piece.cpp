@@ -1,63 +1,67 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 
-static int isValidPieceType(AcPieceType type) {
-    return type >= AC_ANT && type <= AC_EMPTY_PIECE;
+namespace ac {
+
+static int isValidPieceType(PieceType type) {
+    return type >= PieceType::Ant && type <= PieceType::Empty;
 }
 
-static int isValidColorValue(AcColor color) {
-    return color >= AC_WHITE && color <= AC_EMPTY_COLOR;
+static int isValidColorValue(Color color) {
+    return color >= Color::White && color <= Color::Empty;
 }
 
-AcPiece ac_create_piece(AcPieceType type, AcColor color) {
-    AcPiece piece;
+Piece create_piece(PieceType type, Color color) {
+    Piece piece;
 
     piece.type = type;
     piece.color = color;
     return piece;
 }
 
-int ac_is_same_color(AcPiece a, AcPiece b) {
-    if (!ac_is_valid_piece(a) || !ac_is_valid_piece(b)) {
+int is_same_color(Piece a, Piece b) {
+    if (!is_valid_piece(a) || !is_valid_piece(b)) {
         return 0;
     }
 
     return a.color == b.color;
 }
 
-char ac_get_piece_symbol(AcPiece piece) {
-    if (!ac_is_valid_piece(piece) || piece.type == AC_EMPTY_PIECE) {
+char get_piece_symbol(Piece piece) {
+    if (!is_valid_piece(piece) || piece.type == PieceType::Empty) {
         return '.';
     }
 
     switch (piece.type) {
-    case AC_ANT:
+    case PieceType::Ant:
         return 'P';
-    case AC_ROOK:
+    case PieceType::Rook:
         return 'R';
-    case AC_KNIGHT:
+    case PieceType::Knight:
         return 'N';
-    case AC_BISHOP:
+    case PieceType::Bishop:
         return 'B';
-    case AC_QUEEN:
+    case PieceType::Queen:
         return 'Q';
-    case AC_KING:
+    case PieceType::King:
         return 'K';
-    case AC_ANTEATER:
+    case PieceType::Anteater:
         return 'A';
-    case AC_EMPTY_PIECE:
+    case PieceType::Empty:
     default:
         return '.';
     }
 }
 
-int ac_is_valid_piece(AcPiece piece) {
+int is_valid_piece(Piece piece) {
     if (!isValidPieceType(piece.type) || !isValidColorValue(piece.color)) {
         return 0;
     }
 
-    if (piece.type == AC_EMPTY_PIECE) {
-        return piece.color == AC_EMPTY_COLOR;
+    if (piece.type == PieceType::Empty) {
+        return piece.color == Color::Empty;
     }
 
-    return piece.color == AC_WHITE || piece.color == AC_BLACK;
+    return piece.color == Color::White || piece.color == Color::Black;
 }
+
+} // namespace ac

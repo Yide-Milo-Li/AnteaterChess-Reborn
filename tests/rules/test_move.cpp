@@ -1,94 +1,95 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <assert.h>
 #include <stddef.h>
 
-static void assertCaptureRecord(AcCaptureRecord record, AcSquare pos, AcPiece piece) {
-    assert(ac_position_equal(record.pos, pos) == 1);
+using namespace ac;
+
+static void assertCaptureRecord(CaptureRecord record, Square pos, Piece piece) {
+    assert(position_equal(record.pos, pos) == 1);
     assert(record.piece.type == piece.type);
     assert(record.piece.color == piece.color);
 }
 
 static void test_create_move_defaults(void) {
-    AcSquare from = ac_create_position(6, 0);
-    AcSquare to = ac_create_position(5, 0);
-    AcPiece pawn = ac_create_piece(AC_ANT, AC_WHITE);
-    AcMove move = ac_create_move(from, to, pawn);
+    Square from = create_position(6, 0);
+    Square to = create_position(5, 0);
+    Piece pawn = create_piece(PieceType::Ant, Color::White);
+    Move move = create_move(from, to, pawn);
 
-    assert(ac_position_equal(move.from, from) == 1);
-    assert(ac_position_equal(move.to, to) == 1);
-    assert(move.movedPiece.type == AC_ANT);
-    assert(move.movedPiece.color == AC_WHITE);
+    assert(position_equal(move.from, from) == 1);
+    assert(position_equal(move.to, to) == 1);
+    assert(move.movedPiece.type == PieceType::Ant);
+    assert(move.movedPiece.color == Color::White);
     assert(move.pathLength == 0);
     assert(move.captureCount == 0);
-    assert(move.specialType == AC_NO_SPECIAL_MOVE);
+    assert(move.specialType == SpecialMove::None);
 }
 
 static void test_move_path_and_captures(void) {
-    AcMove move =
-        ac_create_move(ac_create_position(2, 2), ac_create_position(4, 4), ac_create_piece(AC_ANTEATER, AC_WHITE));
-    AcSquare pathPos = ac_create_position(3, 3);
-    AcSquare capturePos = ac_create_position(4, 3);
-    AcPiece capturePiece = ac_create_piece(AC_ANT, AC_BLACK);
+    Move move =
+        create_move(create_position(2, 2), create_position(4, 4), create_piece(PieceType::Anteater, Color::White));
+    Square pathPos = create_position(3, 3);
+    Square capturePos = create_position(4, 3);
+    Piece capturePiece = create_piece(PieceType::Ant, Color::Black);
 
-    ac_add_path_step(&move, pathPos);
-    ac_add_capture(&move, capturePos, capturePiece);
-    ac_set_special_move(&move, AC_ANTEATER_CAPTURE);
+    add_path_step(&move, pathPos);
+    add_capture(&move, capturePos, capturePiece);
+    set_special_move(&move, SpecialMove::AnteaterCapture);
 
     assert(move.pathLength == 1);
-    assert(ac_position_equal(move.path[0], pathPos) == 1);
+    assert(position_equal(move.path[0], pathPos) == 1);
     assert(move.captureCount == 1);
     assertCaptureRecord(move.captures[0], capturePos, capturePiece);
-    assert(move.specialType == AC_ANTEATER_CAPTURE);
+    assert(move.specialType == SpecialMove::AnteaterCapture);
 }
 
 static void test_move_capacity_limits(void) {
-    AcMove move =
-        ac_create_move(ac_create_position(0, 0), ac_create_position(1, 1), ac_create_piece(AC_QUEEN, AC_WHITE));
+    Move move = create_move(create_position(0, 0), create_position(1, 1), create_piece(PieceType::Queen, Color::White));
     int i;
 
-    for (i = 0; i < AC_MAX_CHAIN + 2; ++i) {
-        ac_add_path_step(&move, ac_create_position(i, i));
-        ac_add_capture(&move, ac_create_position(i, i + 1), ac_create_piece(AC_ANT, AC_BLACK));
+    for (i = 0; i < MaxChain + 2; ++i) {
+        add_path_step(&move, create_position(i, i));
+        add_capture(&move, create_position(i, i + 1), create_piece(PieceType::Ant, Color::Black));
     }
 
-    assert(move.pathLength == AC_MAX_CHAIN);
-    assert(move.captureCount == AC_MAX_CHAIN);
-    assert(ac_position_equal(move.path[AC_MAX_CHAIN - 1], ac_create_position(AC_MAX_CHAIN - 1, AC_MAX_CHAIN - 1)) == 1);
-    assertCaptureRecord(move.captures[AC_MAX_CHAIN - 1], ac_create_position(AC_MAX_CHAIN - 1, AC_MAX_CHAIN),
-                        ac_create_piece(AC_ANT, AC_BLACK));
+    assert(move.pathLength == MaxChain);
+    assert(move.captureCount == MaxChain);
+    assert(position_equal(move.path[MaxChain - 1], create_position(MaxChain - 1, MaxChain - 1)) == 1);
+    assertCaptureRecord(move.captures[MaxChain - 1], create_position(MaxChain - 1, MaxChain),
+                        create_piece(PieceType::Ant, Color::Black));
 }
 
 static void test_movelist_operations(void) {
-    AcMoveList list;
-    AcMove move = ac_create_move(ac_create_position(6, 1), ac_create_position(5, 1), ac_create_piece(AC_ANT, AC_WHITE));
-    AcMove *stored;
+    MoveList list;
+    Move move = create_move(create_position(6, 1), create_position(5, 1), create_piece(PieceType::Ant, Color::White));
+    Move *stored;
 
-    ac_init_move_list(&list);
-    assert(ac_get_move_count(&list) == 0);
-    assert(ac_add_move(&list, move) == 0);
-    assert(ac_get_move_count(&list) == 1);
+    init_move_list(&list);
+    assert(get_move_count(&list) == 0);
+    assert(add_move(&list, move) == Status::Ok);
+    assert(get_move_count(&list) == 1);
 
-    stored = ac_get_move(&list, 0);
+    stored = get_move(&list, 0);
     assert(stored != NULL);
-    assert(ac_position_equal(stored->from, ac_create_position(6, 1)) == 1);
-    assert(ac_get_move(&list, 1) == NULL);
+    assert(position_equal(stored->from, create_position(6, 1)) == 1);
+    assert(get_move(&list, 1) == NULL);
 
-    assert(ac_remove_last_move(&list) == 0);
-    assert(ac_get_move_count(&list) == 0);
-    assert(ac_remove_last_move(&list) != 0);
+    assert(remove_last_move(&list) == Status::Ok);
+    assert(get_move_count(&list) == 0);
+    assert(remove_last_move(&list) != Status::Ok);
 }
 
 static void test_promotion_special_move_detection(void) {
-    assert(ac_is_promotion_special_move(AC_PROMOTION_QUEEN) == 1);
-    assert(ac_is_promotion_special_move(AC_PROMOTION_ROOK) == 1);
-    assert(ac_is_promotion_special_move(AC_PROMOTION_BISHOP) == 1);
-    assert(ac_is_promotion_special_move(AC_PROMOTION_KNIGHT) == 1);
+    assert(is_promotion_special_move(SpecialMove::PromotionQueen) == 1);
+    assert(is_promotion_special_move(SpecialMove::PromotionRook) == 1);
+    assert(is_promotion_special_move(SpecialMove::PromotionBishop) == 1);
+    assert(is_promotion_special_move(SpecialMove::PromotionKnight) == 1);
 
-    assert(ac_is_promotion_special_move(AC_NO_SPECIAL_MOVE) == 0);
-    assert(ac_is_promotion_special_move(AC_CASTLING_KINGSIDE) == 0);
-    assert(ac_is_promotion_special_move(AC_CASTLING_QUEENSIDE) == 0);
-    assert(ac_is_promotion_special_move(AC_EN_PASSANT) == 0);
-    assert(ac_is_promotion_special_move(AC_ANTEATER_CAPTURE) == 0);
+    assert(is_promotion_special_move(SpecialMove::None) == 0);
+    assert(is_promotion_special_move(SpecialMove::CastlingKingside) == 0);
+    assert(is_promotion_special_move(SpecialMove::CastlingQueenside) == 0);
+    assert(is_promotion_special_move(SpecialMove::EnPassant) == 0);
+    assert(is_promotion_special_move(SpecialMove::AnteaterCapture) == 0);
 }
 
 int main(void) {

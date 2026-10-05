@@ -2,15 +2,18 @@
 #include <QQmlEngine>
 #include <QQmlContext>
 #include <QtQuickTest>
+
+using namespace ac;
 class Setup : public QObject {
     Q_OBJECT
-public slots:
+  public slots:
     void qmlEngineAvailable(QQmlEngine *engine) {
-        adapter = new ac::SessionAdapter(nullptr,engine);
-        engine->rootContext()->setContextProperty("backend",adapter);
+        adapter = new ac::SessionAdapter(nullptr, engine);
+        engine->rootContext()->setContextProperty("backend", adapter);
     }
-private:
+
+  private:
     ac::SessionAdapter *adapter = nullptr;
 };
-QUICK_TEST_MAIN_WITH_SETUP(anteater_qml,Setup)
+QUICK_TEST_MAIN_WITH_SETUP(anteater_qml, Setup)
 #include "test_qml.moc"

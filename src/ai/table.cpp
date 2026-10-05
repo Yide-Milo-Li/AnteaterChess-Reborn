@@ -1,9 +1,11 @@
-#include "internal.h"
-TTEntry *ac_ai_tt_slot(AcSearchContext *ctx, uint64_t key) {
+#include "internal.hpp"
+
+namespace ac {
+TTEntry *ai_tt_slot(SearchContext *ctx, uint64_t key) {
     return &ctx->transpositionTable[key & (AC_TT_SIZE - 1)];
 }
 
-int ac_ai_score_to_tt(int score, int ply) {
+int ai_score_to_tt(int score, int ply) {
     if (score > AI_MATE - 1000) {
         return score + ply;
     }
@@ -14,7 +16,7 @@ int ac_ai_score_to_tt(int score, int ply) {
     return score;
 }
 
-int ac_ai_score_from_tt(int score, int ply) {
+int ai_score_from_tt(int score, int ply) {
     if (score > AI_MATE - 1000) {
         return score - ply;
     }
@@ -25,10 +27,10 @@ int ac_ai_score_from_tt(int score, int ply) {
     return score;
 }
 
-int ac_ai_tt_lookup(AcSearchContext *ctx, uint64_t key, TTEntry *entry) {
+int ai_tt_lookup(SearchContext *ctx, uint64_t key, TTEntry *entry) {
     TTEntry *slot;
 
-    slot = ac_ai_tt_slot(ctx, key);
+    slot = ai_tt_slot(ctx, key);
     if (slot->key != key) {
         return 0;
     }
@@ -39,12 +41,12 @@ int ac_ai_tt_lookup(AcSearchContext *ctx, uint64_t key, TTEntry *entry) {
     return 1;
 }
 
-void ac_ai_tt_store(AcSearchContext *ctx, uint64_t key, int depth, int ply, int score, int flag, const AcMove *bestMove,
-                    unsigned char generation) {
+void ai_tt_store(SearchContext *ctx, uint64_t key, int depth, int ply, int score, int flag, const Move *bestMove,
+                 unsigned char generation) {
     TTEntry *entry;
     int replace;
 
-    entry = ac_ai_tt_slot(ctx, key);
+    entry = ai_tt_slot(ctx, key);
     replace = 0;
     // empty slot or different position
     if (entry->key != key) {
@@ -65,17 +67,19 @@ void ac_ai_tt_store(AcSearchContext *ctx, uint64_t key, int depth, int ply, int 
     }
 
     entry->key = key;
-    entry->score = ac_ai_score_to_tt(score, ply);
+    entry->score = ai_score_to_tt(score, ply);
     entry->depth = (short)depth;
     entry->flag = (unsigned char)flag;
     entry->generation = generation;
     if (bestMove != NULL) {
-        entry->from = (unsigned char)ac_ai_square_index(bestMove->from);
-        entry->to = (unsigned char)ac_ai_square_index(bestMove->to);
+        entry->from = (unsigned char)ai_square_index(bestMove->from);
+        entry->to = (unsigned char)ai_square_index(bestMove->to);
         entry->special = (unsigned char)bestMove->specialType;
     } else {
         entry->from = 255;
         entry->to = 255;
-        entry->special = (unsigned char)AC_NO_SPECIAL_MOVE;
+        entry->special = (unsigned char)SpecialMove::None;
     }
 }
+
+} // namespace ac

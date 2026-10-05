@@ -1,141 +1,144 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <stdlib.h>
 #include <assert.h>
 #include <stddef.h>
 
-static void clear_board(AcPosition *state) {
+using namespace ac;
+
+static void clear_board(Position *state) {
     int row;
     int col;
 
     assert(state != NULL);
-    for (row = 0; row < AC_ROWS; ++row) {
-        for (col = 0; col < AC_COLS; ++col) {
-            ac_set_piece(&state->board, ac_create_position(row, col), ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR));
+    for (row = 0; row < Rows; ++row) {
+        for (col = 0; col < Columns; ++col) {
+            set_piece(&state->board, create_position(row, col), create_piece(PieceType::Empty, Color::Empty));
         }
     }
 }
 
-static AcPosition fresh_empty_state(AcColor turn) {
-    AcGameConfig config;
-    AcPosition state;
+static Position fresh_empty_state(Color turn) {
+    GameConfig config;
+    Position state;
 
-    ac_init_default_game_config(&config);
-    ac_position_init(&state);
+    init_default_game_config(&config);
+    position_init(&state);
     clear_board(&state);
     state.currentTurn = turn;
     state.castlingRights = 15;
-    state.enPassant = ac_create_position(-1, -1);
+    state.enPassant = create_position(-1, -1);
     state.moveCount = 0;
 
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
     return state;
 }
 
-static void push_history_move(AcPosition *state, AcMove move) {
-    state->enPassant =
-        move.movedPiece.type == AC_ANT && abs(move.to.row - move.from.row) == 2 ? move.to : ac_create_position(-1, -1);
-    if (move.movedPiece.type == AC_KING)
-        state->castlingRights &= ~(3 << (move.movedPiece.color == AC_WHITE ? 0 : 2));
-    if (move.movedPiece.type == AC_ROOK && move.from.col == 9)
-        state->castlingRights &= ~(1 << (move.movedPiece.color == AC_WHITE ? 0 : 2));
-    if (move.movedPiece.type == AC_ROOK && move.from.col == 0)
-        state->castlingRights &= ~(2 << (move.movedPiece.color == AC_WHITE ? 0 : 2));
+static void push_history_move(Position *state, Move move) {
+    state->enPassant = move.movedPiece.type == PieceType::Ant && abs(move.to.row - move.from.row) == 2
+                           ? move.to
+                           : create_position(-1, -1);
+    if (move.movedPiece.type == PieceType::King)
+        state->castlingRights &= ~(3 << (move.movedPiece.color == Color::White ? 0 : 2));
+    if (move.movedPiece.type == PieceType::Rook && move.from.col == 9)
+        state->castlingRights &= ~(1 << (move.movedPiece.color == Color::White ? 0 : 2));
+    if (move.movedPiece.type == PieceType::Rook && move.from.col == 0)
+        state->castlingRights &= ~(2 << (move.movedPiece.color == Color::White ? 0 : 2));
     ++state->moveCount;
 }
 
 static void test_resolve_simple_move(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(6, 0), ac_create_piece(AC_ANT, AC_WHITE));
-    assert(ac_create_move_request(&request, ac_create_position(6, 0), ac_create_position(5, 0),
-                                  AC_PROMOTION_CHOICE_NONE) == 0);
+    set_piece(&state.board, create_position(6, 0), create_piece(PieceType::Ant, Color::White));
+    assert(create_move_request(&request, create_position(6, 0), create_position(5, 0), PromotionChoice::None) ==
+           Status::Ok);
 
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(ac_position_equal(move.from, ac_create_position(6, 0)));
-    assert(ac_position_equal(move.to, ac_create_position(5, 0)));
-    assert(move.specialType == AC_NO_SPECIAL_MOVE);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(position_equal(move.from, create_position(6, 0)));
+    assert(position_equal(move.to, create_position(5, 0)));
+    assert(move.specialType == SpecialMove::None);
 }
 
 static void test_resolve_castling(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(7, 9), ac_create_piece(AC_ROOK, AC_WHITE));
-    assert(ac_create_move_request(&request, ac_create_position(7, 5), ac_create_position(7, 7),
-                                  AC_PROMOTION_CHOICE_NONE) == 0);
+    set_piece(&state.board, create_position(7, 9), create_piece(PieceType::Rook, Color::White));
+    assert(create_move_request(&request, create_position(7, 5), create_position(7, 7), PromotionChoice::None) ==
+           Status::Ok);
 
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_CASTLING_KINGSIDE);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::CastlingKingside);
 }
 
 static void test_resolve_en_passant(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(3, 4), ac_create_piece(AC_ANT, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(3, 5), ac_create_piece(AC_ANT, AC_BLACK));
+    set_piece(&state.board, create_position(3, 4), create_piece(PieceType::Ant, Color::White));
+    set_piece(&state.board, create_position(3, 5), create_piece(PieceType::Ant, Color::Black));
     push_history_move(
-        &state, ac_create_move(ac_create_position(1, 5), ac_create_position(3, 5), ac_create_piece(AC_ANT, AC_BLACK)));
+        &state, create_move(create_position(1, 5), create_position(3, 5), create_piece(PieceType::Ant, Color::Black)));
 
-    assert(ac_create_move_request(&request, ac_create_position(3, 4), ac_create_position(2, 5),
-                                  AC_PROMOTION_CHOICE_NONE) == 0);
+    assert(create_move_request(&request, create_position(3, 4), create_position(2, 5), PromotionChoice::None) ==
+           Status::Ok);
 
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_EN_PASSANT);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::EnPassant);
     assert(move.captureCount == 1);
-    assert(ac_position_equal(move.captures[0].pos, ac_create_position(3, 5)));
+    assert(position_equal(move.captures[0].pos, create_position(3, 5)));
 }
 
 static void test_resolve_promotion_defaults_to_queen(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(1, 2), ac_create_piece(AC_ANT, AC_WHITE));
-    assert(ac_create_move_request(&request, ac_create_position(1, 2), ac_create_position(0, 2),
-                                  AC_PROMOTION_CHOICE_NONE) == 0);
+    set_piece(&state.board, create_position(1, 2), create_piece(PieceType::Ant, Color::White));
+    assert(create_move_request(&request, create_position(1, 2), create_position(0, 2), PromotionChoice::None) ==
+           Status::Ok);
 
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_PROMOTION_QUEEN);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::PromotionQueen);
 }
 
 static void test_resolve_explicit_promotion_choices(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(1, 2), ac_create_piece(AC_ANT, AC_WHITE));
+    set_piece(&state.board, create_position(1, 2), create_piece(PieceType::Ant, Color::White));
 
-    assert(ac_create_move_request(&request, ac_create_position(1, 2), ac_create_position(0, 2),
-                                  AC_PROMOTION_CHOICE_ROOK) == 0);
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_PROMOTION_ROOK);
+    assert(create_move_request(&request, create_position(1, 2), create_position(0, 2), PromotionChoice::Rook) ==
+           Status::Ok);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::PromotionRook);
 
-    request.promotion = AC_PROMOTION_CHOICE_BISHOP;
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_PROMOTION_BISHOP);
+    request.promotion = PromotionChoice::Bishop;
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::PromotionBishop);
 
-    request.promotion = AC_PROMOTION_CHOICE_KNIGHT;
-    assert(ac_resolve_move_request(&state, request, &move) == 0);
-    assert(move.specialType == AC_PROMOTION_KNIGHT);
+    request.promotion = PromotionChoice::Knight;
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.specialType == SpecialMove::PromotionKnight);
 }
 
 static void test_resolve_rejects_invalid_request(void) {
-    AcPosition state = fresh_empty_state(AC_WHITE);
-    AcMoveRequest request;
-    AcMove move;
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
 
-    ac_set_piece(&state.board, ac_create_position(1, 2), ac_create_piece(AC_ANT, AC_WHITE));
-    assert(ac_create_move_request(&request, ac_create_position(1, 2), ac_create_position(0, 2),
-                                  AC_PROMOTION_CHOICE_QUEEN) == 0);
-    request.promotion = (AcPromotionChoice)99;
+    set_piece(&state.board, create_position(1, 2), create_piece(PieceType::Ant, Color::White));
+    assert(create_move_request(&request, create_position(1, 2), create_position(0, 2), PromotionChoice::Queen) ==
+           Status::Ok);
+    request.promotion = (PromotionChoice)99;
 
-    assert(ac_resolve_move_request(&state, request, &move) != 0);
+    assert(resolve_move_request(&state, request, &move) != Status::Ok);
 }
 
 int main(void) {

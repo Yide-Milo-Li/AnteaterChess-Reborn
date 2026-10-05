@@ -1,5 +1,7 @@
 #include "baseline_probe.hpp"
 #include "../fixtures/baseline.h"
+
+using namespace ac;
 int main(void) {
     FILE *f = tmpfile();
     assert(f);

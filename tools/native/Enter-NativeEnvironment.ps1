@@ -6,6 +6,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Prefer English when the language resource is installed. CMake also detects
+# localized /showIncludes output in Ninja's actual encoding.
+$env:VSLANG = '1033'
 $acVswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 $acComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
 $acVsPaths = @(& $acVswhere -all -products '*' -requires $acComponent -property installationPath)

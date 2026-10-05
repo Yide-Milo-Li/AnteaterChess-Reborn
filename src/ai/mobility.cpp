@@ -1,21 +1,23 @@
-#include "anteater/rules.h"
-#include "score_constants.h"
-#include "mobility.h"
+#include "anteater/rules.hpp"
+#include "score_constants.hpp"
+#include "mobility.hpp"
+
+namespace ac {
 
 /* Mobility estimates count candidate geometry, not complete legal moves. */
 
-static int ac_ai_count_sliding_mobility(const AcBoard *board, AcSquare from, AcPiece piece, int rowStep, int colStep) {
-    AcSquare current;
+static int ai_count_sliding_mobility(const Board *board, Square from, Piece piece, int rowStep, int colStep) {
+    Square current;
     int mobility;
 
     current = from;
     current.row += rowStep;
     current.col += colStep;
     mobility = 0;
-    while (ac_is_valid_position(current)) {
-        AcPiece target = ac_get_piece(board, current);
+    while (is_valid_position(current)) {
+        Piece target = get_piece(board, current);
 
-        if (target.type == AC_EMPTY_PIECE) {
+        if (target.type == PieceType::Empty) {
             ++mobility;
         } else {
             if (target.color != piece.color) {
@@ -31,25 +33,25 @@ static int ac_ai_count_sliding_mobility(const AcBoard *board, AcSquare from, AcP
     return mobility;
 }
 
-static int ac_ai_count_ant_mobility(const AcBoard *board, AcSquare from, AcPiece piece) {
+static int ai_count_ant_mobility(const Board *board, Square from, Piece piece) {
     int direction;
     int mobility;
-    AcSquare forward;
+    Square forward;
     int fileOffset;
 
-    direction = (piece.color == AC_WHITE) ? -1 : 1;
+    direction = (piece.color == Color::White) ? -1 : 1;
     mobility = 0;
 
     // one step forward
-    forward = ac_create_position(from.row + direction, from.col);
-    if (ac_is_valid_position(forward) && ac_get_piece(board, forward).type == AC_EMPTY_PIECE) {
+    forward = create_position(from.row + direction, from.col);
+    if (is_valid_position(forward) && get_piece(board, forward).type == PieceType::Empty) {
         ++mobility;
 
         // two step forward
-        if (((piece.color == AC_WHITE && from.row == 6) || (piece.color == AC_BLACK && from.row == 1))) {
-            AcSquare doubleStep = ac_create_position(from.row + (2 * direction), from.col);
+        if (((piece.color == Color::White && from.row == 6) || (piece.color == Color::Black && from.row == 1))) {
+            Square doubleStep = create_position(from.row + (2 * direction), from.col);
 
-            if (ac_is_valid_position(doubleStep) && ac_get_piece(board, doubleStep).type == AC_EMPTY_PIECE) {
+            if (is_valid_position(doubleStep) && get_piece(board, doubleStep).type == PieceType::Empty) {
                 ++mobility;
             }
         }
@@ -57,15 +59,15 @@ static int ac_ai_count_ant_mobility(const AcBoard *board, AcSquare from, AcPiece
 
     // diagonal
     for (fileOffset = -1; fileOffset <= 1; fileOffset += 2) {
-        AcSquare diagonal = ac_create_position(from.row + direction, from.col + fileOffset);
-        AcPiece target;
+        Square diagonal = create_position(from.row + direction, from.col + fileOffset);
+        Piece target;
 
-        if (!ac_is_valid_position(diagonal)) {
+        if (!is_valid_position(diagonal)) {
             continue;
         }
 
-        target = ac_get_piece(board, diagonal);
-        if (target.type != AC_EMPTY_PIECE && target.color != piece.color) {
+        target = get_piece(board, diagonal);
+        if (target.type != PieceType::Empty && target.color != piece.color) {
             ++mobility;
         }
     }
@@ -73,7 +75,7 @@ static int ac_ai_count_ant_mobility(const AcBoard *board, AcSquare from, AcPiece
     return mobility;
 }
 
-static int ac_ai_count_knight_mobility(const AcBoard *board, AcSquare from, AcPiece piece) {
+static int ai_count_knight_mobility(const Board *board, Square from, Piece piece) {
     // knight moves
     static const int rowOffsets[] = {-2, -2, -1, -1, 1, 1, 2, 2};
     static const int colOffsets[] = {-1, 1, -2, 2, -2, 2, -1, 1};
@@ -82,15 +84,15 @@ static int ac_ai_count_knight_mobility(const AcBoard *board, AcSquare from, AcPi
 
     mobility = 0;
     for (index = 0; index < 8; ++index) {
-        AcSquare target = ac_create_position(from.row + rowOffsets[index], from.col + colOffsets[index]);
-        AcPiece occupant;
+        Square target = create_position(from.row + rowOffsets[index], from.col + colOffsets[index]);
+        Piece occupant;
 
-        if (!ac_is_valid_position(target)) {
+        if (!is_valid_position(target)) {
             continue;
         }
 
-        occupant = ac_get_piece(board, target);
-        if (occupant.type == AC_EMPTY_PIECE || occupant.color != piece.color) {
+        occupant = get_piece(board, target);
+        if (occupant.type == PieceType::Empty || occupant.color != piece.color) {
             ++mobility;
         }
     }
@@ -98,7 +100,7 @@ static int ac_ai_count_knight_mobility(const AcBoard *board, AcSquare from, AcPi
     return mobility;
 }
 
-static int ac_ai_count_anteater_mobility(const AcBoard *board, AcSquare from, AcPiece piece) {
+static int ai_count_anteater_mobility(const Board *board, Square from, Piece piece) {
     // first step, all 8 directions
     static const int rowSteps[] = {-1, -1, -1, 0, 0, 1, 1, 1};
     static const int colSteps[] = {-1, 0, 1, -1, 1, -1, 0, 1};
@@ -110,28 +112,28 @@ static int ac_ai_count_anteater_mobility(const AcBoard *board, AcSquare from, Ac
 
     mobility = 0;
     for (index = 0; index < 8; ++index) {
-        AcSquare target = ac_create_position(from.row + rowSteps[index], from.col + colSteps[index]);
-        AcPiece occupant;
+        Square target = create_position(from.row + rowSteps[index], from.col + colSteps[index]);
+        Piece occupant;
 
-        if (!ac_is_valid_position(target)) {
+        if (!is_valid_position(target)) {
             continue;
         }
 
-        occupant = ac_get_piece(board, target);
-        if (occupant.type == AC_EMPTY_PIECE || (occupant.type == AC_ANT && occupant.color != piece.color)) {
+        occupant = get_piece(board, target);
+        if (occupant.type == PieceType::Empty || (occupant.type == PieceType::Ant && occupant.color != piece.color)) {
             ++mobility;
         }
     }
 
     for (index = 0; index < 4; ++index) {
-        AcSquare current = ac_create_position(from.row + chainRowSteps[index], from.col + chainColSteps[index]);
+        Square current = create_position(from.row + chainRowSteps[index], from.col + chainColSteps[index]);
         int chainLength;
 
         chainLength = 0;
-        while (ac_is_valid_position(current)) {
-            AcPiece target = ac_get_piece(board, current);
+        while (is_valid_position(current)) {
+            Piece target = get_piece(board, current);
 
-            if (target.type != AC_ANT || target.color == piece.color) {
+            if (target.type != PieceType::Ant || target.color == piece.color) {
                 break;
             }
 
@@ -148,7 +150,7 @@ static int ac_ai_count_anteater_mobility(const AcBoard *board, AcSquare from, Ac
     return mobility;
 }
 
-int ac_ai_count_king_mobility(const AcBoard *board, AcSquare from, AcPiece piece) {
+int ai_count_king_mobility(const Board *board, Square from, Piece piece) {
     int rowOffset;
     int colOffset;
     int mobility;
@@ -156,20 +158,20 @@ int ac_ai_count_king_mobility(const AcBoard *board, AcSquare from, AcPiece piece
     mobility = 0;
     for (rowOffset = -1; rowOffset <= 1; ++rowOffset) {
         for (colOffset = -1; colOffset <= 1; ++colOffset) {
-            AcSquare target;
-            AcPiece occupant;
+            Square target;
+            Piece occupant;
 
             if (rowOffset == 0 && colOffset == 0) {
                 continue;
             }
 
-            target = ac_create_position(from.row + rowOffset, from.col + colOffset);
-            if (!ac_is_valid_position(target)) {
+            target = create_position(from.row + rowOffset, from.col + colOffset);
+            if (!is_valid_position(target)) {
                 continue;
             }
 
-            occupant = ac_get_piece(board, target);
-            if (occupant.type == AC_EMPTY_PIECE || occupant.color != piece.color) {
+            occupant = get_piece(board, target);
+            if (occupant.type == PieceType::Empty || occupant.color != piece.color) {
                 ++mobility;
             }
         }
@@ -178,41 +180,42 @@ int ac_ai_count_king_mobility(const AcBoard *board, AcSquare from, AcPiece piece
     return mobility;
 }
 
-int ac_ai_piece_mobility(const AcBoard *board, AcSquare from, AcPiece piece) {
+int ai_piece_mobility(const Board *board, Square from, Piece piece) {
     switch (piece.type) {
-    case AC_ANT:
-        return ac_ai_count_ant_mobility(board, from, piece);
-    case AC_ROOK:
+    case PieceType::Ant:
+        return ai_count_ant_mobility(board, from, piece);
+    case PieceType::Rook:
         // 4 sliding directions
-        return ac_ai_count_sliding_mobility(board, from, piece, -1, 0) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, 0) +
-               ac_ai_count_sliding_mobility(board, from, piece, 0, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 0, 1);
-    case AC_BISHOP:
+        return ai_count_sliding_mobility(board, from, piece, -1, 0) +
+               ai_count_sliding_mobility(board, from, piece, 1, 0) +
+               ai_count_sliding_mobility(board, from, piece, 0, -1) +
+               ai_count_sliding_mobility(board, from, piece, 0, 1);
+    case PieceType::Bishop:
         // 4 sliding directions
-        return ac_ai_count_sliding_mobility(board, from, piece, -1, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, -1, 1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, 1);
-    case AC_QUEEN:
+        return ai_count_sliding_mobility(board, from, piece, -1, -1) +
+               ai_count_sliding_mobility(board, from, piece, -1, 1) +
+               ai_count_sliding_mobility(board, from, piece, 1, -1) +
+               ai_count_sliding_mobility(board, from, piece, 1, 1);
+    case PieceType::Queen:
         // 8 sliding directions
-        return ac_ai_count_sliding_mobility(board, from, piece, -1, 0) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, 0) +
-               ac_ai_count_sliding_mobility(board, from, piece, 0, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 0, 1) +
-               ac_ai_count_sliding_mobility(board, from, piece, -1, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, -1, 1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, -1) +
-               ac_ai_count_sliding_mobility(board, from, piece, 1, 1);
-    case AC_KNIGHT:
-        return ac_ai_count_knight_mobility(board, from, piece);
-    case AC_KING:
-        return ac_ai_count_king_mobility(board, from, piece);
-    case AC_ANTEATER:
-        return ac_ai_count_anteater_mobility(board, from, piece);
-    case AC_EMPTY_PIECE:
+        return ai_count_sliding_mobility(board, from, piece, -1, 0) +
+               ai_count_sliding_mobility(board, from, piece, 1, 0) +
+               ai_count_sliding_mobility(board, from, piece, 0, -1) +
+               ai_count_sliding_mobility(board, from, piece, 0, 1) +
+               ai_count_sliding_mobility(board, from, piece, -1, -1) +
+               ai_count_sliding_mobility(board, from, piece, -1, 1) +
+               ai_count_sliding_mobility(board, from, piece, 1, -1) +
+               ai_count_sliding_mobility(board, from, piece, 1, 1);
+    case PieceType::Knight:
+        return ai_count_knight_mobility(board, from, piece);
+    case PieceType::King:
+        return ai_count_king_mobility(board, from, piece);
+    case PieceType::Anteater:
+        return ai_count_anteater_mobility(board, from, piece);
+    case PieceType::Empty:
     default:
         return 0;
     }
 }
 
+} // namespace ac

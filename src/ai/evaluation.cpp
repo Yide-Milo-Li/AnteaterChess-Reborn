@@ -1,15 +1,17 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <string.h>
-#include "score_constants.h"
-#include "piece_tables.h"
-#include "mobility.h"
-#include "evaluation_features.h"
-#include "evaluation.h"
+#include "score_constants.hpp"
+#include "piece_tables.hpp"
+#include "mobility.hpp"
+#include "evaluation_features.hpp"
+#include "evaluation.hpp"
 
-int ac_ai_evaluate_absolute(const AcPosition *state) {
-    int antFiles[2][AC_COLS];
+namespace ac {
+
+int ai_evaluate_absolute(const Position *state) {
+    int antFiles[2][Columns];
     int bishopCount[2];
-    AcSquare kingPos[2];
+    Square kingPos[2];
     int phase;
     int score;
     int row;
@@ -18,30 +20,30 @@ int ac_ai_evaluate_absolute(const AcPosition *state) {
     // init
     memset(antFiles, 0, sizeof(antFiles));
     memset(bishopCount, 0, sizeof(bishopCount));
-    kingPos[AC_WHITE] = ac_create_position(-1, -1);
-    kingPos[AC_BLACK] = ac_create_position(-1, -1);
+    kingPos[enum_index(Color::White)] = create_position(-1, -1);
+    kingPos[enum_index(Color::Black)] = create_position(-1, -1);
     phase = 0;
     score = 0;
 
-    for (row = 0; row < AC_ROWS; ++row) {
-        for (col = 0; col < AC_COLS; ++col) {
-            AcPiece piece = ac_get_piece(&state->board, ac_create_position(row, col));
+    for (row = 0; row < Rows; ++row) {
+        for (col = 0; col < Columns; ++col) {
+            Piece piece = get_piece(&state->board, create_position(row, col));
 
-            if (piece.type == AC_EMPTY_PIECE) {
+            if (piece.type == PieceType::Empty) {
                 continue;
             }
 
-            if (piece.type == AC_ANT) {
-                ++antFiles[piece.color][col];
+            if (piece.type == PieceType::Ant) {
+                ++antFiles[enum_index(piece.color)][col];
             }
-            if (piece.type == AC_BISHOP) {
-                ++bishopCount[piece.color];
+            if (piece.type == PieceType::Bishop) {
+                ++bishopCount[enum_index(piece.color)];
             }
-            if (piece.type == AC_KING) {
-                kingPos[piece.color] = ac_create_position(row, col);
+            if (piece.type == PieceType::King) {
+                kingPos[enum_index(piece.color)] = create_position(row, col);
             }
 
-            phase += ac_ai_phase_value(piece.type);
+            phase += ai_phase_value(piece.type);
         }
     }
 
@@ -50,24 +52,24 @@ int ac_ai_evaluate_absolute(const AcPosition *state) {
         phase = AI_MAX_PHASE;
     }
 
-    // ac_ai_piece_value + PST + mobility
-    for (row = 0; row < AC_ROWS; ++row) {
-        for (col = 0; col < AC_COLS; ++col) {
-            AcSquare pos = ac_create_position(row, col);
-            AcPiece piece = ac_get_piece(&state->board, pos);
+    // ai_piece_value + PST + mobility
+    for (row = 0; row < Rows; ++row) {
+        for (col = 0; col < Columns; ++col) {
+            Square pos = create_position(row, col);
+            Piece piece = get_piece(&state->board, pos);
             int value;
 
-            if (piece.type == AC_EMPTY_PIECE) {
+            if (piece.type == PieceType::Empty) {
                 continue;
             }
 
-            value = ac_ai_piece_value(piece.type);
-            value += ac_ai_pst_bonus(piece, row, col, phase);
-            if (piece.type == AC_KNIGHT || piece.type == AC_ANTEATER) {
-                value += ac_ai_piece_mobility(&state->board, pos, piece) * ac_ai_mobility_weight(piece.type);
+            value = ai_piece_value(piece.type);
+            value += ai_pst_bonus(piece, row, col, phase);
+            if (piece.type == PieceType::Knight || piece.type == PieceType::Anteater) {
+                value += ai_piece_mobility(&state->board, pos, piece) * ai_mobility_weight(piece.type);
             }
 
-            if (piece.color == AC_WHITE) {
+            if (piece.color == Color::White) {
                 score += value;
             } else {
                 score -= value;
@@ -76,41 +78,43 @@ int ac_ai_evaluate_absolute(const AcPosition *state) {
     }
 
     // bishop pair
-    if (bishopCount[AC_WHITE] >= 2) {
+    if (bishopCount[enum_index(Color::White)] >= 2) {
         score += 36;
     }
-    if (bishopCount[AC_BLACK] >= 2) {
+    if (bishopCount[enum_index(Color::Black)] >= 2) {
         score -= 36;
     }
 
-    score += ac_ai_evaluate_pawns(state, AC_WHITE, antFiles, phase);
-    score -= ac_ai_evaluate_pawns(state, AC_BLACK, antFiles, phase);
-    score += ac_ai_evaluate_rook_and_queen_files(state, AC_WHITE, antFiles, phase);
-    score -= ac_ai_evaluate_rook_and_queen_files(state, AC_BLACK, antFiles, phase);
-    score += ac_ai_evaluate_king_safety(state, AC_WHITE, kingPos[AC_WHITE], phase);
-    score -= ac_ai_evaluate_king_safety(state, AC_BLACK, kingPos[AC_BLACK], phase);
-    score += ac_ai_evaluate_development(state, AC_WHITE, phase);
-    score -= ac_ai_evaluate_development(state, AC_BLACK, phase);
-    score += ac_ai_evaluate_anteater_threats(&state->board, AC_WHITE);
-    score -= ac_ai_evaluate_anteater_threats(&state->board, AC_BLACK);
+    score += ai_evaluate_pawns(state, Color::White, antFiles, phase);
+    score -= ai_evaluate_pawns(state, Color::Black, antFiles, phase);
+    score += ai_evaluate_rook_and_queen_files(state, Color::White, antFiles, phase);
+    score -= ai_evaluate_rook_and_queen_files(state, Color::Black, antFiles, phase);
+    score += ai_evaluate_king_safety(state, Color::White, kingPos[enum_index(Color::White)], phase);
+    score -= ai_evaluate_king_safety(state, Color::Black, kingPos[enum_index(Color::Black)], phase);
+    score += ai_evaluate_development(state, Color::White, phase);
+    score -= ai_evaluate_development(state, Color::Black, phase);
+    score += ai_evaluate_anteater_threats(&state->board, Color::White);
+    score -= ai_evaluate_anteater_threats(&state->board, Color::Black);
 
     // outpost limitation
     if (phase >= 10) {
-        score += ac_ai_evaluate_outposts(&state->board, AC_WHITE, phase);
-        score -= ac_ai_evaluate_outposts(&state->board, AC_BLACK, phase);
+        score += ai_evaluate_outposts(&state->board, Color::White, phase);
+        score -= ai_evaluate_outposts(&state->board, Color::Black, phase);
     }
 
     return score;
 }
 
-int ac_ai_evaluate_relative(const AcPosition *state) {
+int ai_evaluate_relative(const Position *state) {
     int absoluteScore;
 
-    absoluteScore = ac_ai_evaluate_absolute(state);
+    absoluteScore = ai_evaluate_absolute(state);
     // tempo bonus
-    if (state->currentTurn == AC_WHITE) {
+    if (state->currentTurn == Color::White) {
         return absoluteScore + 1;
     }
 
     return -absoluteScore + 1;
 }
+
+} // namespace ac

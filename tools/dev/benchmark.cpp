@@ -1,6 +1,8 @@
-#include "../../src/ai/internal.h"
+#include "../../src/ai/internal.hpp"
 #include <stdio.h>
 #include <time.h>
+
+using namespace ac;
 static int64_t clock_ms(void *unused) {
     (void)unused;
     struct timespec t;
@@ -8,21 +10,21 @@ static int64_t clock_ms(void *unused) {
     return (int64_t)t.tv_sec * 1000 + t.tv_nsec / 1000000;
 }
 int main(void) {
-    AcPosition p;
-    ac_position_init(&p);
-    AcSearchContext *search = ac_search_create();
+    Position p;
+    position_init(&p);
+    SearchContext *search = search_create();
     if (!search)
         return 1;
-    AcSearchOptions options = {
+    SearchOptions options = {
         {clock_ms, NULL},
         10000, 3, NULL, NULL, NULL, 0
     };
-    AcSearchResult result;
-    AcStatus status = ac_search(search, &p, &options, &result);
+    SearchResult result;
+    Status status = search(search, &p, &options, &result);
     printf("fixture=initial max_depth=3 status=%d completed_depth=%d nodes=%d elapsed_ms=%d "
            "context_allocated_bytes=%zu position_bytes=%zu\n",
-           status, result.completedDepth, result.nodes, result.elapsedMs,
-           sizeof(*search) + AC_TT_SIZE * sizeof(TTEntry) + (AI_MAX_PLY + 1) * sizeof(AcMoveList), sizeof(p));
-    ac_search_destroy(search);
-    return status ? 1 : 0;
+           value(status), result.completedDepth, result.nodes, result.elapsedMs,
+           sizeof(*search) + AC_TT_SIZE * sizeof(TTEntry) + (AI_MAX_PLY + 1) * sizeof(MoveList), sizeof(p));
+    search_destroy(search);
+    return status != Status::Ok ? 1 : 0;
 }

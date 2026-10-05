@@ -1,5 +1,7 @@
-#include "internal.h"
-int ac_ai_clamp_int(int value, int minValue, int maxValue) {
+#include "internal.hpp"
+
+namespace ac {
+int ai_clamp_int(int value, int minValue, int maxValue) {
     if (value < minValue) {
         return minValue;
     }
@@ -9,14 +11,14 @@ int ac_ai_clamp_int(int value, int minValue, int maxValue) {
     return value;
 }
 
-int ac_ai_color_time_index(AcColor color) {
-    if (color == AC_BLACK) {
+int ai_color_time_index(Color color) {
+    if (color == Color::Black) {
         return 1;
     }
     return 0;
 }
 
-void ac_init_ai_time_manager(AcAITimeManager *manager) {
+void init_ai_time_manager(AITimeManager *manager) {
     int index;
 
     if (manager == NULL) {
@@ -29,50 +31,50 @@ void ac_init_ai_time_manager(AcAITimeManager *manager) {
     }
 }
 
-int ac_get_ai_tournament_budget_ms(AcAITimeManager *manager, AcColor color) {
+int get_ai_tournament_budget_ms(AITimeManager *manager, Color color) {
     int index;
     int remainingMs;
     int availableMs;
     int bonusMs;
     int budgetMs;
 
-    if (manager == NULL || (color != AC_WHITE && color != AC_BLACK)) {
+    if (manager == NULL || (color != Color::White && color != Color::Black)) {
         return AI_TOURNAMENT_BASE_MS;
     }
 
-    index = ac_ai_color_time_index(color);
+    index = ai_color_time_index(color);
     remainingMs = manager->remainingMs[index];
     if (remainingMs <= AI_MIN_MOVE_BUDGET_MS) {
         return AI_MIN_MOVE_BUDGET_MS;
     }
     availableMs = remainingMs > AI_TOURNAMENT_RESERVE_MS ? remainingMs - AI_TOURNAMENT_RESERVE_MS : remainingMs;
     bonusMs = manager->poolMs[index] / 4;
-    bonusMs = ac_ai_clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
+    bonusMs = ai_clamp_int(bonusMs, 0, AI_TOURNAMENT_MAX_EXTRA_MS);
 
     budgetMs = AI_TOURNAMENT_BASE_MS + bonusMs;
-    budgetMs = ac_ai_clamp_int(budgetMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+    budgetMs = ai_clamp_int(budgetMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
     if (availableMs > 0 && budgetMs > availableMs) {
-        budgetMs = ac_ai_clamp_int(availableMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
+        budgetMs = ai_clamp_int(availableMs, AI_MIN_MOVE_BUDGET_MS, AI_TOURNAMENT_MAX_MS);
     }
     return budgetMs;
 }
 
-int ac_is_ai_tournament_time_expired(const AcAITimeManager *manager, AcColor color) {
+int is_ai_tournament_time_expired(const AITimeManager *manager, Color color) {
     int index;
 
-    if (manager == NULL || (color != AC_WHITE && color != AC_BLACK)) {
+    if (manager == NULL || (color != Color::White && color != Color::Black)) {
         return 0;
     }
 
-    index = ac_ai_color_time_index(color);
+    index = ai_color_time_index(color);
     return manager->remainingMs[index] <= 0;
 }
 
-void ac_update_ai_tournament_time(AcAITimeManager *manager, AcColor color, int budgetMs, int elapsedMs) {
+void update_ai_tournament_time(AITimeManager *manager, Color color, int budgetMs, int elapsedMs) {
     int index;
     int poolMs;
 
-    if (manager == NULL || (color != AC_WHITE && color != AC_BLACK)) {
+    if (manager == NULL || (color != Color::White && color != Color::Black)) {
         return;
     }
 
@@ -83,7 +85,7 @@ void ac_update_ai_tournament_time(AcAITimeManager *manager, AcColor color, int b
         elapsedMs = 0;
     }
 
-    index = ac_ai_color_time_index(color);
+    index = ai_color_time_index(color);
     if (manager->remainingMs[index] > elapsedMs) {
         manager->remainingMs[index] -= elapsedMs;
     } else {
@@ -96,5 +98,7 @@ void ac_update_ai_tournament_time(AcAITimeManager *manager, AcColor color, int b
     } else {
         poolMs -= elapsedMs - budgetMs;
     }
-    manager->poolMs[index] = ac_ai_clamp_int(poolMs, 0, AI_TOURNAMENT_POOL_CAP_MS);
+    manager->poolMs[index] = ai_clamp_int(poolMs, 0, AI_TOURNAMENT_POOL_CAP_MS);
 }
+
+} // namespace ac

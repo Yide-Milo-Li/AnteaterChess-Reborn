@@ -26,7 +26,7 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | --- | --- | --- |
 | Environment | Passed locally | Four combination probes; attachment hashes above |
 | Build and conventions | Passed locally | Four desktop builds, 22/22 each; two core runs, 19/19 each |
-| Rules and evaluation | Pending | Frozen expected files must remain unchanged |
+| Rules and evaluation | Passed locally | Typed C++ API, semantic comparisons, injected rule-workspace failures; four 23/23 runs |
 | Session ownership and transactions | Pending | Allocation-failure and lifetime matrix |
 | Search ownership | Pending | Owned requests, cancellation and frozen AI output |
 | Desktop | Pending | Narrow models, lifecycle and interaction checks |
@@ -57,3 +57,24 @@ failed first compile logs are retained separately in the private attachment tree
 Commands used the checked-in presets. Qt GUI tests used offscreen/software/Basic.
 This establishes build compatibility of the existing algorithms, not the planned
 owning Session/SearchRequest API or human desktop acceptance.
+## Rules and evaluation verification
+
+The C++ API uses namespace `ac`, `.hpp/.cpp`, scoped enums and fixed value arrays.
+Status, allocation-free Error metadata and variant-based Result<T> are established.
+No C linkage wrapper remains in maintained headers. Position and Move equality
+compare fields and arrays, so apply/unmake checks no longer inspect padding bytes.
+Rules temporary workspaces use RAII and an injected memory resource. Their failure
+checks preserve caller outputs and release every allocated block.
+
+Windows/Linux Debug and Release each passed 23/23, including the immutable AI
+score/SEE/legal-move/chosen-move/depth/node reference. Linux ASan/UBSan passed
+20/20. These tests still exercise the transitional Session/search owners, which
+are replaced in the following stages. All 27 protected files remain unchanged.
+
+Localized MSVC header dependency detection initially produced a mojibake prefix
+and zero recorded dependencies. Requesting English diagnostics was insufficient
+because this toolset only has Chinese language resources. The CMake configuration
+now detects /showIncludes using Ninja's actual encoding, then a clean native
+rebuild passed. `ninja -t deps` records rules.hpp and types.hpp (two valid direct
+project dependencies) for board.cpp. Raw failed and successful receipts remain
+outside the disposable build tree. This adjustment does not modify installed MSVC.

@@ -1,6 +1,6 @@
 #pragma once
-#include "anteater/ai.h"
-#include "anteater/session.h"
+#include "anteater/ai.hpp"
+#include "anteater/session.hpp"
 #include <QObject>
 #include <QThread>
 #include <atomic>
@@ -9,29 +9,35 @@
 
 namespace ac {
 struct SearchOutcome {
-    AcSearchResult result{};
+    SearchResult result{};
     uint64_t revision = 0, generation = 0;
     int budgetMs = 0;
     bool hint = false, cancelled = false;
 };
 class SearchJobs : public QObject {
     Q_OBJECT
-public:
-    explicit SearchJobs(QObject *parent = nullptr) : QObject(parent) {}
+  public:
+    explicit SearchJobs(QObject *parent = nullptr) : QObject(parent) {
+    }
     ~SearchJobs() override;
-    bool busy() const { return thread_ != nullptr; }
-    bool start(const AcSnapshot &snapshot, uint64_t generation, bool hint, int budgetMs, int maxDepth);
+    bool busy() const {
+        return thread_ != nullptr;
+    }
+    bool start(const Snapshot &snapshot, uint64_t generation, bool hint, int budgetMs, int maxDepth);
     void cancel();
     void shutdown();
-    const SearchOutcome &outcome() const { return outcome_; }
-signals:
+    const SearchOutcome &outcome() const {
+        return outcome_;
+    }
+  signals:
     void completed();
     void busyChanged();
-private:
+
+  private:
     struct Job {
-        AcPosition position{};
+        Position position{};
         std::vector<uint64_t> hashes;
-        AcSearchOptions options{};
+        SearchOptions options{};
         SearchOutcome outcome;
         std::atomic<bool> cancelled{false};
     };
@@ -39,4 +45,4 @@ private:
     std::shared_ptr<Job> job_;
     SearchOutcome outcome_;
 };
-}
+} // namespace ac

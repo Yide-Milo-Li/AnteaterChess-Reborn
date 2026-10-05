@@ -1,37 +1,41 @@
-#include "internal.h"
-AcSearchContext *ac_search_create(void) {
-    AcSearchContext *ctx = static_cast<AcSearchContext *>(calloc(1, sizeof(*ctx)));
+#include "internal.hpp"
+
+namespace ac {
+SearchContext *search_create(void) {
+    SearchContext *ctx = static_cast<SearchContext *>(calloc(1, sizeof(*ctx)));
     if (!ctx)
         return NULL;
     ctx->transpositionTable = static_cast<TTEntry *>(calloc(AC_TT_SIZE, sizeof(TTEntry)));
-    ctx->moveBuffers = static_cast<AcMoveList *>(calloc(AI_MAX_PLY + 1, sizeof(AcMoveList)));
+    ctx->moveBuffers = static_cast<MoveList *>(calloc(AI_MAX_PLY + 1, sizeof(MoveList)));
     if (!ctx->transpositionTable || !ctx->moveBuffers) {
-        ac_search_destroy(ctx);
+        search_destroy(ctx);
         return NULL;
     }
     return ctx;
 }
-void ac_search_destroy(AcSearchContext *ctx) {
+void search_destroy(SearchContext *ctx) {
     if (!ctx)
         return;
     free(ctx->transpositionTable);
     free(ctx->moveBuffers);
     free(ctx);
 }
-AcStatus ac_search(AcSearchContext *ctx, const AcPosition *p, const AcSearchOptions *o, AcSearchResult *out) {
+Status search(SearchContext *ctx, const Position *p, const SearchOptions *o, SearchResult *out) {
     if (!ctx || !p || !o || !out || !o->clock.now || o->budgetMs <= 0 || o->maxDepth <= 0 || o->hashCount < 0 ||
-        o->hashCount > AC_MAX_MOVES + 1 || (!o->hashes && o->hashCount))
-        return AC_INVALID_ARGUMENT;
+        o->hashCount > MaxMoves + 1 || (!o->hashes && o->hashCount))
+        return Status::InvalidArgument;
     memset(out, 0, sizeof(*out));
     ctx->options = *o;
     if (o->cancelled && o->cancelled(o->cancelContext))
-        return out->status = AC_CANCELLED;
-    AcPosition root = *p;
-    root.hash = ac_position_hash(&root);
-    int status = ac_ai_search_best_move(ctx, &root, o->maxDepth, o->budgetMs, &out->move);
+        return out->status = Status::Cancelled;
+    Position root = *p;
+    root.hash = position_hash(&root);
+    int status = ai_search_best_move(ctx, &root, o->maxDepth, o->budgetMs, &out->move);
     out->nodes = ctx->nodes;
     out->completedDepth = ctx->completedDepth;
-    out->elapsedMs = ac_ai_elapsed_ms(ctx);
-    out->status = ctx->failure ? ctx->failure : status ? AC_UNAVAILABLE : AC_OK;
+    out->elapsedMs = ai_elapsed_ms(ctx);
+    out->status = ctx->failure != Status::Ok ? ctx->failure : status ? Status::Unavailable : Status::Ok;
     return out->status;
 }
+
+} // namespace ac

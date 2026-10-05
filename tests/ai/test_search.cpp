@@ -1,8 +1,10 @@
-#include "anteater/ai.h"
+#include "anteater/ai.hpp"
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
+using namespace ac;
 typedef struct {
     int64_t now;
     int ticks, stop;
@@ -15,41 +17,41 @@ static int cancelled(void *p) {
     return ((Env *)p)->stop;
 }
 int main(void) {
-    AcPosition p, before;
-    ac_position_init(&p);
+    Position p, before;
+    position_init(&p);
     before = p;
-    AcSearchContext *a = ac_search_create(), *b = ac_search_create();
+    SearchContext *a = search_create(), *b = search_create();
     assert(a && b);
     Env e = {};
-    AcSearchOptions o = {
+    SearchOptions o = {
         {now, &e},
         1000, 2, cancelled, &e, NULL, 0
     };
-    AcSearchResult ra, rb;
-    assert(!ac_search(a, &p, &o, &ra));
-    assert(ac_validate_move(&p, ra.move));
-    assert(!memcmp(&p, &before, sizeof(p)));
+    SearchResult ra, rb;
+    assert(!search(a, &p, &o, &ra));
+    assert(validate_move(&p, ra.move));
+    assert((p == before));
     e = Env{};
-    assert(!ac_search(b, &p, &o, &rb));
-    assert(!memcmp(&ra.move, &rb.move, sizeof(AcMove)));
+    assert(!search(b, &p, &o, &rb));
+    assert((ra.move == rb.move));
     e.stop = 1;
-    assert(ac_search(a, &p, &o, &ra) == AC_CANCELLED);
-    assert(!memcmp(&p, &before, sizeof(p)));
+    assert(search(a, &p, &o, &ra) == Status::Cancelled);
+    assert((p == before));
     e = Env{};
     o.budgetMs = 1;
     o.maxDepth = 24;
-    assert(!ac_search(a, &p, &o, &ra));
-    assert(ac_validate_move(&p, ra.move));
-    assert(ac_search(a, NULL, &o, &ra) == AC_INVALID_ARGUMENT);
-    AcAITimeManager t;
-    ac_init_ai_time_manager(&t);
-    int n = ac_get_ai_tournament_budget_ms(&t, AC_WHITE);
+    assert(!search(a, &p, &o, &ra));
+    assert(validate_move(&p, ra.move));
+    assert(search(a, NULL, &o, &ra) == Status::InvalidArgument);
+    AITimeManager t;
+    init_ai_time_manager(&t);
+    int n = get_ai_tournament_budget_ms(&t, Color::White);
     assert(n > 0);
-    ac_update_ai_tournament_time(&t, AC_WHITE, n, n - 100);
-    assert(t.poolMs[AC_WHITE] >= 100 && t.poolMs[AC_BLACK] == 0);
-    ac_update_ai_tournament_time(&t, AC_WHITE, n, 1000000);
-    assert(ac_is_ai_tournament_time_expired(&t, AC_WHITE));
-    ac_search_destroy(a);
-    ac_search_destroy(b);
+    update_ai_tournament_time(&t, Color::White, n, n - 100);
+    assert(t.poolMs[enum_index(Color::White)] >= 100 && t.poolMs[enum_index(Color::Black)] == 0);
+    update_ai_tournament_time(&t, Color::White, n, 1000000);
+    assert(is_ai_tournament_time_expired(&t, Color::White));
+    search_destroy(a);
+    search_destroy(b);
     return 0;
 }

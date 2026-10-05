@@ -1,22 +1,24 @@
 #include <stdlib.h>
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <assert.h>
 #include <stddef.h>
 
-static int terminal(const AcPosition *p, AcColor side, int check) {
-    AcPosition copy = *p;
+using namespace ac;
+
+static int terminal(const Position *p, Color side, int check) {
+    Position copy = *p;
     copy.currentTurn = side;
-    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
+    MoveList *list = static_cast<MoveList *>(malloc(sizeof(*list)));
     assert(list);
-    assert(!ac_generate_legal_moves(&copy, list));
+    assert(!generate_legal_moves(&copy, list));
     int none = !list->count;
     free(list);
-    return none && ac_is_in_check(&copy, side) == check;
+    return none && is_in_check(&copy, side) == check;
 }
-static int is_checkmate(const AcPosition *p, AcColor side) {
+static int is_checkmate(const Position *p, Color side) {
     return terminal(p, side, 1);
 }
-static int is_stalemate(const AcPosition *p, AcColor side) {
+static int is_stalemate(const Position *p, Color side) {
     return terminal(p, side, 0);
 }
 /*
@@ -27,134 +29,134 @@ static int is_stalemate(const AcPosition *p, AcColor side) {
  */
 
 /* Clear the board so each endgame test can install only the pieces it needs. */
-void clearBoardForEndgameTest(AcBoard *board) {
+void clearBoardForEndgameTest(Board *board) {
     int row;
     int col;
 
-    for (row = 0; row < AC_ROWS; ++row) {
-        for (col = 0; col < AC_COLS; ++col) {
-            ac_set_piece(board, ac_create_position(row, col), ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR));
+    for (row = 0; row < Rows; ++row) {
+        for (col = 0; col < Columns; ++col) {
+            set_piece(board, create_position(row, col), create_piece(PieceType::Empty, Color::Empty));
         }
     }
 }
 
 /* Check that line attacks are detected and blocked correctly. */
 void test_is_in_check_detects_attacks_and_blockers(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
 
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(7, 0), ac_create_piece(AC_ROOK, AC_BLACK));
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(7, 0), create_piece(PieceType::Rook, Color::Black));
 
-    assert(ac_is_in_check(&state, AC_WHITE) == 1);
+    assert(is_in_check(&state, Color::White) == 1);
 
-    ac_set_piece(&state.board, ac_create_position(7, 3), ac_create_piece(AC_BISHOP, AC_WHITE));
-    assert(ac_is_in_check(&state, AC_WHITE) == 0);
+    set_piece(&state.board, create_position(7, 3), create_piece(PieceType::Bishop, Color::White));
+    assert(is_in_check(&state, Color::White) == 0);
 }
 
 /* Check a basic forced-mate position for the side to move. */
 void test_checkmate_detection_finds_forced_mate(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
-    state.currentTurn = AC_BLACK;
+    state.currentTurn = Color::Black;
 
-    ac_set_piece(&state.board, ac_create_position(0, 0), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(1, 1), ac_create_piece(AC_QUEEN, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(2, 2), ac_create_piece(AC_KING, AC_WHITE));
+    set_piece(&state.board, create_position(0, 0), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(1, 1), create_piece(PieceType::Queen, Color::White));
+    set_piece(&state.board, create_position(2, 2), create_piece(PieceType::King, Color::White));
 
-    assert(ac_is_in_check(&state, AC_BLACK) == 1);
-    assert(is_checkmate(&state, AC_BLACK) == 1);
-    assert(is_stalemate(&state, AC_BLACK) == 0);
+    assert(is_in_check(&state, Color::Black) == 1);
+    assert(is_checkmate(&state, Color::Black) == 1);
+    assert(is_stalemate(&state, Color::Black) == 0);
 }
 
 /* Check that pseudo "capture king" escapes do not break checkmate detection. */
 void test_checkmate_ignores_capture_king_pseudomove(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
-    state.currentTurn = AC_BLACK;
+    state.currentTurn = Color::Black;
 
-    ac_set_piece(&state.board, ac_create_position(0, 0), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(1, 1), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 2), ac_create_piece(AC_ROOK, AC_WHITE));
+    set_piece(&state.board, create_position(0, 0), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(1, 1), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 2), create_piece(PieceType::Rook, Color::White));
 
-    assert(ac_is_in_check(&state, AC_BLACK) == 1);
-    assert(is_checkmate(&state, AC_BLACK) == 1);
+    assert(is_in_check(&state, Color::Black) == 1);
+    assert(is_checkmate(&state, Color::Black) == 1);
 }
 
 /* Check a position with no legal escape moves but no current check. */
 void test_stalemate_detection_finds_no_legal_move_position(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
-    state.currentTurn = AC_BLACK;
+    state.currentTurn = Color::Black;
 
-    ac_set_piece(&state.board, ac_create_position(0, 0), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(1, 2), ac_create_piece(AC_QUEEN, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(2, 2), ac_create_piece(AC_KING, AC_WHITE));
+    set_piece(&state.board, create_position(0, 0), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(1, 2), create_piece(PieceType::Queen, Color::White));
+    set_piece(&state.board, create_position(2, 2), create_piece(PieceType::King, Color::White));
 
-    assert(ac_is_in_check(&state, AC_BLACK) == 0);
-    assert(is_stalemate(&state, AC_BLACK) == 1);
-    assert(is_checkmate(&state, AC_BLACK) == 0);
+    assert(is_in_check(&state, Color::Black) == 0);
+    assert(is_stalemate(&state, Color::Black) == 1);
+    assert(is_checkmate(&state, Color::Black) == 0);
 }
 
 /* Check common low-material positions that should be treated as draws. */
 void test_insufficient_material_detects_simple_draws(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
 
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    assert(ac_is_insufficient_material(&state) == 1);
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    assert(is_insufficient_material(&state) == 1);
 
-    ac_set_piece(&state.board, ac_create_position(4, 4), ac_create_piece(AC_BISHOP, AC_WHITE));
-    assert(ac_is_insufficient_material(&state) == 1);
+    set_piece(&state.board, create_position(4, 4), create_piece(PieceType::Bishop, Color::White));
+    assert(is_insufficient_material(&state) == 1);
 
-    ac_set_piece(&state.board, ac_create_position(4, 6), ac_create_piece(AC_QUEEN, AC_WHITE));
-    assert(ac_is_insufficient_material(&state) == 0);
+    set_piece(&state.board, create_position(4, 6), create_piece(PieceType::Queen, Color::White));
+    assert(is_insufficient_material(&state) == 0);
 }
 
 /* Check additional low-material combinations near the detector boundaries. */
 void test_insufficient_material_detects_boundary_combinations(void) {
-    AcPosition state;
+    Position state;
 
-    ac_position_init(&state);
+    position_init(&state);
     clearBoardForEndgameTest(&state.board);
 
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(4, 4), ac_create_piece(AC_KNIGHT, AC_WHITE));
-    assert(ac_is_insufficient_material(&state) == 1);
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(4, 4), create_piece(PieceType::Knight, Color::White));
+    assert(is_insufficient_material(&state) == 1);
 
     clearBoardForEndgameTest(&state.board);
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(4, 4), ac_create_piece(AC_KNIGHT, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(4, 6), ac_create_piece(AC_KNIGHT, AC_BLACK));
-    assert(ac_is_insufficient_material(&state) == 1);
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(4, 4), create_piece(PieceType::Knight, Color::White));
+    set_piece(&state.board, create_position(4, 6), create_piece(PieceType::Knight, Color::Black));
+    assert(is_insufficient_material(&state) == 1);
 
     clearBoardForEndgameTest(&state.board);
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(3, 3), ac_create_piece(AC_BISHOP, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(5, 5), ac_create_piece(AC_BISHOP, AC_BLACK));
-    assert(ac_is_insufficient_material(&state) == 1);
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(3, 3), create_piece(PieceType::Bishop, Color::White));
+    set_piece(&state.board, create_position(5, 5), create_piece(PieceType::Bishop, Color::Black));
+    assert(is_insufficient_material(&state) == 1);
 
     clearBoardForEndgameTest(&state.board);
-    ac_set_piece(&state.board, ac_create_position(7, 5), ac_create_piece(AC_KING, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(0, 5), ac_create_piece(AC_KING, AC_BLACK));
-    ac_set_piece(&state.board, ac_create_position(3, 3), ac_create_piece(AC_BISHOP, AC_WHITE));
-    ac_set_piece(&state.board, ac_create_position(5, 4), ac_create_piece(AC_BISHOP, AC_BLACK));
-    assert(ac_is_insufficient_material(&state) == 0);
+    set_piece(&state.board, create_position(7, 5), create_piece(PieceType::King, Color::White));
+    set_piece(&state.board, create_position(0, 5), create_piece(PieceType::King, Color::Black));
+    set_piece(&state.board, create_position(3, 3), create_piece(PieceType::Bishop, Color::White));
+    set_piece(&state.board, create_position(5, 4), create_piece(PieceType::Bishop, Color::Black));
+    assert(is_insufficient_material(&state) == 0);
 }
 
 int main(void) {

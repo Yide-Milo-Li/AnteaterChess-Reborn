@@ -4,25 +4,27 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "anteater/rules.h"
-typedef AcPosition State;
-typedef AcMoveList List;
-typedef AcMove M;
-#define gen ac_generate_legal_moves
-#define square ac_create_position
-#define piece(type, color) ac_create_piece(static_cast<AcPieceType>(type), static_cast<AcColor>(color))
-#define place ac_set_piece
+#include "anteater/rules.hpp"
+
+using namespace ac;
+typedef Position State;
+typedef MoveList List;
+typedef Move M;
+#define gen generate_legal_moves
+#define square create_position
+#define piece(type, color) create_piece(static_cast<PieceType>(type), static_cast<Color>(color))
+#define place set_piece
 static int apply(State *s, M m) {
-    AcUndo u;
-    return ac_position_apply(s, m, &u);
+    Undo u;
+    return value(position_apply(s, m, &u));
 }
 static void init(State *s) {
-    ac_position_init(s);
+    position_init(s);
 }
 static int result(State *s) {
-    AcGameResult r;
-    assert(!ac_position_result(s, &r));
-    return r;
+    GameResult r;
+    assert(!position_result(s, &r));
+    return value(r);
 }
 static uint64_t fingerprint(const List *l) {
     uint64_t sum = 0;
@@ -34,14 +36,14 @@ static uint64_t fingerprint(const List *l) {
         values[n++] = m.from.col;
         values[n++] = m.to.row;
         values[n++] = m.to.col;
-        values[n++] = m.specialType;
+        values[n++] = value(m.specialType);
         values[n++] = m.captureCount;
         values[n++] = m.pathLength;
         for (int k = 0; k < m.captureCount; ++k) {
             values[n++] = m.captures[k].pos.row;
             values[n++] = m.captures[k].pos.col;
-            values[n++] = m.captures[k].piece.type;
-            values[n++] = m.captures[k].piece.color;
+            values[n++] = value(m.captures[k].piece.type);
+            values[n++] = value(m.captures[k].piece.color);
         }
         for (int k = 0; k < m.pathLength; ++k) {
             values[n++] = m.path[k].row;
@@ -117,7 +119,7 @@ static void probe(FILE *out) {
             place(&s->board, square(6, 5), piece(1, 1));
         }
 #ifndef AC_LEGACY_PROBE
-        s->hash = ac_position_hash(s);
+        s->hash = position_hash(s);
 #endif
         assert(!gen(s, l));
         fprintf(out, "fixture %d %d %llu %d\n", scenario, l->count, (unsigned long long)fingerprint(l), result(s));

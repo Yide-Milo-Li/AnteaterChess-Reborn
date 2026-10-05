@@ -1,7 +1,9 @@
-#include "anteater/session.h"
+#include "anteater/session.hpp"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+using namespace ac;
 typedef struct {
     int64_t ms;
     int writes, fail, allocs, live, failAt;
@@ -9,11 +11,11 @@ typedef struct {
 static int64_t clock_now(void *p) {
     return ((Env *)p)->ms;
 }
-static AcStatus log_write(void *p, const AcSnapshot *s) {
+static Status log_write(void *p, const Snapshot *s) {
     Env *e = static_cast<Env *>(p);
     (void)s;
     ++e->writes;
-    return e->fail ? AC_IO_ERROR : AC_OK;
+    return e->fail ? Status::IoError : Status::Ok;
 }
 static void *alloc(void *p, size_t n) {
     Env *e = static_cast<Env *>(p);
@@ -27,17 +29,17 @@ static void dealloc(void *p, void *x) {
     --e->live;
     free(x);
 }
-static AcSession *create(Env *e) {
-    AcSessionOptions o = {
+static Session *create(Env *e) {
+    SessionOptions o = {
         {clock_now, e},
         log_write, e, alloc, dealloc, e
     };
-    return ac_session_create(&o);
+    return session_create(&o);
 }
-static AcStatus move(AcSession *s, const char *a, const char *b) {
-    AcMoveRequest r;
-    assert(!ac_parse_move_request_fields(a, b, AC_PROMOTION_CHOICE_QUEEN, &r));
-    return ac_session_submit(s, r);
+static Status move(Session *s, const char *a, const char *b) {
+    MoveRequest r;
+    assert(!parse_move_request_fields(a, b, PromotionChoice::Queen, &r));
+    return session_submit(s, r);
 }
 int main(void) {
     for (int i = 1; i <= 4; ++i) {
@@ -47,105 +49,105 @@ int main(void) {
         assert(!e.live);
     }
     Env a = {}, b = {};
-    AcSession *x = create(&a), *y = create(&b);
+    Session *x = create(&a), *y = create(&b);
     assert(x && y);
-    AcGameConfig config;
-    ac_init_default_game_config(&config);
+    GameConfig config;
+    init_default_game_config(&config);
     config.timerEnabled = 1;
     config.initialTimeSeconds = 2;
-    assert(!ac_session_start(x, &config));
-    assert(!ac_session_start(y, &config));
-    AcSnapshot sx, sy;
+    assert(!session_start(x, &config));
+    assert(!session_start(y, &config));
+    Snapshot sx, sy;
     assert(!move(x, "E2", "E4"));
-    ac_session_snapshot(x, &sx);
-    ac_session_snapshot(y, &sy);
+    session_snapshot(x, &sx);
+    session_snapshot(y, &sy);
     assert(sx.historyCount == 1 && sy.historyCount == 0 && a.writes == 2 && b.writes == 1);
-    AcPosition saved = sx.position;
-    assert(move(x, "A1", "J8") == AC_ILLEGAL_MOVE);
-    ac_session_snapshot(x, &sx);
-    assert(!memcmp(&saved, &sx.position, sizeof(saved)));
+    Position saved = sx.position;
+    assert(move(x, "A1", "J8") == Status::IllegalMove);
+    session_snapshot(x, &sx);
+    assert((saved == sx.position));
     assert(!move(x, "E7", "E5"));
-    assert(!ac_session_undo(x));
-    ac_session_snapshot(x, &sx);
-    assert(sx.historyCount == 0 && sx.position.currentTurn == AC_WHITE);
+    assert(!session_undo(x));
+    session_snapshot(x, &sx);
+    assert(sx.historyCount == 0 && sx.position.currentTurn == Color::White);
     a.ms = 2000;
-    assert(move(x, "E2", "E4") == AC_STALE_RESULT);
-    ac_session_snapshot(x, &sx);
-    ac_session_snapshot(y, &sy);
-    assert(sx.position.currentTurn == AC_BLACK && sx.historyCount == 0 && sy.position.currentTurn == AC_WHITE &&
-           sx.remaining[AC_BLACK] == 2);
+    assert(move(x, "E2", "E4") == Status::StaleResult);
+    session_snapshot(x, &sx);
+    session_snapshot(y, &sy);
+    assert(sx.position.currentTurn == Color::Black && sx.historyCount == 0 && sy.position.currentTurn == Color::White &&
+           sx.remaining[enum_index(Color::Black)] == 2);
     a.fail = 1;
     assert(!move(x, "E7", "E5"));
-    ac_session_snapshot(x, &sx);
-    assert(sx.historyCount == 1 && sx.diagnostic == AC_IO_ERROR);
-    assert(!ac_session_finish(x));
-    ac_session_snapshot(x, &sx);
+    session_snapshot(x, &sx);
+    assert(sx.historyCount == 1 && sx.diagnostic == Status::IoError);
+    assert(!session_finish(x));
+    session_snapshot(x, &sx);
     int64_t elapsed = sx.elapsedMs;
     a.ms += 10000;
-    ac_session_snapshot(x, &sx);
-    assert(sx.elapsedMs == elapsed && sx.result == AC_RESULT_TERMINATED_BY_USER);
-    config.mode = AC_MODE_COMPUTER_VS_COMPUTER;
+    session_snapshot(x, &sx);
+    assert(sx.elapsedMs == elapsed && sx.result == GameResult::TerminatedByUser);
+    config.mode = GameMode::ComputerVsComputer;
     config.timerEnabled = 0;
-    config.aiDifficultyWhite = config.aiDifficultyBlack = AC_DIFFICULTY_EASY;
-    assert(!ac_session_start(x, &config));
-    ac_session_snapshot(x, &sx);
-    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
+    config.aiDifficultyWhite = config.aiDifficultyBlack = Difficulty::Easy;
+    assert(!session_start(x, &config));
+    session_snapshot(x, &sx);
+    MoveList *list = static_cast<MoveList *>(malloc(sizeof(*list)));
     assert(list);
-    assert(!ac_generate_legal_moves(&sx.position, list));
+    assert(!generate_legal_moves(&sx.position, list));
     uint64_t revision = sx.revision;
-    assert(!ac_session_start(x, &config));
-    assert(ac_session_submit_ai(x, list->moves[0], revision, 350, 10) == AC_STALE_RESULT);
+    assert(!session_start(x, &config));
+    assert(session_submit_ai(x, list->moves[0], revision, 350, 10) == Status::StaleResult);
     const char *from[] = {"B1", "B8", "C3", "C6"}, *to[] = {"C3", "C6", "B1", "B8"};
     for (int i = 0; i < 8; ++i) {
-        ac_session_snapshot(x, &sx);
-        AcMoveRequest r;
-        AcMove m;
-        assert(!ac_parse_move_request_fields(from[i % 4], to[i % 4], AC_PROMOTION_CHOICE_QUEEN, &r));
-        assert(!ac_resolve_move_request(&sx.position, r, &m));
-        assert(!ac_session_submit_ai(x, m, sx.revision, 350, 1));
+        session_snapshot(x, &sx);
+        MoveRequest r;
+        Move m;
+        assert(!parse_move_request_fields(from[i % 4], to[i % 4], PromotionChoice::Queen, &r));
+        assert(!resolve_move_request(&sx.position, r, &m));
+        assert(!session_submit_ai(x, m, sx.revision, 350, 1));
     }
-    ac_session_snapshot(x, &sx);
-    assert(sx.phase == AC_SESSION_FINISHED && sx.result == AC_RESULT_DRAW);
-    config.aiDifficultyWhite = AC_DIFFICULTY_TOURNAMENT;
-    assert(!ac_session_start(x, &config));
-    ac_session_snapshot(x, &sx);
-    assert(!ac_generate_legal_moves(&sx.position, list));
-    assert(!ac_session_submit_ai(x, list->moves[0], sx.revision, 7000, 700000));
-    ac_session_snapshot(x, &sx);
-    assert(sx.result == AC_RESULT_BLACK_WIN);
-    ac_init_default_game_config(&config);
-    assert(!ac_session_start(x, &config));
-    for (int i = 0; i < AC_MAX_MOVES; ++i)
+    session_snapshot(x, &sx);
+    assert(sx.phase == SessionPhase::Finished && sx.result == GameResult::Draw);
+    config.aiDifficultyWhite = Difficulty::Tournament;
+    assert(!session_start(x, &config));
+    session_snapshot(x, &sx);
+    assert(!generate_legal_moves(&sx.position, list));
+    assert(!session_submit_ai(x, list->moves[0], sx.revision, 7000, 700000));
+    session_snapshot(x, &sx);
+    assert(sx.result == GameResult::BlackWin);
+    init_default_game_config(&config);
+    assert(!session_start(x, &config));
+    for (int i = 0; i < MaxMoves; ++i)
         assert(!move(x, from[i % 4], to[i % 4]));
-    ac_session_snapshot(x, &sx);
-    assert(sx.historyCount == AC_MAX_MOVES && sx.phase == AC_SESSION_ACTIVE);
+    session_snapshot(x, &sx);
+    assert(sx.historyCount == MaxMoves && sx.phase == SessionPhase::Active);
     assert(!move(x, "B1", "C3"));
-    ac_session_snapshot(x, &sx);
-    assert(sx.result == AC_RESULT_DRAW && sx.historyCount == AC_MAX_MOVES);
-    for (int color = AC_WHITE; color <= AC_BLACK; ++color) {
-        ac_init_game_config_for_mode(&config, AC_MODE_HUMAN_VS_COMPUTER);
-        config.playerColor = static_cast<AcColor>(color);
-        assert(!ac_session_start(x, &config));
+    session_snapshot(x, &sx);
+    assert(sx.result == GameResult::Draw && sx.historyCount == MaxMoves);
+    for (int color = value(Color::White); color <= value(Color::Black); ++color) {
+        init_game_config_for_mode(&config, GameMode::HumanVsComputer);
+        config.playerColor = static_cast<Color>(color);
+        assert(!session_start(x, &config));
         for (int ply = 0; ply < 4; ++ply) {
-            ac_session_snapshot(x, &sx);
-            AcMoveRequest request;
-            AcMove m;
-            assert(!ac_parse_move_request_fields(from[ply], to[ply], AC_PROMOTION_CHOICE_NONE, &request));
-            if (sx.position.currentTurn == (AcColor)color)
-                assert(!ac_session_submit(x, request));
+            session_snapshot(x, &sx);
+            MoveRequest request;
+            Move m;
+            assert(!parse_move_request_fields(from[ply], to[ply], PromotionChoice::None, &request));
+            if (sx.position.currentTurn == (Color)color)
+                assert(!session_submit(x, request));
             else {
-                assert(!ac_resolve_move_request(&sx.position, request, &m));
-                assert(!ac_session_submit_ai(x, m, sx.revision, 350, 1));
+                assert(!resolve_move_request(&sx.position, request, &m));
+                assert(!session_submit_ai(x, m, sx.revision, 350, 1));
             }
         }
-        assert(!ac_session_undo(x));
-        ac_session_snapshot(x, &sx);
-        assert(sx.position.currentTurn == (AcColor)color);
-        assert(sx.historyCount == (color == AC_WHITE ? 2 : 3));
+        assert(!session_undo(x));
+        session_snapshot(x, &sx);
+        assert(sx.position.currentTurn == (Color)color);
+        assert(sx.historyCount == (color == value(Color::White) ? 2 : 3));
     }
     free(list);
-    ac_session_destroy(x);
-    ac_session_destroy(y);
+    session_destroy(x);
+    session_destroy(y);
     assert(!a.live && !b.live);
     return 0;
 }

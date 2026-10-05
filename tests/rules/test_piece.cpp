@@ -1,38 +1,42 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 #include <assert.h>
 
-static void test_create_piece(void) {
-    AcPiece piece = ac_create_piece(AC_BISHOP, AC_WHITE);
+using namespace ac;
 
-    assert(piece.type == AC_BISHOP);
-    assert(piece.color == AC_WHITE);
+static void test_create_piece(void) {
+    Piece piece = create_piece(PieceType::Bishop, Color::White);
+
+    assert(piece.type == PieceType::Bishop);
+    assert(piece.color == Color::White);
 }
 
 static void test_same_color_checks(void) {
-    assert(ac_is_same_color(ac_create_piece(AC_ROOK, AC_WHITE), ac_create_piece(AC_KING, AC_WHITE)) == 1);
-    assert(ac_is_same_color(ac_create_piece(AC_ROOK, AC_WHITE), ac_create_piece(AC_KING, AC_BLACK)) == 0);
-    assert(ac_is_same_color(ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR),
-                            ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR)) == 1);
+    assert(is_same_color(create_piece(PieceType::Rook, Color::White), create_piece(PieceType::King, Color::White)) ==
+           1);
+    assert(is_same_color(create_piece(PieceType::Rook, Color::White), create_piece(PieceType::King, Color::Black)) ==
+           0);
+    assert(is_same_color(create_piece(PieceType::Empty, Color::Empty), create_piece(PieceType::Empty, Color::Empty)) ==
+           1);
 }
 
 static void test_piece_symbols(void) {
-    assert(ac_get_piece_symbol(ac_create_piece(AC_ANT, AC_WHITE)) == 'P');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_ROOK, AC_BLACK)) == 'R');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_KNIGHT, AC_WHITE)) == 'N');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_BISHOP, AC_WHITE)) == 'B');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_QUEEN, AC_BLACK)) == 'Q');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_KING, AC_WHITE)) == 'K');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_ANTEATER, AC_BLACK)) == 'A');
-    assert(ac_get_piece_symbol(ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR)) == '.');
+    assert(get_piece_symbol(create_piece(PieceType::Ant, Color::White)) == 'P');
+    assert(get_piece_symbol(create_piece(PieceType::Rook, Color::Black)) == 'R');
+    assert(get_piece_symbol(create_piece(PieceType::Knight, Color::White)) == 'N');
+    assert(get_piece_symbol(create_piece(PieceType::Bishop, Color::White)) == 'B');
+    assert(get_piece_symbol(create_piece(PieceType::Queen, Color::Black)) == 'Q');
+    assert(get_piece_symbol(create_piece(PieceType::King, Color::White)) == 'K');
+    assert(get_piece_symbol(create_piece(PieceType::Anteater, Color::Black)) == 'A');
+    assert(get_piece_symbol(create_piece(PieceType::Empty, Color::Empty)) == '.');
 }
 
 static void test_piece_validity(void) {
-    assert(ac_is_valid_piece(ac_create_piece(AC_ANT, AC_WHITE)) == 1);
-    assert(ac_is_valid_piece(ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR)) == 1);
-    assert(ac_is_valid_piece(ac_create_piece(AC_QUEEN, AC_EMPTY_COLOR)) == 0);
-    assert(ac_is_valid_piece(ac_create_piece(AC_EMPTY_PIECE, AC_WHITE)) == 0);
-    assert(ac_is_valid_piece(ac_create_piece((AcPieceType)-1, AC_WHITE)) == 0);
-    assert(ac_is_valid_piece(ac_create_piece(AC_ROOK, (AcColor)99)) == 0);
+    assert(is_valid_piece(create_piece(PieceType::Ant, Color::White)) == 1);
+    assert(is_valid_piece(create_piece(PieceType::Empty, Color::Empty)) == 1);
+    assert(is_valid_piece(create_piece(PieceType::Queen, Color::Empty)) == 0);
+    assert(is_valid_piece(create_piece(PieceType::Empty, Color::White)) == 0);
+    assert(is_valid_piece(create_piece((PieceType)-1, Color::White)) == 0);
+    assert(is_valid_piece(create_piece(PieceType::Rook, (Color)99)) == 0);
 }
 
 int main(void) {

@@ -1,32 +1,34 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 
 #include <stddef.h>
 
-static void initializeMoveArrays(AcMove *move) {
+namespace ac {
+
+static void initializeMoveArrays(Move *move) {
     int i;
 
-    for (i = 0; i < AC_MAX_CHAIN; ++i) {
-        move->path[i] = ac_create_position(-1, -1); /* (-1,-1) is an invalid position */
-        move->captures[i].pos = ac_create_position(-1, -1);
-        move->captures[i].piece = ac_create_piece(AC_EMPTY_PIECE, AC_EMPTY_COLOR);
+    for (i = 0; i < MaxChain; ++i) {
+        move->path[i] = create_position(-1, -1); /* (-1,-1) is an invalid position */
+        move->captures[i].pos = create_position(-1, -1);
+        move->captures[i].piece = create_piece(PieceType::Empty, Color::Empty);
     }
 }
 
-AcMove ac_create_move(AcSquare from, AcSquare to, AcPiece piece) {
-    AcMove move;
+Move create_move(Square from, Square to, Piece piece) {
+    Move move;
 
     move.from = from;
     move.to = to;
     move.movedPiece = piece;
     move.pathLength = 0;
     move.captureCount = 0;
-    move.specialType = AC_NO_SPECIAL_MOVE;
+    move.specialType = SpecialMove::None;
     initializeMoveArrays(&move);
     return move;
 }
 
-void ac_add_capture(AcMove *move, AcSquare pos, AcPiece piece) {
-    if (move == NULL || move->captureCount >= AC_MAX_CHAIN) {
+void add_capture(Move *move, Square pos, Piece piece) {
+    if (move == NULL || move->captureCount >= MaxChain) {
         return;
     }
 
@@ -35,8 +37,8 @@ void ac_add_capture(AcMove *move, AcSquare pos, AcPiece piece) {
     ++move->captureCount;
 }
 
-void ac_add_path_step(AcMove *move, AcSquare pos) {
-    if (move == NULL || move->pathLength >= AC_MAX_CHAIN) {
+void add_path_step(Move *move, Square pos) {
+    if (move == NULL || move->pathLength >= MaxChain) {
         return;
     }
 
@@ -44,7 +46,7 @@ void ac_add_path_step(AcMove *move, AcSquare pos) {
     ++move->pathLength;
 }
 
-void ac_set_special_move(AcMove *move, AcSpecialMove type) {
+void set_special_move(Move *move, SpecialMove type) {
     if (move == NULL) {
         return;
     }
@@ -52,7 +54,9 @@ void ac_set_special_move(AcMove *move, AcSpecialMove type) {
     move->specialType = type;
 }
 
-int ac_is_promotion_special_move(AcSpecialMove type) {
-    return type == AC_PROMOTION_QUEEN || type == AC_PROMOTION_ROOK || type == AC_PROMOTION_BISHOP ||
-           type == AC_PROMOTION_KNIGHT;
+int is_promotion_special_move(SpecialMove type) {
+    return type == SpecialMove::PromotionQueen || type == SpecialMove::PromotionRook ||
+           type == SpecialMove::PromotionBishop || type == SpecialMove::PromotionKnight;
 }
+
+} // namespace ac

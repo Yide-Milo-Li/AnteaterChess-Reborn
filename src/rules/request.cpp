@@ -1,32 +1,36 @@
-#include "anteater/rules.h"
+#include "anteater/rules.hpp"
 
 #include <stddef.h>
 
-static void mark_invalid_request(AcMoveRequest *request) {
+namespace ac {
+
+static void mark_invalid_request(MoveRequest *request) {
     if (request == NULL) {
         return;
     }
 
-    request->from = ac_create_position(-1, -1);
-    request->to = ac_create_position(-1, -1);
-    request->promotion = AC_PROMOTION_CHOICE_NONE;
+    request->from = create_position(-1, -1);
+    request->to = create_position(-1, -1);
+    request->promotion = PromotionChoice::None;
 }
 
-int ac_is_valid_promotion_choice(AcPromotionChoice promotion) {
-    return promotion == AC_PROMOTION_CHOICE_NONE || promotion == AC_PROMOTION_CHOICE_QUEEN ||
-           promotion == AC_PROMOTION_CHOICE_ROOK || promotion == AC_PROMOTION_CHOICE_BISHOP ||
-           promotion == AC_PROMOTION_CHOICE_KNIGHT;
+int is_valid_promotion_choice(PromotionChoice promotion) {
+    return promotion == PromotionChoice::None || promotion == PromotionChoice::Queen ||
+           promotion == PromotionChoice::Rook || promotion == PromotionChoice::Bishop ||
+           promotion == PromotionChoice::Knight;
 }
 
-int ac_create_move_request(AcMoveRequest *request, AcSquare from, AcSquare to, AcPromotionChoice promotion) {
-    if (request == NULL || !ac_is_valid_position(from) || !ac_is_valid_position(to) ||
-        !ac_is_valid_promotion_choice(promotion)) {
+Status create_move_request(MoveRequest *request, Square from, Square to, PromotionChoice promotion) {
+    if (request == NULL || !is_valid_position(from) || !is_valid_position(to) ||
+        !is_valid_promotion_choice(promotion)) {
         mark_invalid_request(request);
-        return 1;
+        return Status::InvalidArgument;
     }
 
     request->from = from;
     request->to = to;
     request->promotion = promotion;
-    return 0;
+    return Status::Ok;
 }
+
+} // namespace ac

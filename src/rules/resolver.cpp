@@ -1,55 +1,57 @@
-#include "anteater/rules.h"
-#include <stdlib.h>
+#include "anteater/rules.hpp"
+#include "anteater/memory.hpp"
 
 #include <stddef.h>
 
-static AcSpecialMove special_for_promotion_choice(AcPromotionChoice promotion) {
+namespace ac {
+
+static SpecialMove special_for_promotion_choice(PromotionChoice promotion) {
     switch (promotion) {
-    case AC_PROMOTION_CHOICE_ROOK:
-        return AC_PROMOTION_ROOK;
-    case AC_PROMOTION_CHOICE_BISHOP:
-        return AC_PROMOTION_BISHOP;
-    case AC_PROMOTION_CHOICE_KNIGHT:
-        return AC_PROMOTION_KNIGHT;
-    case AC_PROMOTION_CHOICE_NONE:
-    case AC_PROMOTION_CHOICE_QUEEN:
+    case PromotionChoice::Rook:
+        return SpecialMove::PromotionRook;
+    case PromotionChoice::Bishop:
+        return SpecialMove::PromotionBishop;
+    case PromotionChoice::Knight:
+        return SpecialMove::PromotionKnight;
+    case PromotionChoice::None:
+    case PromotionChoice::Queen:
     default:
-        return AC_PROMOTION_QUEEN;
+        return SpecialMove::PromotionQueen;
     }
 }
 
-static int candidate_matches_request(AcMove candidate, AcMoveRequest request, AcPiece movingPiece) {
-    return ac_position_equal(candidate.from, request.from) && ac_position_equal(candidate.to, request.to) &&
+static int candidate_matches_request(Move candidate, MoveRequest request, Piece movingPiece) {
+    return position_equal(candidate.from, request.from) && position_equal(candidate.to, request.to) &&
            candidate.movedPiece.type == movingPiece.type && candidate.movedPiece.color == movingPiece.color;
 }
 
-static int resolve_with_workspace(const AcPosition *state, AcMoveRequest request, AcMove *resolvedMove,
-                                  AcMoveList *candidates) {
+static Status resolve_with_workspace(const Position *state, MoveRequest request, Move *resolvedMove,
+                                     MoveList *candidates) {
     /* Workspace supplied by the public wrapper. */
-    AcPiece movingPiece;
-    AcMove *singleNonPromotionMove;
-    AcMove *selectedPromotionMove;
-    AcSpecialMove requestedPromotion;
+    Piece movingPiece;
+    Move *singleNonPromotionMove;
+    Move *selectedPromotionMove;
+    SpecialMove requestedPromotion;
     int nonPromotionCount;
     int promotionCount;
     int index;
 
-    if (state == NULL || resolvedMove == NULL || !ac_is_valid_position(request.from) ||
-        !ac_is_valid_position(request.to) || !ac_is_valid_promotion_choice(request.promotion)) {
-        return 1;
+    if (state == NULL || resolvedMove == NULL || !is_valid_position(request.from) || !is_valid_position(request.to) ||
+        !is_valid_promotion_choice(request.promotion)) {
+        return Status::InvalidArgument;
     }
 
-    if (ac_validate_selection(state, request.from) != AC_SELECT_VALID) {
-        return 1;
+    if (validate_selection(state, request.from) != SelectionResult::Valid) {
+        return Status::InvalidArgument;
     }
 
-    movingPiece = ac_get_piece(&state->board, request.from);
-    if (movingPiece.type == AC_EMPTY_PIECE) {
-        return 1;
+    movingPiece = get_piece(&state->board, request.from);
+    if (movingPiece.type == PieceType::Empty) {
+        return Status::InvalidArgument;
     }
 
-    int status = ac_generate_legal_moves_for_position(state, request.from, candidates);
-    if (status != AC_OK) {
+    Status status = generate_legal_moves_for_position(state, request.from, candidates);
+    if (status != Status::Ok) {
         return status;
     }
 
@@ -59,14 +61,14 @@ static int resolve_with_workspace(const AcPosition *state, AcMoveRequest request
     nonPromotionCount = 0;
     promotionCount = 0;
 
-    for (index = 0; index < ac_get_move_count(candidates); ++index) {
-        AcMove *candidate = ac_get_move(candidates, index);
+    for (index = 0; index < get_move_count(candidates); ++index) {
+        Move *candidate = get_move(candidates, index);
 
         if (candidate == NULL || !candidate_matches_request(*candidate, request, movingPiece)) {
             continue;
         }
 
-        if (ac_is_promotion_special_move(candidate->specialType)) {
+        if (is_promotion_special_move(candidate->specialType)) {
             ++promotionCount;
             if (candidate->specialType == requestedPromotion) {
                 selectedPromotionMove = candidate;
@@ -81,26 +83,32 @@ static int resolve_with_workspace(const AcPosition *state, AcMoveRequest request
 
     if (promotionCount > 0) {
         if (selectedPromotionMove == NULL) {
-            return 1;
+            return Status::InvalidArgument;
         }
 
         *resolvedMove = *selectedPromotionMove;
-        return 0;
+        return Status::Ok;
     }
 
     if (nonPromotionCount == 1 && singleNonPromotionMove != NULL) {
         *resolvedMove = *singleNonPromotionMove;
-        return 0;
+        return Status::Ok;
     }
 
-    return 1;
+    return Status::InvalidArgument;
 }
 
-int ac_resolve_move_request(const AcPosition *s, AcMoveRequest r, AcMove *m) {
-    AcMoveList *l = static_cast<AcMoveList *>(malloc(sizeof(*l)));
-    if (!l)
-        return AC_OUT_OF_MEMORY;
-    int result = resolve_with_workspace(s, r, m, l);
-    free(l);
-    return result;
+Status resolve_move_request(const Position *s, MoveRequest r, Move *m, std::pmr::memory_resource *resource) {
+    if (!resource)
+        return Status::InvalidArgument;
+    try {
+        auto workspace = detail::make_owned<MoveList>(resource);
+        MoveList *l = workspace.get();
+        Status result = resolve_with_workspace(s, r, m, l);
+        return result;
+
+    } catch (const std::bad_alloc &) {
+        return Status::OutOfMemory;
+    }
 }
+} // namespace ac

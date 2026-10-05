@@ -1,31 +1,35 @@
-#include "anteater/rules.h"
-void ac_init_move_list(AcMoveList *l) {
+#include "anteater/rules.hpp"
+
+namespace ac {
+void init_move_list(MoveList *l) {
     if (l) {
         l->count = 0;
-        l->status = AC_OK;
+        l->status = Status::Ok;
     }
 }
-int ac_add_move(AcMoveList *l, AcMove m) {
+Status add_move(MoveList *l, Move m) {
     if (!l)
-        return AC_INVALID_ARGUMENT;
-    if (l->status != AC_OK)
+        return Status::InvalidArgument;
+    if (l->status != Status::Ok)
         return l->status;
-    if (l->count >= AC_MAX_MOVES) {
-        l->status = AC_CAPACITY;
-        return AC_CAPACITY;
+    if (l->count >= MaxMoves) {
+        l->status = Status::Capacity;
+        return Status::Capacity;
     }
     l->moves[l->count++] = m;
-    return AC_OK;
+    return Status::Ok;
 }
-AcMove *ac_get_move(AcMoveList *l, int i) {
+Move *get_move(MoveList *l, int i) {
     return l && i >= 0 && i < l->count ? &l->moves[i] : NULL;
 }
-int ac_get_move_count(AcMoveList *l) {
+int get_move_count(MoveList *l) {
     return l ? l->count : 0;
 }
-int ac_remove_last_move(AcMoveList *l) {
+Status remove_last_move(MoveList *l) {
     if (!l || l->count <= 0)
-        return AC_INVALID_ARGUMENT;
+        return Status::InvalidArgument;
     --l->count;
-    return AC_OK;
+    return Status::Ok;
 }
+
+} // namespace ac

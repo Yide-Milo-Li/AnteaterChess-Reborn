@@ -1,12 +1,14 @@
-#include "anteater/rules.h"
-#include <stdlib.h>
+#include "anteater/rules.hpp"
+#include "anteater/memory.hpp"
 
 #include <stddef.h>
 
-static int moves_match_exactly(AcMove expected, AcMove candidate) {
+namespace ac {
+
+static int moves_match_exactly(Move expected, Move candidate) {
     int index;
 
-    if (!ac_position_equal(expected.from, candidate.from) || !ac_position_equal(expected.to, candidate.to)) {
+    if (!position_equal(expected.from, candidate.from) || !position_equal(expected.to, candidate.to)) {
         return 0;
     }
 
@@ -17,13 +19,13 @@ static int moves_match_exactly(AcMove expected, AcMove candidate) {
     }
 
     for (index = 0; index < expected.pathLength; ++index) {
-        if (!ac_position_equal(expected.path[index], candidate.path[index])) {
+        if (!position_equal(expected.path[index], candidate.path[index])) {
             return 0;
         }
     }
 
     for (index = 0; index < expected.captureCount; ++index) {
-        if (!ac_position_equal(expected.captures[index].pos, candidate.captures[index].pos) ||
+        if (!position_equal(expected.captures[index].pos, candidate.captures[index].pos) ||
             expected.captures[index].piece.type != candidate.captures[index].piece.type ||
             expected.captures[index].piece.color != candidate.captures[index].piece.color) {
             return 0;
@@ -33,15 +35,15 @@ static int moves_match_exactly(AcMove expected, AcMove candidate) {
     return 1;
 }
 
-static int move_requests_explicit_special_semantics(AcMove move) {
-    return move.specialType != AC_NO_SPECIAL_MOVE || move.captureCount > 0 || move.pathLength > 0;
+static int move_requests_explicit_special_semantics(Move move) {
+    return move.specialType != SpecialMove::None || move.captureCount > 0 || move.pathLength > 0;
 }
 
 /* Callers sometimes only know from/to before special-move metadata is derived.
  * In that common case, matching the destination against generated candidates is
  * enough; detailed requests still require an exact semantic match. */
-static int generated_move_matches_request(AcMove requested, AcMove candidate) {
-    if (!ac_position_equal(requested.from, candidate.from) || !ac_position_equal(requested.to, candidate.to)) {
+static int generated_move_matches_request(Move requested, Move candidate) {
+    if (!position_equal(requested.from, candidate.from) || !position_equal(requested.to, candidate.to)) {
         return 0;
     }
 
@@ -57,45 +59,45 @@ static int generated_move_matches_request(AcMove requested, AcMove candidate) {
     return 1;
 }
 
-AcSelectionResult ac_validate_selection(const AcPosition *state, AcSquare pos) {
-    AcPiece piece;
+SelectionResult validate_selection(const Position *state, Square pos) {
+    Piece piece;
 
-    if (state == NULL || !ac_is_valid_position(pos)) {
-        return AC_SELECT_OUT_OF_BOUNDS;
+    if (state == NULL || !is_valid_position(pos)) {
+        return SelectionResult::OutOfBounds;
     }
 
-    piece = ac_get_piece(&state->board, pos);
-    if (piece.type == AC_EMPTY_PIECE) {
-        return AC_SELECT_EMPTY;
+    piece = get_piece(&state->board, pos);
+    if (piece.type == PieceType::Empty) {
+        return SelectionResult::Empty;
     }
 
     if (piece.color != state->currentTurn) {
-        return AC_SELECT_OPPONENT_PIECE;
+        return SelectionResult::OpponentPiece;
     }
 
-    return AC_SELECT_VALID;
+    return SelectionResult::Valid;
 }
 
-static int resolve_with_workspace(const AcPosition *state, AcMove move, AcMoveList *candidates) {
+static int resolve_with_workspace(const Position *state, Move move, MoveList *candidates) {
     /* Workspace supplied by the public wrapper. */
     int index;
     int simpleMatchCount;
     int allSimpleMatchesArePromotions;
     int queenVariantFound;
 
-    if (state == NULL || !ac_is_valid_position(move.from) || !ac_is_valid_position(move.to)) {
+    if (state == NULL || !is_valid_position(move.from) || !is_valid_position(move.to)) {
         return 0;
     }
 
-    if (ac_generate_legal_moves_for_position(state, move.from, candidates) != 0) {
+    if (generate_legal_moves_for_position(state, move.from, candidates) != Status::Ok) {
         return 0;
     }
 
     simpleMatchCount = 0;
     allSimpleMatchesArePromotions = 1;
     queenVariantFound = 0;
-    for (index = 0; index < ac_get_move_count(candidates); ++index) {
-        AcMove *candidate = ac_get_move(candidates, index);
+    for (index = 0; index < get_move_count(candidates); ++index) {
+        Move *candidate = get_move(candidates, index);
 
         if (candidate == NULL) {
             continue;
@@ -110,10 +112,10 @@ static int resolve_with_workspace(const AcPosition *state, AcMove move, AcMoveLi
 
         if (generated_move_matches_request(move, *candidate)) {
             ++simpleMatchCount;
-            if (!ac_is_promotion_special_move(candidate->specialType)) {
+            if (!is_promotion_special_move(candidate->specialType)) {
                 allSimpleMatchesArePromotions = 0;
             }
-            if (candidate->specialType == AC_PROMOTION_QUEEN) {
+            if (candidate->specialType == SpecialMove::PromotionQueen) {
                 queenVariantFound = 1;
             }
         }
@@ -130,11 +132,17 @@ static int resolve_with_workspace(const AcPosition *state, AcMove move, AcMoveLi
     return 0;
 }
 
-int ac_validate_move(const AcPosition *s, AcMove m) {
-    AcMoveList *l = static_cast<AcMoveList *>(malloc(sizeof(*l)));
-    if (!l)
+int validate_move(const Position *s, Move m, std::pmr::memory_resource *resource) {
+    if (!resource)
         return 0;
-    int result = resolve_with_workspace(s, m, l);
-    free(l);
-    return result;
+    try {
+        auto workspace = detail::make_owned<MoveList>(resource);
+        MoveList *l = workspace.get();
+        int result = resolve_with_workspace(s, m, l);
+        return result;
+
+    } catch (const std::bad_alloc &) {
+        return 0;
+    }
 }
+} // namespace ac

@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Public interfaces: [types](../../include/anteater/types.h), [rules](../../include/anteater/rules.h), [session](../../include/anteater/session.h), [AI](../../include/anteater/ai.h). All public library symbols use `ac_`, `Ac`, or `AC_`. Qt desktop internals are private to the application.
+Public interfaces: [types](../../include/anteater/types.hpp), [rules](../../include/anteater/rules.hpp), [session](../../include/anteater/session.hpp), [AI](../../include/anteater/ai.hpp). All public library symbols use `ac_`, `Ac`, or `AC_`. Qt desktop internals are private to the application.
 
 ```mermaid
 flowchart TD

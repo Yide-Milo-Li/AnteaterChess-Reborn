@@ -1,17 +1,20 @@
-#include "internal.h"
-#include <stdlib.h>
-int ac_is_in_check(const AcPosition *s, AcColor c) {
-    if (!s || (c != AC_WHITE && c != AC_BLACK))
+#include "internal.hpp"
+#include "anteater/memory.hpp"
+
+namespace ac {
+int is_in_check(const Position *s, Color c) {
+    if (!s || (c != Color::White && c != Color::Black))
         return 0;
-    for (int r = 0; r < AC_ROWS; ++r)
-        for (int k = 0; k < AC_COLS; ++k) {
-            AcPiece p = s->board.cells[r][k];
-            if (p.type == AC_KING && p.color == c)
-                return ac_square_attacked(&s->board, ac_create_position(r, k), c == AC_WHITE ? AC_BLACK : AC_WHITE);
+    for (int r = 0; r < Rows; ++r)
+        for (int k = 0; k < Columns; ++k) {
+            Piece p = s->board.cells[r][k];
+            if (p.type == PieceType::King && p.color == c)
+                return square_attacked(&s->board, create_position(r, k),
+                                       c == Color::White ? Color::Black : Color::White);
         }
     return 0;
 }
-int ac_is_insufficient_material(const AcPosition *state) {
+int is_insufficient_material(const Position *state) {
     int totalNonKingPieces;
     int totalAnts;
     int totalRooks;
@@ -38,14 +41,14 @@ int ac_is_insufficient_material(const AcPosition *state) {
     bishopsAllSameColor = 1;
     firstBishopSquareColor = -1;
 
-    for (row = 0; row < AC_ROWS; ++row) {
-        for (col = 0; col < AC_COLS; ++col) {
-            AcPiece piece = ac_get_piece(&state->board, ac_create_position(row, col));
+    for (row = 0; row < Rows; ++row) {
+        for (col = 0; col < Columns; ++col) {
+            Piece piece = get_piece(&state->board, create_position(row, col));
             int squareColor;
 
             /* Kings do not count toward mating material, and empty squares are
              * ignored entirely. */
-            if (piece.type == AC_EMPTY_PIECE || piece.type == AC_KING) {
+            if (piece.type == PieceType::Empty || piece.type == PieceType::King) {
                 continue;
             }
 
@@ -53,13 +56,13 @@ int ac_is_insufficient_material(const AcPosition *state) {
 
             /* Count each remaining piece type so the draw rules can make a
              * simple decision after the full board scan is done. */
-            if (piece.type == AC_ANT) {
+            if (piece.type == PieceType::Ant) {
                 ++totalAnts;
-            } else if (piece.type == AC_ROOK) {
+            } else if (piece.type == PieceType::Rook) {
                 ++totalRooks;
-            } else if (piece.type == AC_QUEEN) {
+            } else if (piece.type == PieceType::Queen) {
                 ++totalQueens;
-            } else if (piece.type == AC_BISHOP) {
+            } else if (piece.type == PieceType::Bishop) {
                 ++totalBishops;
 
                 /* Same-color bishops are a common insufficient-material case,
@@ -72,9 +75,9 @@ int ac_is_insufficient_material(const AcPosition *state) {
                 } else if (firstBishopSquareColor != squareColor) {
                     bishopsAllSameColor = 0;
                 }
-            } else if (piece.type == AC_KNIGHT) {
+            } else if (piece.type == PieceType::Knight) {
                 ++totalKnights;
-            } else if (piece.type == AC_ANTEATER) {
+            } else if (piece.type == PieceType::Anteater) {
                 ++totalAnteaters;
             }
         }
@@ -123,23 +126,29 @@ int ac_is_insufficient_material(const AcPosition *state) {
     return 0;
 }
 
-AcStatus ac_position_result(const AcPosition *s, AcGameResult *result) {
-    if (!s || !result)
-        return AC_INVALID_ARGUMENT;
-    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
-    if (!moves)
-        return AC_OUT_OF_MEMORY;
-    AcStatus status = static_cast<AcStatus>(ac_generate_legal_moves(s, moves));
-    int count = moves->count;
-    free(moves);
-    if (status != AC_OK)
-        return status;
-    *result = AC_RESULT_NONE;
-    if (count == 0)
-        *result = ac_is_in_check(s, s->currentTurn)
-                      ? (s->currentTurn == AC_WHITE ? AC_RESULT_BLACK_WIN : AC_RESULT_WHITE_WIN)
-                      : AC_RESULT_DRAW;
-    else if (ac_is_insufficient_material(s))
-        *result = AC_RESULT_DRAW;
-    return AC_OK;
+Status position_result(const Position *s, GameResult *result, std::pmr::memory_resource *resource) {
+    if (!resource)
+        return Status::InvalidArgument;
+    try {
+        if (!s || !result)
+            return Status::InvalidArgument;
+        auto workspace = detail::make_owned<MoveList>(resource);
+        MoveList *moves = workspace.get();
+        Status status = static_cast<Status>(generate_legal_moves(s, moves));
+        int count = moves->count;
+        if (status != Status::Ok)
+            return status;
+        *result = GameResult::None;
+        if (count == 0)
+            *result = is_in_check(s, s->currentTurn)
+                          ? (s->currentTurn == Color::White ? GameResult::BlackWin : GameResult::WhiteWin)
+                          : GameResult::Draw;
+        else if (is_insufficient_material(s))
+            *result = GameResult::Draw;
+        return Status::Ok;
+
+    } catch (const std::bad_alloc &) {
+        return Status::OutOfMemory;
+    }
 }
+} // namespace ac

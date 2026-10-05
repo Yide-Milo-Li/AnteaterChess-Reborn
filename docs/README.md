@@ -1,9 +1,9 @@
 # Documentation
 
-Current documentation describes the C++20 / Qt 6 native implementation. It was
-reviewed on 2026-10-05 against source commit `cf2f30b`. VERSION remains `2.0.1`,
-which is also used by the older published C11/GTK release; use source revisions
-to distinguish them.
+Current documentation describes the C++20 / Qt 6 native implementation in
+version **2.1.0**. The earlier published v2.0.1 contains the C11/GTK implementation.
+See [release notes](development/release-notes.md) for the delivery and use each
+archive's SOURCE_REVISION to identify its exact source.
 
 ## Playing the game
 
@@ -31,7 +31,7 @@ to distinguish them.
 The ledger records local packages and remote CI as passed, and clean-Windows/manual
 acceptance as complete per user confirmation. Detailed independent acceptance
 receipts were not supplied. The native migration is integrated into main.
-No native Release is published.
+Version 2.1.0 is the native release line.
 
 ## Historical material
 

@@ -7,7 +7,7 @@ Supported native distribution targets are Windows x64 and Ubuntu 24.04 x64. Extr
 Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their QML, plugins and configuration directories with the executable.
 
 The native C++20/Qt implementation can be identified by SOURCE_REVISION in its
-archive. VERSION alone is insufficient: the older published v2.0.1 release uses
+archive. Version 2.1.0 uses C++20/Qt; the older published v2.0.1 release uses
 C11/GTK. In a source checkout, docs/development/release-notes.md records
 publication and acceptance status.
 

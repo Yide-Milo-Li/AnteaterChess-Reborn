@@ -1,57 +1,115 @@
+<div align="center">
+
 # AnteaterChess Reborn
 
-A C++20 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, with Ants and
-chain-capturing Anteaters. The maintained implementation has a Qt-independent
-core and preserves the original variant's rules and frozen AI regression results.
+### A bigger board. A new kind of chess.
 
-## Current version and status
+**Ants, chain-capturing Anteaters, and 80 squares to explore.**
 
-Reviewed on 2026-10-05 against source commit
-`cf2f30b7db09edac42cade7e7b61ad0db483d2a1`, now integrated into `main`. [VERSION](VERSION) remains `2.0.1`; identify native
-packages by their `SOURCE_REVISION`, rather than the version number alone.
+[![Release](https://img.shields.io/github/v/release/Yide-Milo-Li/AnteaterChess-Reborn?style=flat-square&color=d99b20)](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/latest)
+[![Native CI](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/workflows/ci.yml)
+![C++20](https://img.shields.io/badge/C%2B%2B-20-31445b?style=flat-square)
+![Qt 6 / QML](https://img.shields.io/badge/Qt_6-QML-31445b?style=flat-square)
+![Platforms](https://img.shields.io/badge/platforms-Windows_%7C_Ubuntu-31445b?style=flat-square)
 
-- C++20 source migration, Windows/Linux packages and no-Git source rebuilds are complete.
-- [Windows and Linux CI](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/runs/37358903929) passed for that source commit.
-- Clean-Windows and manual desktop acceptance are complete per the user's 2026-10-05 confirmation. Individual acceptance receipts were not supplied; see the [validation ledger](docs/development/native-migration/validation.md).
-- `main` includes the native migration. The native implementation has not been published as a GitHub Release.
+[**Download v2.1.0**](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.1.0) · [How to play](docs/user/manual.md) · [Build from source](docs/development/guide.md) · [Release notes](docs/development/release-notes.md)
 
-The [published v2.0.1 release](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
-is the earlier C11/GTK implementation at `6d92663`. Its archives do not contain
-the current C++20/Qt implementation.
+</div>
 
-## Features
+![The native Qt interface: an 8 by 10 board, move input, hints and history](docs/media/gameplay.png)
 
-- Human vs Human, Human vs AI and AI vs AI.
-- Ant movement, Anteater capture chains, castling, en passant and four promotion choices.
-- Dark Qt Quick interface, SVG pieces rasterized for board size and display pixel ratio, and F11/Escape fullscreen controls.
-- Click and coordinate input, legal-move and hint highlights, undo, turn timers and Tournament time budgets.
-- Owning AI requests run on a QThread with cooperative cancellation; stale results are checked before application.
-- Per-game diagnostic logs in `logs/` beside the actual executable.
+AnteaterChess Reborn is a local desktop chess variant created at **UC Irvine**.
+Play a friend, challenge the AI, or watch two engines compete. An **8 × 10 board**
+adds room for Ants and Anteaters while keeping familiar pieces, castling, en
+passant and promotion.
 
-The [user manual](docs/user/manual.md) defines the variant's rules and timing/undo
-policies. Experimental difficulty has been removed. There is no networking or
-saved-game import/export.
+Version **2.1.0** brings the native **C++20 / Qt 6 + QML** implementation to the
+release line, with a Qt-independent core and reproducible CMake/CTest/CPack builds.
+The earlier [v2.0.1](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
+contains the historical C11/GTK implementation.
 
-## Run a native package
+## Get the game
 
-Use a native archive delivered for the source revision above, or build and package
-this checkout using the [development guide](docs/development/guide.md).
+| Platform | Download | Start playing |
+| --- | --- | --- |
+| **Windows x64** | [Portable ZIP](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-windows-x64.zip) | Extract everything to a writable folder; launch `anteater-chess.exe`. |
+| **Ubuntu 24.04 x64** | [Linux TGZ](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-linux-x64.tar.gz) | Install the Qt packages in `INSTALL.md`; launch `./anteater-chess`. |
+| **Source** | [Source archive](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-source.tar.gz) | Follow the [development guide](docs/development/guide.md). |
 
-- **Windows x64:** extract the complete ZIP to a writable directory and launch `anteater-chess.exe`. Keep DLLs, `plugins/`, `qml/` and `qt.conf` with it. The game opens without a console; no development tools are required.
-- **Ubuntu 24.04 x64:** extract the TGZ, install the system Qt dependencies listed in the package's `INSTALL.md`, then run `./anteater-chess` in a graphical session. The [Linux installation template](tools/packaging/templates/INSTALL-linux.md) lists those packages.
+Windows includes its required runtime libraries. Keep the DLLs, `plugins/`,
+`qml/` and `qt.conf` beside the executable. Ubuntu uses system Qt libraries and
+requires a graphical session. macOS packages are not available.
 
-Each native archive includes `SOURCE_REVISION`, `FILES.sha256`, dependency/license
-records and `INSTALL.md`. A different working directory or a Linux symlink does
-not change the log location. macOS is outside the supported distribution targets.
+Every archive includes `SOURCE_REVISION` and `FILES.sha256`; runtime packages
+also include `INSTALL.md`, dependency inventories and license notices. SHA-256
+sidecars are available with the downloads. See [package verification](docs/development/guide.md#install-and-cpack).
 
-## Build from source
+## Meet the variant
 
-### Windows: native PowerShell
+| Piece | What changes |
+| --- | --- |
+| **Ant** | Advances like a pawn, captures diagonally, and promotes to Queen, Rook, Bishop or Knight. |
+| **Anteater** | Moves to an adjacent empty square, or captures an adjacent enemy Ant and continues through an orthogonally connected capture chain. |
+| **The board** | Ten files, A–J, and eight ranks. Each side starts with two Anteaters and ten Ants. |
 
-Install Visual Studio's v143 **14.44 x64** component, a Windows SDK, native
-CMake >= 3.25, Ninja and Python 3, and the official **Qt 6.11.2 MSVC 2022 x64**
-kit with Shader Tools. The environment script defaults to
-`C:\Qt\6.11.2\msvc2022_64`; initialize each new PowerShell process:
+An Anteater captures **Ants only**. Its first capture may be diagonal; later
+captures in the same chain must be orthogonal. A chain can stop after any capture,
+up to ten. Coordinate input rejects ambiguous paths. The [manual](docs/user/manual.md#pieces-and-special-moves)
+explains the full rules, including the variant's castling positions and draw policies.
+
+## Choose your game
+
+- **Human vs Human** — share the board for a local match.
+- **Human vs AI** — choose your color and Easy, Medium, Hard or Tournament difficulty.
+- **AI vs AI** — set both opponents and watch the game unfold.
+
+Click a friendly piece, then right-click a highlighted destination, or enter
+coordinates. Ask for a hint, review move history, undo according to the game mode,
+and switch fullscreen with **F11** / **Escape**. Optional turn timers skip an
+expired turn; Tournament uses a separate per-player time budget.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/media/menu.png" alt="Main menu of AnteaterChess Reborn" /><br /><b>A focused start</b><br />Start a new game from the native desktop menu.</td>
+<td width="50%"><img src="docs/media/setup.png" alt="Human versus human game setup and turn timer settings" /><br /><b>Your match, your pace</b><br />Choose the mode and configure player and timer settings.</td>
+</tr>
+</table>
+
+<details>
+<summary><b>See promotion in the native interface</b></summary>
+
+![Promotion dialog over an active game, offering Queen, Rook, Bishop and Knight](docs/media/promotion.png)
+
+</details>
+
+Screenshots are captured from the maintained Windows Qt interface at an actual
+1.5 device pixel ratio using deterministic desktop test positions.
+
+## Under the hood
+
+The desktop routes game commands through one owning **Session**. Rules, policy
+and AI compile independently of Qt. Background search owns its input snapshots,
+supports cooperative cancellation, and checks result identities before applying
+moves or hints. SVG pieces follow board size and display pixel ratio. Per-game
+logs live in `logs/` beside the executable.
+
+| Layer | Source | Responsibility |
+| --- | --- | --- |
+| Desktop | `apps/qt/` | QML pages, typed models, controller, background jobs and runtime |
+| Session | `src/session/` | Live game, transactions, history, revisions and clocks |
+| Rules | `src/rules/` | Position, legal moves, reversible execution and endgame rules |
+| Policy | `src/policy/` | Configuration, depth selection and Tournament budgets |
+| AI | `src/ai/` | Owning search contexts, evaluation and search |
+
+The [interactive architecture](docs/architecture/architecture.html) and
+[software specification](docs/architecture/software-specification.md) describe
+the current contracts. The game supports local play; networking and saved-game
+import/export are outside its feature set.
+
+## Build and verification
+
+**Windows:** native MSVC v143 **14.44 x64**, CMake ≥ 3.25, Ninja, Python 3 and
+**Qt 6.11.2 MSVC 2022 x64** with Shader Tools.
 
 ```powershell
 . ./tools/native/Enter-NativeEnvironment.ps1 -RequireQt -RequirePython
@@ -61,55 +119,29 @@ ctest --preset windows-release
 ./build/windows-release/bin/anteater-chess.exe
 ```
 
-The Release desktop preset enables distribution receipts and therefore requires
-Python. MinGW/MSYS2 is not a supported Windows build toolchain.
-
-### Ubuntu 24.04
-
-Use GCC, CMake >= 3.25, Ninja, Python 3 and system Qt 6.4.2:
+**Ubuntu 24.04:** GCC, CMake ≥ 3.25, Ninja, Python 3 and system **Qt 6.4.2**.
+Install the packages listed in the [development guide](docs/development/guide.md), then:
 
 ```sh
-sudo apt-get update
-sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-shader-baker qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
 cmake --preset linux-release
 cmake --build --preset linux-release
 ctest --preset linux-release
 ./build/linux-release/bin/anteater-chess
 ```
 
-### Core and sanitizer builds
+CI covers Windows/Linux Debug and Release desktop/core presets, Linux ASan/UBSan,
+effective DPI checks, packaging and no-Git source rebuilds. Frozen AI regression
+fixtures preserve the original search results. The [validation ledger](docs/development/native-migration/validation.md)
+records tested revisions and separates measured checks from user-confirmed clean
+Windows and manual acceptance.
 
-`windows-debug-core`, `windows-release-core`, `linux-debug-core` and
-`linux-release-core` build and test without Qt or Python discovery.
-`linux-sanitizer` runs core tests with ASan/UBSan. Production core-only builds
-disable desktop, testing, development tools and distribution; see the
-[development guide](docs/development/guide.md).
+Start at the [documentation index](docs/README.md) for the manual, build guide,
+CI evidence, architecture and historical course documents.
 
-## Architecture and documentation
+## Made by DeepAnteater
 
-| Module | Path | Responsibility |
-| --- | --- | --- |
-| Desktop | `apps/qt/{app,models,qml,async}/` | ApplicationController, typed models, pages and background jobs |
-| Session | `src/session/` | Sole live game owner, transactions, history, revisions and clocks |
-| Rules | `src/rules/` | Position, legal moves, reversible execution and endgame rules |
-| Policy | `src/policy/` | Configuration validation, depth selection and Tournament budgets |
-| AI | `src/ai/` | Owning search contexts/requests, evaluation and search |
-| Runtime | `apps/qt/runtime/` | Executable paths, injected monotonic clock and atomic diagnostic logs |
-
-Start at the [documentation index](docs/README.md). The
-[software specification](docs/architecture/software-specification.md) defines
-current contracts; the [interactive architecture](docs/architecture/architecture.html)
-shows their relationships. Build, test and packaging instructions are in the
-[development guide](docs/development/guide.md), with measured results in the
-[native validation ledger](docs/development/native-migration/validation.md).
-
-[Historical documents](docs/legacy/README.md) are archived and receive no ongoing
-behavior updates. The current manual and specification are authoritative.
-
-## Authors and rights
-
-Originally developed for UC Irvine EECS 22L by **Team 22: DeepAnteater**:
-Yao Li, Benjamin Feng, Yide Li, Yurang Li, Yasith Diunugala and Max Zhang.
+Originally developed for **UC Irvine EECS 22L** by **Team 22: DeepAnteater**:
+**Yao Li · Benjamin Feng · Yide Li · Yurang Li · Yasith Diunugala · Max Zhang**.
 The original 215-commit course history is retained.
 
 [COPYRIGHT](COPYRIGHT) and team attribution remain unchanged. All rights remain

@@ -89,7 +89,7 @@ presets passed. Windows/Linux packages, no-Git rebuilds and remote CI passed for
 that commit. Independent clean-Windows and human desktop acceptance are complete
 per the user's 2026-10-05 confirmation; per-check receipts were not supplied.
 The native migration is integrated into main.
-No native Release is published.
+Version 2.1.0 is the native release line; see [release notes](../release-notes.md).
 See [the validation ledger](validation.md) for evidence and the distinction between
 measured results and user-confirmed acceptance. Earlier blocked installer reports
 remain historical attachments.

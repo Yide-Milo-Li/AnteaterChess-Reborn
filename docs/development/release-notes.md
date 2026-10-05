@@ -1,10 +1,18 @@
-# Native migration: accepted, unpublished
+# AnteaterChess Reborn 2.1.0
 
-Reviewed on 2026-10-05. VERSION remains `2.0.1`, while the native implementation
-is identified by source commit `cf2f30b7db09edac42cade7e7b61ad0db483d2a1` in
-`main`. The
-[published v2.0.1 release](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
-at `6d92663` contains the earlier C11/GTK implementation. No native Release is published.
+The first release of the native **C++20 / Qt 6 + QML** implementation, dated
+2026-10-05. It replaces the C11/GTK desktop and build stack while preserving the
+variant's gameplay and frozen AI regression expectations.
+
+[Download v2.1.0](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.1.0).
+Windows x64 is a portable ZIP with bundled runtime libraries; Ubuntu 24.04 x64
+is a TGZ using system Qt packages listed in INSTALL.md. A no-Git source archive
+and SHA-256 sidecars accompany the runtime packages. SOURCE_REVISION binds each
+archive to its exact release commit.
+
+The [earlier v2.0.1](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
+at `6d92663` remains the historical C11/GTK release. Existing packages and tags
+are retained.
 
 ## Changes
 
@@ -47,4 +55,16 @@ Clean-Windows and manual desktop acceptance are complete per the user's
 2026-10-05 confirmation. Individual machine details, screenshots and per-check
 receipts were not supplied with that confirmation. The
 [native ledger](native-migration/validation.md) preserves this distinction and the
-earlier stage records. Publication remains a separate step.
+earlier stage records. Release-specific checks are recorded below.
+
+## 2.1.0 release verification
+
+The version and repository presentation change for this release; game rules,
+AI behavior and frozen fixtures remain unchanged. The release candidate runs
+the Windows/Linux native matrix, effective DPI rendering, dependency and license
+checks, portable startup and no-Git source rebuilds before publication. Command
+receipts and checksums accompany the [native CI workflow](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/workflows/ci.yml).
+
+The release assets are selected only from a successful run for the tagged commit.
+This release does not add a new independent clean-machine acceptance receipt;
+the existing user-confirmed acceptance above remains the acceptance evidence.

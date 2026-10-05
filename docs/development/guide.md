@@ -1,11 +1,10 @@
 # Development and packaging
 
-Reviewed on 2026-10-05 against source commit `cf2f30b`. The native migration's
-local packages and remote CI passed; clean-Windows/manual acceptance is complete
-per user confirmation. See the [native ledger](native-migration/validation.md)
-for evidence and its limits. The native migration is integrated into main.
-No native Release is published.
-VERSION remains 2.0.1, also used by the older published C11/GTK implementation.
+Version 2.1.0 is the native C++20 / Qt 6 release line. The migration's original
+local packages and remote CI passed at `cf2f30b`; clean-Windows/manual acceptance
+is complete per user confirmation. See the [native ledger](native-migration/validation.md)
+for evidence and its limits, and the [release notes](release-notes.md) for the
+2.1.0 delivery. The earlier published 2.0.1 contains C11/GTK.
 
 Use one C++20 CMake >= 3.25/Ninja graph, CTest and CPack. Windows requires native
 v143 14.44 x64 and the official Qt 6.11.2 MSVC 2022 x64 kit with Shader Tools.
@@ -96,7 +95,7 @@ Verify candidates in a fresh persistent directory (native environment remains
 initialized for the optional rebuild):
 
 ```sh
-python3 tools/packaging/verify_candidate.py --runtime dist/AnteaterChess-Reborn-2.0.1-linux-x64.tar.gz --source dist/AnteaterChess-Reborn-2.0.1-source.tar.gz --work ../migration-evidence/candidate-linux --rebuild
+python3 tools/packaging/verify_candidate.py --runtime dist/AnteaterChess-Reborn-2.1.0-linux-x64.tar.gz --source dist/AnteaterChess-Reborn-2.1.0-source.tar.gz --work ../migration-evidence/candidate-linux --rebuild
 ```
 
 Windows uses python and the windows-x64.zip runtime. The verifier checks all file

@@ -226,3 +226,12 @@ resolve Qt 6.11's new kit-specific repository hierarchy. CI now reads the pinned
 official metadata directly, verifies archive checksums and records extraction
 results. Failed attempts remain attachments. Remote Windows acceptance is still
 pending until the repaired job completes for the final tested commit.
+
+The b03a39a remote Windows job subsequently passed all four build/test presets,
+three effective DPI runs, official deployment and portable startup checks. Its
+Unicode no-Git rebuild reached CTest and failed there. A local path containing a
+chess glyph reproduced the AI comparison driver's narrow-argv limitation (exit 2).
+The driver now uses wmain and filesystem's native wide path on Windows; the same
+unchanged fixture then passed all 27 comparisons (exit 0). Linux retains its native
+UTF-8 main. Final candidates and CI are rerun at the repair commit. Candidate
+command logs are included in CI artifacts so failures can be inspected directly.

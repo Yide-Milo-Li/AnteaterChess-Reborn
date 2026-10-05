@@ -8,6 +8,7 @@
 #include <memory>
 #include <string.h>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 
@@ -81,7 +82,11 @@ static void clear(Position *p) {
 static void put(Position *p, int r, int c, PieceType t, Color color) {
     set_piece(&p->board, Square{r, c}, create_piece(t, color));
 }
+#ifdef _WIN32
+int wmain(int argc, wchar_t **argv) {
+#else
 int main(int argc, char **argv) {
+#endif
     Position p;
     auto ownedMoves = std::make_unique<MoveList>();
     auto *moves = ownedMoves.get();
@@ -126,7 +131,8 @@ int main(int argc, char **argv) {
         std::cerr << "Usage: ai_reference frozen-fixture\n";
         return 2;
     }
-    std::ifstream fixture(argv[1]);
+    // Native wide paths preserve Unicode on Windows regardless of its ANSI locale.
+    std::ifstream fixture{std::filesystem::path(argv[1])};
     std::istringstream computed(actual.str());
     std::string expected, observed;
     int index = 0;

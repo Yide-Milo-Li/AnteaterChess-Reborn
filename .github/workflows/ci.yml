@@ -19,9 +19,12 @@ jobs:
         with:
           name: linux-${{ github.sha }}
           path: |
-            dist/*
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
             build/ci-evidence
             build/ci-candidate/RESULT.json
+            build/ci-candidate/*.txt
   windows:
     runs-on: windows-2022
     defaults:
@@ -56,6 +59,9 @@ jobs:
         with:
           name: windows-${{ github.sha }}
           path: |
-            dist/*
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
             build/ci-evidence
             build/ci-candidate/RESULT.json
+            build/ci-candidate/*.txt

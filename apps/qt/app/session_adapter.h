@@ -36,7 +36,8 @@ class SessionAdapter : public QObject {
     enum Page { MainMenu, ModeMenu, Setup, Gameplay, EndGame };
     Q_ENUM(Page)
     explicit SessionAdapter(const SessionOptions *options = nullptr, QObject *parent = nullptr,
-                            SessionLog log = SessionLog::besideExecutable());
+                            SessionLog log = SessionLog::besideExecutable(),
+                            std::pmr::memory_resource *searchResource = std::pmr::get_default_resource());
     ~SessionAdapter() override;
     bool valid() const {
         return session_.has_value();
@@ -86,7 +87,10 @@ class SessionAdapter : public QObject {
     }
     SessionState state() const;
     Result<SessionSnapshot> snapshot() const {
-        return session_ ? session_->snapshot() : Result<SessionSnapshot>{Error{Status::Unavailable, "No Session"}};
+        return session_ ? session_->snapshot()
+                        : Result<SessionSnapshot>{
+                              Error{Status::Unavailable, "No Session"}
+        };
     }
     Status diagnostic() const {
         return diagnostic_;

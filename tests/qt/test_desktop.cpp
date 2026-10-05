@@ -197,7 +197,7 @@ class DesktopTest : public QObject {
         QCOMPARE(a.start(config()), Status::Ok);
         ac::SearchJobs jobs;
         QSignalSpy completed(&jobs, &ac::SearchJobs::completed);
-        QVERIFY(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 1, true, 100, 1));
+        QCOMPARE(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 1, true, 100, 1), Status::Ok);
         auto *thread = jobs.findChild<QThread *>();
         QVERIFY(thread);
         // Join without pumping the GUI queue: finished has been posted, but its
@@ -206,7 +206,7 @@ class DesktopTest : public QObject {
         QVERIFY(jobs.busy());
         jobs.shutdown();
         QVERIFY(!jobs.busy());
-        QVERIFY(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 2, true, 100, 1));
+        QCOMPARE(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 2, true, 100, 1), Status::Ok);
         QTRY_COMPARE_WITH_TIMEOUT(completed.count(), 1, 5000);
         QCOMPARE(jobs.outcome().generation, uint64_t(2));
         QVERIFY(!jobs.busy());

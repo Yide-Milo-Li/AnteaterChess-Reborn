@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <memory>
 #include <string.h>
 
 using namespace ac;
@@ -38,7 +39,8 @@ static int64_t now(void *unused) {
     return 0;
 }
 static void emit(const Position *p, int index) {
-    MoveList *list = static_cast<MoveList *>(malloc(sizeof(*list)));
+    auto ownedList = std::make_unique<MoveList>();
+    auto *list = ownedList.get();
     if (!list || generate_legal_moves(p, list) != Status::Ok)
         exit(1);
     uint64_t see = UINT64_C(1469598103934665603);
@@ -46,19 +48,21 @@ static void emit(const Position *p, int index) {
         see ^= signature(&list->moves[i]);
         see = fold(see, ai_see_move_score(p, &list->moves[i]));
     }
-    SearchContext *ctx = search_create();
-    SearchOptions o = {
-        {now, NULL},
-        10000, 2, NULL, NULL, NULL, 0
-    };
-    SearchResult r = {};
-    Status s = search(ctx, p, &o, &r);
+    auto owner = SearchContext::create();
+    auto request = SearchRequest::create(*p, {}, {10000, 2}, Clock{now, nullptr});
+    if (!std::holds_alternative<SearchContext>(owner) || !std::holds_alternative<SearchRequest>(request))
+        exit(1);
+    auto outcome = std::get<SearchContext>(owner).search(std::get<SearchRequest>(request));
+    SearchResult r{};
+    Status s = Status::Ok;
+    if (auto *error = std::get_if<Error>(&outcome))
+        s = error->status;
+    else
+        r = std::get<SearchResult>(outcome);
     printf("%d hash=%" PRIu64 " absolute=%d relative=%d moves=%d see=%" PRIu64
            " status=%d depth=%d nodes=%d move=%" PRIu64 "\n",
            index, p->hash, ai_evaluate_absolute(p), ai_evaluate_relative(p), list->count, see, value(s),
            r.completedDepth, r.nodes, s == Status::Ok ? signature(&r.move) : 0);
-    search_destroy(ctx);
-    free(list);
 }
 static void clear(Position *p) {
     position_init(p);
@@ -71,7 +75,8 @@ static void put(Position *p, int r, int c, PieceType t, Color color) {
 }
 int main(void) {
     Position p;
-    MoveList *moves = static_cast<MoveList *>(malloc(sizeof(*moves)));
+    auto ownedMoves = std::make_unique<MoveList>();
+    auto *moves = ownedMoves.get();
     uint32_t seed = 0x41c0ffee;
     position_init(&p);
     for (int i = 0; i < 24; ++i) {
@@ -109,6 +114,5 @@ int main(void) {
     p.enPassant = Square{3, 5};
     p.hash = position_hash(&p);
     emit(&p, 26);
-    free(moves);
     return 0;
 }

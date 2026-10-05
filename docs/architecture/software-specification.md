@@ -11,7 +11,7 @@ flowchart TD
     Adapter --> Models[Copied board and history models]
     Models --> QML
     Adapter --> Task[Snapshot QThread worker]
-    Task --> AI[AcSearchContext]
+    Task --> AI[ac::SearchContext]
     Session --> Rules[Rules and ac::Position]
     AI --> Rules
     Session --> Budget[Configuration and budget policy]
@@ -32,7 +32,7 @@ The session has no GTK or GLib dependency. Platform callbacks are injected. It u
 
 `ac::Session` is a noncopyable, movable RAII owner with capacity for 1,024 moves and undo records and 1,025 hashes. Its factory requires an injected clock and memory resource. `SessionState` is an allocation-free value; `SessionSnapshot` owns its moves and hashes across Session mutation or destruction. The resource outlives all objects allocated through it, including moved owners. Clock callbacks do not throw. Allocation failure cleans partial construction and returns `Error`. See [Session ownership](session-ownership.md). Sessions are not internally locked; independent owners may be used independently.
 
-`AcSearchContext` owns its transposition table, killer/history heuristics, per-ply move buffers, undo stack, and hash workspace. One invocation at a time per context. Separate contexts share immutable tables only. Search options and callbacks must remain alive throughout the synchronous search. Destroy the context after it returns.
+`ac::SearchContext` owns its transposition table, killer/history heuristics, per-ply move buffers, undo stack and hash workspace. Its factory and the owning `SearchRequest` factory return typed errors on allocation failure. Requests copy all inputs synchronously; contexts discard input views before returning. Both owners are noncopyable and movable. See [search ownership](search-ownership.md).
 
 ## Session commands and state
 
@@ -77,18 +77,18 @@ Results contain the selected legal move, status, completed depth, node count and
 ## Desktop tasks and resources
 
 [search_jobs.cpp](../../apps/qt/async/search_jobs.cpp) owns one job at a time,
-with copied position/hash history, search options, atomic cancellation flag,
+with an owning SearchRequest, stop_source/stop_token cancellation,
 result, Session revision and desktop generation. A QThread runs the search.
-Cancellation sets the atomic flag immediately; it does not require a queued
+Cancellation requests stop immediately; it does not require a queued
 worker slot. Completion is delivered on the main thread and joined before job
-storage is released. Results require matching page, generation and revision,
+storage is released. Results require matching page, gameId, generation and revision,
 and an open, uncancelled desktop. Close disables commands, cancels work, then
 waits for cooperative exit before freeing Session/log/model storage.
 
 [session_adapter.cpp](../../apps/qt/app/session_adapter.cpp) is the only live
 Session owner. It executes commands, ticks every 100 ms using injected monotonic
 time, queries Rules for selections and legality, and publishes copied projections.
-Board/history models own their values; borrowed snapshot pointers never reach
+Board/history models own their values; temporary input spans never reach
 QML or workers. Getters do not mutate game state or navigation. QML pages own
 controls and layouts; a clock tick or ordinary move does not recreate the page.
 

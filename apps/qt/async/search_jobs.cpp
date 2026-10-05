@@ -1,60 +1,69 @@
 #include "search_jobs.h"
 #include "runtime/runtime.h"
 #include <algorithm>
-
-using namespace ac;
 namespace ac {
 SearchJobs::~SearchJobs() {
     shutdown();
 }
-bool SearchJobs::start(const SessionSnapshot &s, uint64_t generation, bool hint, int budget, int depth) {
+Status SearchJobs::start(const SessionSnapshot &s, uint64_t generation, bool hint, int budget, int depth) noexcept {
     if (busy())
-        return false;
-    auto j = std::make_shared<Job>();
-    j->position = s.position;
-    j->hashes.assign(s.hashes.begin(), s.hashes.end());
-    j->outcome.revision = s.revision;
-    j->outcome.generation = generation;
-    j->outcome.hint = hint;
-    j->outcome.budgetMs = std::max(1, budget);
-    j->options.clock = {monotonicMilliseconds, nullptr};
-    j->options.budgetMs = j->outcome.budgetMs;
-    j->options.maxDepth = depth;
-    j->options.hashes = j->hashes.data();
-    j->options.hashCount = int(j->hashes.size());
-    j->options.cancelContext = j.get();
-    j->options.cancelled = [](void *p) -> int { return static_cast<Job *>(p)->cancelled.load(); };
-    job_ = j;
-    // The worker captures only owned search data, never the UI or live session.
-    thread_ = QThread::create([j] {
-        SearchContext *ctx = search_create();
-        j->outcome.result.status =
-            ctx ? search(ctx, &j->position, &j->options, &j->outcome.result) : Status::OutOfMemory;
-        search_destroy(ctx);
-    });
-    thread_->setParent(this);
-    QThread *thread = thread_;
-    connect(thread, &QThread::finished, this, [this, j, thread] {
-        // Disconnect cannot remove a completion already queued before shutdown.
-        // Check both identities before touching a retired or reused thread address.
-        if (thread_ != thread || job_ != j)
-            return;
-        thread->wait();
-        outcome_ = j->outcome;
-        outcome_.cancelled = j->cancelled.load();
-        thread_ = nullptr;
-        job_.reset();
-        thread->deleteLater();
+        return Status::Unavailable;
+    if (!resource_)
+        return Status::InvalidArgument;
+    try {
+        std::stop_source stop;
+        auto owned = SearchRequest::create(s.position, {s.hashes.data(), s.hashes.size()}, {std::max(1, budget), depth},
+                                           Clock{monotonicMilliseconds, nullptr}, stop.get_token(), resource_);
+        if (auto *error = std::get_if<Error>(&owned))
+            return error->status;
+        auto j = std::allocate_shared<Job>(std::pmr::polymorphic_allocator<Job>{resource_},
+                                           std::move(std::get<SearchRequest>(owned)), std::move(stop), resource_);
+        j->outcome.gameId = s.gameId;
+        j->outcome.revision = s.revision;
+        j->outcome.generation = generation;
+        j->outcome.hint = hint;
+        j->outcome.budgetMs = std::max(1, budget);
+        // Capture only owned inputs and cancellation. No Session/UI access.
+        std::unique_ptr<QThread> prepared(QThread::create([j] {
+            auto owner = SearchContext::create(j->resource);
+            if (auto *error = std::get_if<Error>(&owner))
+                j->outcome.result.status = error->status;
+            else {
+                auto result = std::get<SearchContext>(owner).search(j->request);
+                if (auto *error = std::get_if<Error>(&result))
+                    j->outcome.result.status = error->status;
+                else
+                    j->outcome.result = std::get<SearchResult>(result);
+            }
+        }));
+        auto *thread = prepared.get();
+        thread->setParent(this);
+        connect(thread, &QThread::finished, this, [this, j, thread] {
+            // A completion already queued before shutdown survives disconnect.
+            if (thread_ != thread || job_ != j)
+                return;
+            thread->wait();
+            outcome_ = j->outcome;
+            outcome_.cancelled = j->stop.stop_requested();
+            thread_ = nullptr;
+            job_.reset();
+            thread->deleteLater();
+            emit busyChanged();
+            emit completed();
+        });
+        // Publish only after request, job, thread and connection are prepared.
+        job_ = j;
+        thread_ = prepared.release();
+        thread->start();
         emit busyChanged();
-        emit completed();
-    });
-    thread->start();
-    emit busyChanged();
-    return true;
+        return Status::Ok;
+    } catch (const std::bad_alloc &) {
+        return Status::OutOfMemory;
+    }
 }
 void SearchJobs::cancel() {
     if (job_)
-        job_->cancelled.store(true);
+        job_->stop.request_stop();
 }
 void SearchJobs::shutdown() {
     cancel();

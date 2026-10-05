@@ -27,8 +27,9 @@ static QString duration(int64_t seconds) {
         .arg(seconds / 60 % 60, 2, 10, QChar('0'))
         .arg(seconds % 60, 2, 10, QChar('0'));
 }
-SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent, SessionLog log)
-    : QObject(parent), log_(std::move(log)) {
+SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent, SessionLog log,
+                               std::pmr::memory_resource *searchResource)
+    : QObject(parent), log_(std::move(log)), jobs_(nullptr, searchResource) {
     SessionOptions defaults{};
     defaults.clock = {monotonicMilliseconds, nullptr};
     auto created = Session::create(options ? *options : defaults);
@@ -296,12 +297,10 @@ bool SessionAdapter::hint() {
     }
     const auto &s = std::get<SessionSnapshot>(owned);
     board_.hint(nullptr);
-    bool started = false;
-    try {
-        started = jobs_.start(s, generation_, true, get_ai_time_budget_ms(&s.config, Difficulty::Medium), 8);
-    } catch (const std::bad_alloc &) {
-        report(Status::OutOfMemory);
-    }
+    const auto status = jobs_.start(s, generation_, true, get_ai_time_budget_ms(&s.config, Difficulty::Medium), 8);
+    const bool started = status == Status::Ok;
+    if (!started)
+        report(status);
     if (started) {
         status_ = "Hint thinking…";
         error_ = false;
@@ -382,9 +381,15 @@ void SessionAdapter::refresh() {
                 if (searchWanted) {
                     Difficulty d = s.position.currentTurn == Color::White ? s.config.aiDifficultyWhite
                                                                           : s.config.aiDifficultyBlack;
-                    if (jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth_limit(d))) {
+                    const auto started =
+                        jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth_limit(d));
+                    if (started == Status::Ok) {
                         status_ = "AI thinking…";
                         error_ = false;
+                    } else {
+                        failedCount_ = s.historyCount;
+                        failedTurn_ = s.position.currentTurn;
+                        report(started);
                     }
                 }
             } catch (const std::bad_alloc &) {
@@ -402,8 +407,8 @@ void SessionAdapter::refresh() {
 void SessionAdapter::searchCompleted() {
     const SearchOutcome out = jobs_.outcome();
     SessionState s = state();
-    bool current =
-        !closing_ && page_ == Gameplay && out.generation == generation_ && out.revision == s.revision && !out.cancelled;
+    bool current = !closing_ && page_ == Gameplay && out.gameId == s.gameId && out.generation == generation_ &&
+                   out.revision == s.revision && !out.cancelled;
     if (current && out.result.status == Status::Ok) {
         if (out.hint) {
             board_.hint(&out.result.move);

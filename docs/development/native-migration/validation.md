@@ -29,7 +29,7 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Rules and evaluation | Passed locally | Typed C++ API, semantic comparisons, injected rule-workspace failures; four 23/23 runs |
 | Session ownership | Passed locally | Owning snapshots, resource lifetime, moves and progressive allocation failures; four 24/24 runs |
 | Transaction and budget policy isolation | Passed locally | Independent policy module; Tournament and timeout failure matrix; four 25/25 runs |
-| Search ownership | Pending | Owned requests, cancellation and frozen AI output |
+| Search ownership | Passed locally | RAII contexts/requests, stop tokens, progressive failures and frozen output; four 26/26 runs |
 | Desktop | Pending | Narrow models, lifecycle and interaction checks |
 | Distribution and cleanup | Pending | CPack, dependency and license manifests |
 | Remote CI | Not run | Must be bound to the final tested commit |
@@ -116,3 +116,21 @@ configured budget to a nonempty saved-time pool. Wide integer arithmetic now
 applies the same retained cap without overflow; boundary regression and frozen
 comparisons pass. Failed probe and repaired checks are separate attachments.
 Unattended Windows tests direct CRT diagnostics to stderr and have bounded timeouts.
+
+## Search ownership verification
+
+SearchContext and SearchRequest own all required workspaces, position and hash
+inputs. Both are noncopyable and movable. Progressive resource failures cover
+every factory allocation and release partial state. Requests survive Session and
+snapshot destruction; context/request moves preserve ownership without allocating.
+Synchronous searches allocate nothing and retain no borrowed input spans afterward.
+Cancellation before and during search preserves the caller's position.
+
+Qt task construction and worker workspace failures produce explicit errors. Tests
+exercise every task resource allocation, complete cleanup after shutdown, matching
+gameId/revision/generation, and failure suppression across 100 ticks followed by a
+successful new-game retry. Existing move/restart/undo/timeout/navigation/hint/close
+and queued-completion lifecycle tests pass. QThread tasks use stop_source/stop_token.
+Windows/Linux Debug and Release passed 26/26, Linux ASan/UBSan 23/23, with all
+immutable score/SEE/legal/chosen/depth/node references unchanged on both compilers.
+Desktop model/type registration and distribution remain pending.

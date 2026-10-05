@@ -1,7 +1,7 @@
 #include "internal.hpp"
 
 namespace ac {
-int ai_elapsed_ms(const SearchContext *ctx) {
+int ai_elapsed_ms(const SearchData *ctx) {
     int64_t now;
 
     if (ctx == NULL || read_clock(ctx, &now) != Status::Ok || now < ctx->searchStartMs) {
@@ -13,8 +13,8 @@ int ai_elapsed_ms(const SearchContext *ctx) {
     return (int)(now - ctx->searchStartMs);
 }
 
-int ai_time_is_up(SearchContext *ctx) {
-    if (ctx->options.cancelled && ctx->options.cancelled(ctx->options.cancelContext)) {
+int ai_time_is_up(SearchData *ctx) {
+    if (ctx->options.stop.stop_requested()) {
         ctx->stopSearch = 1;
         ctx->failure = Status::Cancelled;
     }
@@ -23,7 +23,7 @@ int ai_time_is_up(SearchContext *ctx) {
     return ctx->stopSearch;
 }
 
-Status ai_init_search_context(SearchContext *ctx, int timeLimitMs) {
+Status ai_init_search_context(SearchData *ctx, int timeLimitMs) {
     ctx->nodes = 0;
     ctx->stopSearch = 0;
     ctx->failure = Status::Ok;
@@ -39,10 +39,10 @@ Status ai_init_search_context(SearchContext *ctx, int timeLimitMs) {
     return Status::Ok;
 }
 
-int ai_build_game_hash_history(SearchContext *ctx, const Position *state) {
-    int n = ctx->options.hashCount;
-    if (n > 0 && ctx->options.hashes)
-        memcpy(ctx->gameHashes, ctx->options.hashes, (size_t)n * sizeof(uint64_t));
+int ai_build_game_hash_history(SearchData *ctx, const Position *state) {
+    int n = int(ctx->options.hashes.size());
+    if (n > 0)
+        memcpy(ctx->gameHashes, ctx->options.hashes.data(), (size_t)n * sizeof(uint64_t));
     else {
         n = 1;
         ctx->gameHashes[0] = state->hash;
@@ -52,7 +52,7 @@ int ai_build_game_hash_history(SearchContext *ctx, const Position *state) {
     return 0;
 }
 
-int ai_node_is_repetition(const SearchContext *ctx, uint64_t key, int ply) {
+int ai_node_is_repetition(const SearchData *ctx, uint64_t key, int ply) {
     int index;
 
     if (ctx == NULL || ctx->nullMoveActive[ply]) {
@@ -121,7 +121,7 @@ int ai_side_has_major_material(const Board *board, Color color) {
     return 0;
 }
 
-int ai_try_null_move(SearchContext *ctx, Position *state, int depth, int beta, int ply) {
+int ai_try_null_move(SearchData *ctx, Position *state, int depth, int beta, int ply) {
     if (ply + 1 >= AI_MAX_PLY)
         return beta - 1;
     Position saved = *state;
@@ -137,7 +137,7 @@ int ai_try_null_move(SearchContext *ctx, Position *state, int depth, int beta, i
     return score;
 }
 
-int ai_alpha_beta(SearchContext *ctx, Position *state, int depth, int alpha, int beta, int ply, int allowNull) {
+int ai_alpha_beta(SearchData *ctx, Position *state, int depth, int alpha, int beta, int ply, int allowNull) {
     TTEntry ttEntry;
     int ttHit;
     int originalAlpha;
@@ -366,7 +366,7 @@ int ai_alpha_beta(SearchContext *ctx, Position *state, int depth, int alpha, int
     return bestScore;
 }
 
-int ai_quiescence(SearchContext *ctx, Position *state, int alpha, int beta, int ply, int qDepth) {
+int ai_quiescence(SearchData *ctx, Position *state, int alpha, int beta, int ply, int qDepth) {
     TTEntry ttEntry;
     int ttHit;
     int originalAlpha;
@@ -514,7 +514,7 @@ int ai_quiescence(SearchContext *ctx, Position *state, int alpha, int beta, int 
     return alpha;
 }
 
-int ai_search_best_move(SearchContext *ctx, const Position *state, int maxDepth, int maxTimeMs, Move *bestMove) {
+int ai_search_best_move(SearchData *ctx, const Position *state, int maxDepth, int maxTimeMs, Move *bestMove) {
     Position searchState;
     MoveList *rootMoves;
     TTEntry rootEntry;

@@ -1,7 +1,7 @@
 #include "internal.hpp"
 
 namespace ac {
-TTEntry *ai_tt_slot(SearchContext *ctx, uint64_t key) {
+TTEntry *ai_tt_slot(SearchData *ctx, uint64_t key) {
     return &ctx->transpositionTable[key & (AC_TT_SIZE - 1)];
 }
 
@@ -27,7 +27,7 @@ int ai_score_from_tt(int score, int ply) {
     return score;
 }
 
-int ai_tt_lookup(SearchContext *ctx, uint64_t key, TTEntry *entry) {
+int ai_tt_lookup(SearchData *ctx, uint64_t key, TTEntry *entry) {
     TTEntry *slot;
 
     slot = ai_tt_slot(ctx, key);
@@ -41,7 +41,7 @@ int ai_tt_lookup(SearchContext *ctx, uint64_t key, TTEntry *entry) {
     return 1;
 }
 
-void ai_tt_store(SearchContext *ctx, uint64_t key, int depth, int ply, int score, int flag, const Move *bestMove,
+void ai_tt_store(SearchData *ctx, uint64_t key, int depth, int ply, int score, int flag, const Move *bestMove,
                  unsigned char generation) {
     TTEntry *entry;
     int replace;

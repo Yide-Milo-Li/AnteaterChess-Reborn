@@ -1,7 +1,7 @@
 #include "internal.hpp"
 
 namespace ac {
-void ai_ensure_search_heuristics_ready(SearchContext *ctx) {
+void ai_ensure_search_heuristics_ready(SearchData *ctx) {
     if (ctx->searchHeuristicsReady != 0) {
         return;
     }
@@ -12,7 +12,7 @@ void ai_ensure_search_heuristics_ready(SearchContext *ctx) {
     ctx->searchHeuristicsReady = 1;
 }
 
-void ai_age_history_scores(SearchContext *ctx) {
+void ai_age_history_scores(SearchData *ctx) {
     int color;
     int from;
     int to;
@@ -45,7 +45,7 @@ int ai_move_equal_signature(const Move *lhs, const Move *rhs) {
            lhs->specialType == rhs->specialType;
 }
 
-void ai_save_killer(SearchContext *ctx, int ply, Move move) {
+void ai_save_killer(SearchData *ctx, int ply, Move move) {
     (void)ctx;
     ai_ensure_search_heuristics_ready(ctx);
     if (ply >= AI_MAX_PLY || !ai_is_quiet_move(&move)) {
@@ -64,7 +64,7 @@ void ai_save_killer(SearchContext *ctx, int ply, Move move) {
     ctx->killerValid[ply][0] = 1;
 }
 
-void ai_update_history_score(SearchContext *ctx, Color color, Move move, int delta) {
+void ai_update_history_score(SearchData *ctx, Color color, Move move, int delta) {
     int from;
     int to;
     int *cell;
@@ -123,7 +123,7 @@ int ai_quick_exchange_margin(const Move *move) {
     return gain - risk;
 }
 
-int ai_move_order_score(SearchContext *ctx, const Position *state, const Move *move, int ply, const TTEntry *ttMove) {
+int ai_move_order_score(SearchData *ctx, const Position *state, const Move *move, int ply, const TTEntry *ttMove) {
     int from;
     int to;
     int score;
@@ -167,7 +167,7 @@ int ai_move_order_score(SearchContext *ctx, const Position *state, const Move *m
     return score;
 }
 
-void ai_sort_moves(SearchContext *ctx, const Position *state, MoveList *list, int ply, const TTEntry *ttMove) {
+void ai_sort_moves(SearchData *ctx, const Position *state, MoveList *list, int ply, const TTEntry *ttMove) {
     int scores[MaxMoves];
     int index;
 

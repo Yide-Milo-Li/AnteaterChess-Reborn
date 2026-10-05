@@ -1,58 +1,49 @@
-#include "anteater/policy.hpp"
 #include "anteater/ai.hpp"
-#include <assert.h>
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
-
+#include <cassert>
 using namespace ac;
-typedef struct {
-    int64_t now;
-    int ticks, stop;
-} Env;
-static int64_t now(void *p) {
-    Env *e = static_cast<Env *>(p);
-    return e->now + (e->ticks++ / 100);
+struct Env {
+    int64_t now = 0;
+    int ticks = 0;
+    std::stop_source *stop = nullptr;
+    int stopAt = 0;
+};
+static int64_t now(void *context) {
+    auto &env = *static_cast<Env *>(context);
+    if (env.stop && env.ticks >= env.stopAt)
+        env.stop->request_stop();
+    return env.now + env.ticks++ / 100;
 }
-static int cancelled(void *p) {
-    return ((Env *)p)->stop;
+static Result<SearchResult> run(SearchContext &context, const Position &position, Env &env, SearchLimits limits,
+                                std::stop_token stop = {}) {
+    auto request = SearchRequest::create(position, {}, limits, Clock{now, &env}, stop);
+    assert(std::holds_alternative<SearchRequest>(request));
+    return context.search(std::get<SearchRequest>(request));
 }
-int main(void) {
-    Position p, before;
-    position_init(&p);
-    before = p;
-    SearchContext *a = search_create(), *b = search_create();
-    assert(a && b);
-    Env e = {};
-    SearchOptions o = {
-        {now, &e},
-        1000, 2, cancelled, &e, NULL, 0
-    };
-    SearchResult ra, rb;
-    assert(!search(a, &p, &o, &ra));
-    assert(validate_move(&p, ra.move));
-    assert((p == before));
-    e = Env{};
-    assert(!search(b, &p, &o, &rb));
-    assert((ra.move == rb.move));
-    e.stop = 1;
-    assert(search(a, &p, &o, &ra) == Status::Cancelled);
-    assert((p == before));
-    e = Env{};
-    o.budgetMs = 1;
-    o.maxDepth = 24;
-    assert(!search(a, &p, &o, &ra));
-    assert(validate_move(&p, ra.move));
-    assert(search(a, NULL, &o, &ra) == Status::InvalidArgument);
-    TournamentBudget t;
-    initialize_tournament_budget(&t);
-    int n = tournament_budget_ms(&t, Color::White);
-    assert(n > 0);
-    charge_tournament_budget(&t, Color::White, n, n - 100);
-    assert(t.poolMs[enum_index(Color::White)] >= 100 && t.poolMs[enum_index(Color::Black)] == 0);
-    charge_tournament_budget(&t, Color::White, n, 1000000);
-    assert(tournament_expired(&t, Color::White));
-    search_destroy(a);
-    search_destroy(b);
-    return 0;
+int main() {
+    Position position{};
+    position_init(&position);
+    const auto before = position;
+    auto aOwner = SearchContext::create(), bOwner = SearchContext::create();
+    auto &a = std::get<SearchContext>(aOwner);
+    auto &b = std::get<SearchContext>(bOwner);
+    Env env{};
+    auto first = run(a, position, env, {1000, 2});
+    const auto ra = std::get<SearchResult>(first);
+    assert(validate_move(&position, ra.move) && position == before);
+    env = {};
+    auto second = run(b, position, env, {1000, 2});
+    const auto rb = std::get<SearchResult>(second);
+    assert(ra.move == rb.move && ra.nodes == rb.nodes && ra.completedDepth == rb.completedDepth);
+    std::stop_source stop;
+    stop.request_stop();
+    assert(std::get<Error>(run(a, position, env, {1000, 2}, stop.get_token())).status == Status::Cancelled);
+    assert(position == before);
+    std::stop_source during;
+    env = {0, 0, &during, 2};
+    assert(std::get<Error>(run(a, position, env, {1000, 24}, during.get_token())).status == Status::Cancelled);
+    assert(position == before);
+    env = {};
+    auto timed = run(a, position, env, {1, 24});
+    assert(validate_move(&position, std::get<SearchResult>(timed).move));
+    assert(std::get<Error>(SearchRequest::create(position, {}, {1000, 2}, {})).status == Status::InvalidArgument);
 }

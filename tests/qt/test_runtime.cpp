@@ -1,5 +1,6 @@
 #include "runtime/runtime.h"
 #include "app/session_adapter.h"
+#include "../core/failing_resource.hpp"
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -8,6 +9,24 @@ using namespace ac;
 class RuntimeTest : public QObject {
     Q_OBJECT
   private slots:
+    void projectionAllocationFailure() {
+        FailingResource resource;
+        SessionOptions options{
+            {ac::monotonicMilliseconds, nullptr},
+            &resource
+        };
+        SessionAdapter controller(&options);
+        QVERIFY(controller.valid());
+        GameConfig config{};
+        init_default_game_config(&config);
+        resource.failNext();
+        QCOMPARE(controller.start(config), Status::Ok);
+        QCOMPARE(controller.state().phase, SessionPhase::Active);
+        QCOMPARE(controller.diagnostic(), Status::OutOfMemory);
+        resource.failAt = 0;
+        QCOMPARE(controller.start(config), Status::Ok);
+        QCOMPARE(controller.diagnostic(), Status::Ok);
+    }
     void pathsAndMonotonic() {
         QVERIFY(QDir::isAbsolutePath(ac::executableDirectory()));
         int64_t before = ac::monotonicMilliseconds(nullptr);

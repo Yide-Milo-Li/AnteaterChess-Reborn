@@ -1,4 +1,4 @@
-#include "anteater/rules.hpp"
+#include "anteater/policy.hpp"
 
 #include <limits.h>
 #include <stddef.h>
@@ -123,6 +123,48 @@ int is_ai_turn_timer_setting_valid(const GameConfig *config) {
 
     requiredSeconds = get_required_ai_turn_timer_seconds(config);
     return requiredSeconds <= 0 || config->initialTimeSeconds >= requiredSeconds;
+}
+
+int is_ai_turn(const GameConfig *c, Color color) {
+    return c && (c->mode == GameMode::ComputerVsComputer ||
+                 (c->mode == GameMode::HumanVsComputer && color != c->playerColor));
+}
+bool is_valid_difficulty(Difficulty difficulty) noexcept {
+    /* Enum membership matters now that the removed alias leaves a numeric hole. */
+    switch (difficulty) {
+    case Difficulty::None:
+    case Difficulty::Easy:
+    case Difficulty::Medium:
+    case Difficulty::Hard:
+    case Difficulty::Tournament:
+        return 1;
+    default:
+        return 0;
+    }
+}
+Status validate_config(const GameConfig &config) noexcept {
+    const auto *c = &config;
+    if (c->mode < GameMode::HumanVsHuman || c->mode > GameMode::ComputerVsComputer ||
+        !is_valid_difficulty(c->aiDifficultyWhite) || !is_valid_difficulty(c->aiDifficultyBlack) ||
+        (c->mode == GameMode::HumanVsComputer && c->playerColor != Color::White && c->playerColor != Color::Black) ||
+        c->initialTimeSeconds < 0 || c->aiTimeLimit < 0 || (c->timerEnabled && c->initialTimeSeconds <= 0) ||
+        !is_ai_turn_timer_setting_valid(c))
+        return Status::InvalidArgument;
+    return Status::Ok;
+}
+int search_depth_limit(Difficulty difficulty) {
+    switch (difficulty) {
+    case Difficulty::Easy:
+        return 2;
+    case Difficulty::Medium:
+        return 10;
+    case Difficulty::Hard:
+    case Difficulty::Tournament:
+        return 24;
+    case Difficulty::None:
+    default:
+        return 8;
+    }
 }
 
 } // namespace ac

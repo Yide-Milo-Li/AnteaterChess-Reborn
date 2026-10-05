@@ -3,7 +3,7 @@ from pathlib import Path
 import re, subprocess, sys, xml.etree.ElementTree as ET
 root = Path(__file__).resolve().parents[2]
 errors=[]
-for directory in ['include/anteater', 'src/rules', 'src/session', 'src/ai',
+for directory in ['include/anteater', 'src/rules', 'src/session', 'src/ai', 'src/policy',
                   'apps/qt/runtime', 'apps/qt/models', 'apps/qt/app',
                   'apps/qt/qml', 'apps/qt/async', 'assets/pieces',
                   'assets/icons', 'docs/user', 'docs/architecture', 'docs/development',
@@ -23,7 +23,7 @@ for manifest in ['assets/resources.qrc','apps/qt/qml/qml.qrc']:
             alias = resource.get('prefix','')+'/'+item.get('alias',item.text)
             if alias in aliases: errors.append('Duplicate resource alias '+alias)
             aliases.add(alias)
-for module in ['rules','session','ai']:
+for module in ['rules','session','ai','policy']:
     for path in (root/'src'/module).iterdir():
         if path.suffix not in {'.h', '.hpp', '.cpp'}: continue
         if re.search(r'#include\s*[<"](?:Q[A-Z]|gtk/|glib|gio/)',path.read_text(encoding='utf-8')):

@@ -1,3 +1,4 @@
+#include "anteater/policy.hpp"
 #include "anteater/ai.hpp"
 #include <assert.h>
 #include <string.h>
@@ -43,14 +44,14 @@ int main(void) {
     assert(!search(a, &p, &o, &ra));
     assert(validate_move(&p, ra.move));
     assert(search(a, NULL, &o, &ra) == Status::InvalidArgument);
-    AITimeManager t;
-    init_ai_time_manager(&t);
-    int n = get_ai_tournament_budget_ms(&t, Color::White);
+    TournamentBudget t;
+    initialize_tournament_budget(&t);
+    int n = tournament_budget_ms(&t, Color::White);
     assert(n > 0);
-    update_ai_tournament_time(&t, Color::White, n, n - 100);
+    charge_tournament_budget(&t, Color::White, n, n - 100);
     assert(t.poolMs[enum_index(Color::White)] >= 100 && t.poolMs[enum_index(Color::Black)] == 0);
-    update_ai_tournament_time(&t, Color::White, n, 1000000);
-    assert(is_ai_tournament_time_expired(&t, Color::White));
+    charge_tournament_budget(&t, Color::White, n, 1000000);
+    assert(tournament_expired(&t, Color::White));
     search_destroy(a);
     search_destroy(b);
     return 0;

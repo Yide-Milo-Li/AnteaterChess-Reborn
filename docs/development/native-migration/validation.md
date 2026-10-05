@@ -28,7 +28,7 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Build and conventions | Passed locally | Four desktop builds, 22/22 each; two core runs, 19/19 each |
 | Rules and evaluation | Passed locally | Typed C++ API, semantic comparisons, injected rule-workspace failures; four 23/23 runs |
 | Session ownership | Passed locally | Owning snapshots, resource lifetime, moves and progressive allocation failures; four 24/24 runs |
-| Transaction and budget policy isolation | Pending | Tournament rollback and Session-to-rules dependency cutover |
+| Transaction and budget policy isolation | Passed locally | Independent policy module; Tournament and timeout failure matrix; four 25/25 runs |
 | Search ownership | Pending | Owned requests, cancellation and frozen AI output |
 | Desktop | Pending | Narrow models, lifecycle and interaction checks |
 | Distribution and cleanup | Pending | CPack, dependency and license manifests |
@@ -98,3 +98,21 @@ standard library allocates an iterator proxy inside its noexcept vector allocato
 constructor. Exact-sized resource-owned sequences now avoid that hidden allocation
 without disabling Debug iterator checks. The repaired Debug ownership test and
 full matrix pass. Search ownership and narrow desktop model migration remain pending.
+
+## Transaction and policy verification
+
+Configuration, search-depth selection and Tournament budgets live in `ac_policy`.
+Session links Rules and Policy; it has no AI library dependency. Search receives
+explicit limits. Tournament charges prepare a value before move preparation and
+publish it only with an accepted move. Progressive AI preparation failures preserve
+position, history, hashes, revision and balances. Undo does not refund charged time.
+Promotion allocation errors preserve state. Timeout still ticks before rejecting
+a stale command, without allocating. Desktop snapshot allocation errors remain
+diagnostic after an accepted start.
+
+Windows/Linux Debug and Release passed 25/25, Linux ASan/UBSan 22/22.
+A separate UBSan probe exposed preexisting signed overflow when adding an INT_MAX
+configured budget to a nonempty saved-time pool. Wide integer arithmetic now
+applies the same retained cap without overflow; boundary regression and frozen
+comparisons pass. Failed probe and repaired checks are separate attachments.
+Unattended Windows tests direct CRT diagnostics to stderr and have bounded timeouts.

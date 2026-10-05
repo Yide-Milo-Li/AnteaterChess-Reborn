@@ -1,3 +1,4 @@
+#include "anteater/policy.hpp"
 #include "anteater/rules.hpp"
 #include <stdlib.h>
 #include <assert.h>

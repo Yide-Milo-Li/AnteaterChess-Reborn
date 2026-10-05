@@ -1,5 +1,6 @@
 #pragma once
 #include "anteater/rules.hpp"
+#include "anteater/policy.hpp"
 #include "anteater/memory.hpp"
 #include <memory_resource>
 #include <vector>
@@ -66,6 +67,5 @@ class Session {
     explicit Session(detail::OwnedObject<detail::SessionData> data) noexcept;
     detail::OwnedObject<detail::SessionData> data_;
 };
-int session_is_ai(const GameConfig *config, Color color);
 const char *status_message(Status status);
 } // namespace ac

@@ -1,5 +1,5 @@
 #include "anteater/session.hpp"
-#include "anteater/ai.hpp"
+#include "anteater/policy.hpp"
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -14,7 +14,7 @@ struct SessionData {
         position_init(&position);
         init_default_game_config(&config);
         hashes[0] = position.hash;
-        init_ai_time_manager(&tournament);
+        initialize_tournament_budget(&tournament);
     }
     SessionOptions options;
     Position position{};
@@ -27,7 +27,7 @@ struct SessionData {
     std::pmr::vector<uint64_t> hashes;
     int count = 0;
     int64_t startMs = 0, turnMs = 0, finishedMs = 0;
-    AITimeManager tournament{};
+    TournamentBudget tournament{};
 };
 } // namespace detail
 using detail::SessionData;
@@ -50,10 +50,6 @@ Result<Session> Session::create(SessionOptions options) noexcept {
 }
 static int64_t nonnegative_delta(int64_t a, int64_t b) {
     return a > b ? a - b : 0;
-}
-int session_is_ai(const GameConfig *c, Color color) {
-    return c && (c->mode == GameMode::ComputerVsComputer ||
-                 (c->mode == GameMode::HumanVsComputer && color != c->playerColor));
 }
 SessionState Session::state() const noexcept {
     SessionState out{};
@@ -101,37 +97,22 @@ static void end(SessionData *s, GameResult result) {
     s->result = result;
     s->finishedMs = now(s);
 }
-static int valid_difficulty(Difficulty difficulty) {
-    /* Enum membership matters now that the removed alias leaves a numeric hole. */
-    switch (difficulty) {
-    case Difficulty::None:
-    case Difficulty::Easy:
-    case Difficulty::Medium:
-    case Difficulty::Hard:
-    case Difficulty::Tournament:
-        return 1;
-    default:
-        return 0;
-    }
-}
 Status Session::start(const GameConfig &config) noexcept {
     auto *s = data_.get();
-    const GameConfig *c = &config;
-    if (!s || !c || c->mode < GameMode::HumanVsHuman || c->mode > GameMode::ComputerVsComputer ||
-        !valid_difficulty(c->aiDifficultyWhite) || !valid_difficulty(c->aiDifficultyBlack) ||
-        (c->mode == GameMode::HumanVsComputer && c->playerColor != Color::White && c->playerColor != Color::Black) ||
-        c->initialTimeSeconds < 0 || c->aiTimeLimit < 0 || (c->timerEnabled && c->initialTimeSeconds <= 0) ||
-        !is_ai_turn_timer_setting_valid(c))
+    if (!s)
         return Status::InvalidArgument;
+    auto validation = validate_config(config);
+    if (validation != Status::Ok)
+        return validation;
     position_init(&s->position);
-    s->config = *c;
+    s->config = config;
     s->count = 0;
     s->hashes[0] = s->position.hash;
     s->phase = SessionPhase::Active;
     ++s->gameId;
     s->result = GameResult::None;
     s->startMs = s->turnMs = now(s);
-    init_ai_time_manager(&s->tournament);
+    initialize_tournament_budget(&s->tournament);
     publish(s);
     return Status::Ok;
 }
@@ -193,7 +174,7 @@ Status Session::submit(MoveRequest request) noexcept {
     tick();
     if (s->revision != revision)
         return Status::StaleResult;
-    if (s->phase != SessionPhase::Active || session_is_ai(&s->config, s->position.currentTurn))
+    if (s->phase != SessionPhase::Active || is_ai_turn(&s->config, s->position.currentTurn))
         return Status::Unavailable;
     Move move;
     Status resolved = resolve_move_request(&s->position, request, &move, s->options.resource);
@@ -209,7 +190,7 @@ Status Session::submit_ai(Move move, uint64_t revision, int budgetMs, int elapse
     tick();
     if (revision != s->revision)
         return Status::StaleResult;
-    if (s->phase != SessionPhase::Active || !session_is_ai(&s->config, s->position.currentTurn))
+    if (s->phase != SessionPhase::Active || !is_ai_turn(&s->config, s->position.currentTurn))
         return Status::Unavailable;
     Color color = s->position.currentTurn;
     Difficulty d = color == Color::White ? s->config.aiDifficultyWhite : s->config.aiDifficultyBlack;
@@ -220,11 +201,11 @@ Status Session::submit_ai(Move move, uint64_t revision, int budgetMs, int elapse
             publish(s);
             return Status::Ok;
         }
-        AITimeManager previous = s->tournament;
-        update_ai_tournament_time(&s->tournament, color, budgetMs, elapsedMs);
+        TournamentBudget prepared = s->tournament;
+        charge_tournament_budget(&prepared, color, budgetMs, elapsedMs);
         Status status = commit_move(s, move);
-        if (status != Status::Ok)
-            s->tournament = previous;
+        if (status == Status::Ok)
+            s->tournament = prepared;
         return status;
     }
     return commit_move(s, move);
@@ -285,8 +266,8 @@ int Session::ai_budget() const noexcept {
     Color c = s->position.currentTurn;
     Difficulty d = c == Color::White ? s->config.aiDifficultyWhite : s->config.aiDifficultyBlack;
     if (d == Difficulty::Tournament) {
-        AITimeManager copy = s->tournament;
-        return get_ai_tournament_budget_ms(&copy, c);
+        TournamentBudget copy = s->tournament;
+        return tournament_budget_ms(&copy, c);
     }
     return get_ai_time_budget_ms(&s->config, d);
 }

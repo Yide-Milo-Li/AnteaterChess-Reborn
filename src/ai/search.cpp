@@ -514,21 +514,6 @@ int ai_quiescence(SearchContext *ctx, Position *state, int alpha, int beta, int 
     return alpha;
 }
 
-int search_depth(Difficulty difficulty) {
-    switch (difficulty) {
-    case Difficulty::Easy:
-        return 2;
-    case Difficulty::Medium:
-        return 10;
-    case Difficulty::Hard:
-    case Difficulty::Tournament:
-        return 24;
-    case Difficulty::None:
-    default:
-        return 8;
-    }
-}
-
 int ai_search_best_move(SearchContext *ctx, const Position *state, int maxDepth, int maxTimeMs, Move *bestMove) {
     Position searchState;
     MoveList *rootMoves;

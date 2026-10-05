@@ -21,13 +21,6 @@ struct HashState {
 #define AI_HISTORY_MAX 2000000 // upper limit of history heuristic's score
 #define ASPIRATION_WINDOW 60
 #define NULL_MOVE_R 2
-#define AI_TOURNAMENT_TOTAL_MS 600999
-#define AI_TOURNAMENT_RESERVE_MS 30000
-#define AI_TOURNAMENT_BASE_MS 7000
-#define AI_TOURNAMENT_MAX_MS 10000
-#define AI_TOURNAMENT_MAX_EXTRA_MS 3000
-#define AI_TOURNAMENT_POOL_CAP_MS 180000
-#define AI_MIN_MOVE_BUDGET_MS 300
 
 enum { TT_FLAG_EXACT = 0, TT_FLAG_LOWER = 1, TT_FLAG_UPPER = 2 };
 struct TTEntry {
@@ -77,14 +70,8 @@ static inline int derive_hash(const Position *s, HashState *h) {
     h->value = s->hash;
     return 0;
 }
-int ai_clamp_int(int value, int minValue, int maxValue);
-int ai_color_time_index(Color color);
 int ai_elapsed_ms(const SearchContext *ctx);
 int ai_time_is_up(SearchContext *ctx);
-void init_ai_time_manager(AITimeManager *manager);
-int get_ai_tournament_budget_ms(AITimeManager *manager, Color color);
-int is_ai_tournament_time_expired(const AITimeManager *manager, Color color);
-void update_ai_tournament_time(AITimeManager *manager, Color color, int budgetMs, int elapsedMs);
 void ai_ensure_search_heuristics_ready(SearchContext *ctx);
 void ai_age_history_scores(SearchContext *ctx);
 Status ai_init_search_context(SearchContext *ctx, int timeLimitMs);
@@ -110,7 +97,6 @@ int ai_side_has_major_material(const Board *board, Color color);
 int ai_try_null_move(SearchContext *ctx, Position *state, int depth, int beta, int ply);
 int ai_alpha_beta(SearchContext *ctx, Position *state, int depth, int alpha, int beta, int ply, int allowNull);
 int ai_quiescence(SearchContext *ctx, Position *state, int alpha, int beta, int ply, int qDepth);
-int search_depth(Difficulty difficulty);
 int ai_search_best_move(SearchContext *ctx, const Position *state, int maxDepth, int maxTimeMs, Move *bestMove);
 
 } // namespace ac

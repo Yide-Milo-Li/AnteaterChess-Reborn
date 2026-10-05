@@ -49,7 +49,7 @@ SessionState SessionAdapter::state() const {
 }
 bool SessionAdapter::humanTurn() const {
     return page_ == Gameplay && state_.phase == SessionPhase::Active &&
-           !session_is_ai(&state_.config, state_.position.currentTurn) && !closing_;
+           !is_ai_turn(&state_.config, state_.position.currentTurn) && !closing_;
 }
 bool SessionAdapter::canUndo() const {
     return page_ == Gameplay && state_.historyCount > 0 && !closing_;
@@ -357,7 +357,7 @@ void SessionAdapter::refresh() {
         updateHighlights();
     }
     const bool searchWanted = !closing_ && page_ == Gameplay && s.phase == SessionPhase::Active &&
-                              session_is_ai(&s.config, s.position.currentTurn) && !busy() &&
+                              is_ai_turn(&s.config, s.position.currentTurn) && !busy() &&
                               !(failedCount_ == s.historyCount && failedTurn_ == s.position.currentTurn);
     // Clock polling takes no snapshot. Allocation or logging failures cannot
     // turn a command already accepted by the core into a failed command.
@@ -382,7 +382,7 @@ void SessionAdapter::refresh() {
                 if (searchWanted) {
                     Difficulty d = s.position.currentTurn == Color::White ? s.config.aiDifficultyWhite
                                                                           : s.config.aiDifficultyBlack;
-                    if (jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth(d))) {
+                    if (jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth_limit(d))) {
                         status_ = "AI thinking…";
                         error_ = false;
                     }

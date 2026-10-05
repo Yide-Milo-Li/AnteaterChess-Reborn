@@ -4,7 +4,7 @@ Baseline: `fb6df82eba4d513bbc160d2d848ffe6abc41cd3e` on original `main`, 215 com
 
 | Old path/interface | Reborn replacement |
 | --- | --- |
-| `include/core`, `src/core` | `include/anteater/types.h`, `src/rules`, `src/session/config.c` |
+| `include/core`, `src/core` | `include/anteater/types.h`, `src/rules`, `src/policy/config.cpp` |
 | `src/gameplay`, `src/input` | `src/rules` generation, request parsing, resolution, validation and execution |
 | `GameState` | compact `AcPosition` plus opaque `AcSession`; Qt models own copied projections |
 | `applyMove` / `undoMove` | `ac_position_apply` / `ac_position_unmake` for rules; `ac_session_submit` / `ac_session_undo` for games |

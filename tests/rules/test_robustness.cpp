@@ -132,24 +132,24 @@ static void audit_movelist_bounds(void) {
 
 /* 3. Audit Time Budget and Tournament Arithmetic Boundaries */
 static void audit_budget_arithmetic(void) {
-    AITimeManager tm;
-    init_ai_time_manager(&tm);
+    TournamentBudget tm;
+    initialize_tournament_budget(&tm);
 
     /* Base tournament values */
-    int budgetW = get_ai_tournament_budget_ms(&tm, Color::White);
+    int budgetW = tournament_budget_ms(&tm, Color::White);
     assert(budgetW >= TEST_AI_MIN_MOVE_BUDGET_MS && budgetW <= TEST_AI_TOURNAMENT_MAX_MS);
 
     /* Extreme elapsed time: larger than remaining */
-    update_ai_tournament_time(&tm, Color::White, budgetW, 1000000);
+    charge_tournament_budget(&tm, Color::White, budgetW, 1000000);
     assert(tm.remainingMs[0] == 0);
-    assert(is_ai_tournament_time_expired(&tm, Color::White));
+    assert(tournament_expired(&tm, Color::White));
 
     /* Check budget when expired */
-    budgetW = get_ai_tournament_budget_ms(&tm, Color::White);
+    budgetW = tournament_budget_ms(&tm, Color::White);
     assert(budgetW == TEST_AI_MIN_MOVE_BUDGET_MS);
 
     /* Check negative and boundary values */
-    update_ai_tournament_time(&tm, Color::Black, -100, -500);
+    charge_tournament_budget(&tm, Color::Black, -100, -500);
     assert(tm.remainingMs[1] == TEST_AI_TOURNAMENT_TOTAL_MS);
 
     /* GameConfig turn timer required seconds with extreme limit */

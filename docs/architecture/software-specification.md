@@ -14,7 +14,7 @@ flowchart TD
     Task --> AI[AcSearchContext]
     Session --> Rules[Rules and ac::Position]
     AI --> Rules
-    Session --> Budget[AI time budget helpers]
+    Session --> Budget[Configuration and budget policy]
     Adapter --> Platform[Qt runtime clock and log adapter]
     Platform --> Session
     Resources[Qt resource system] --> QML
@@ -22,7 +22,7 @@ flowchart TD
 
 An [interactive architecture diagram](architecture.html) is also available.
 
-The session has no GTK or GLib dependency. Platform callbacks are injected. It uses AI budget helpers but never initiates a search. Search consumes copied positions and historical hashes and never mutates a live session. The former Controller/event queue/FSM contracts are replaced by synchronous session commands and application-owned navigation.
+The session has no GTK or GLib dependency. Platform callbacks are injected. It uses independent configuration and budget policies and never initiates a search. Search consumes copied positions and historical hashes and never mutates a live session. The former Controller/event queue/FSM contracts are replaced by synchronous session commands and application-owned navigation.
 
 ## Values, ownership, and lifetime
 
@@ -53,7 +53,7 @@ Start validates configuration and resets history, position, clocks, diagnostics,
 
 Move processing: parse coordinates → resolve canonical special move/path → apply to a temporary position → determine terminal state → append history and undo → publish a new revision → write the diagnostic log. A move's status reports whether the command applied. Log failure is separately available as a desktop diagnostic, so callers never retry an already accepted move merely because logging failed.
 
-Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.c](../../src/ai/budget.cpp).
+Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.cpp](../../src/policy/budget.cpp).
 
 ## Rule engine
 

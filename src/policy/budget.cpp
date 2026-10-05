@@ -1,7 +1,15 @@
-#include "internal.hpp"
+#include "anteater/policy.hpp"
 
 namespace ac {
-int ai_clamp_int(int value, int minValue, int maxValue) {
+#define AI_TOURNAMENT_TOTAL_MS 600999
+#define AI_TOURNAMENT_RESERVE_MS 30000
+#define AI_TOURNAMENT_BASE_MS 7000
+#define AI_TOURNAMENT_MAX_MS 10000
+#define AI_TOURNAMENT_MAX_EXTRA_MS 3000
+#define AI_TOURNAMENT_POOL_CAP_MS 180000
+#define AI_MIN_MOVE_BUDGET_MS 300
+
+static int ai_clamp_int(int value, int minValue, int maxValue) {
     if (value < minValue) {
         return minValue;
     }
@@ -11,14 +19,14 @@ int ai_clamp_int(int value, int minValue, int maxValue) {
     return value;
 }
 
-int ai_color_time_index(Color color) {
+static int ai_color_time_index(Color color) {
     if (color == Color::Black) {
         return 1;
     }
     return 0;
 }
 
-void init_ai_time_manager(AITimeManager *manager) {
+void initialize_tournament_budget(TournamentBudget *manager) {
     int index;
 
     if (manager == NULL) {
@@ -31,7 +39,7 @@ void init_ai_time_manager(AITimeManager *manager) {
     }
 }
 
-int get_ai_tournament_budget_ms(AITimeManager *manager, Color color) {
+int tournament_budget_ms(const TournamentBudget *manager, Color color) {
     int index;
     int remainingMs;
     int availableMs;
@@ -59,7 +67,7 @@ int get_ai_tournament_budget_ms(AITimeManager *manager, Color color) {
     return budgetMs;
 }
 
-int is_ai_tournament_time_expired(const AITimeManager *manager, Color color) {
+int tournament_expired(const TournamentBudget *manager, Color color) {
     int index;
 
     if (manager == NULL || (color != Color::White && color != Color::Black)) {
@@ -70,9 +78,9 @@ int is_ai_tournament_time_expired(const AITimeManager *manager, Color color) {
     return manager->remainingMs[index] <= 0;
 }
 
-void update_ai_tournament_time(AITimeManager *manager, Color color, int budgetMs, int elapsedMs) {
+void charge_tournament_budget(TournamentBudget *manager, Color color, int budgetMs, int elapsedMs) {
     int index;
-    int poolMs;
+    int64_t poolMs;
 
     if (manager == NULL || (color != Color::White && color != Color::Black)) {
         return;
@@ -98,7 +106,11 @@ void update_ai_tournament_time(AITimeManager *manager, Color color, int budgetMs
     } else {
         poolMs -= elapsedMs - budgetMs;
     }
-    manager->poolMs[index] = ai_clamp_int(poolMs, 0, AI_TOURNAMENT_POOL_CAP_MS);
+    // Saturation follows wide integer arithmetic, preserving the existing cap
+    // even when a configured budget would overflow a signed int.
+    manager->poolMs[index] = poolMs < 0                           ? 0
+                             : poolMs > AI_TOURNAMENT_POOL_CAP_MS ? AI_TOURNAMENT_POOL_CAP_MS
+                                                                  : int(poolMs);
 }
 
 } // namespace ac

@@ -108,13 +108,6 @@ struct GameConfig {
     bool operator==(const GameConfig &) const = default;
 };
 
-void init_default_game_config(GameConfig *config);
-void init_game_config_for_mode(GameConfig *config, GameMode mode);
-int get_default_ai_time_budget_ms(Difficulty difficulty);
-int get_ai_time_budget_ms(const GameConfig *config, Difficulty difficulty);
-int get_required_ai_turn_timer_seconds(const GameConfig *config);
-int is_ai_turn_timer_setting_valid(const GameConfig *config);
-
 enum class PromotionChoice { None, Queen, Rook, Bishop, Knight };
 
 struct MoveRequest {

@@ -3,11 +3,6 @@
 #include <cassert>
 #include <optional>
 #include <type_traits>
-#include <cstdio>
-#ifdef _WIN32
-#include <crtdbg.h>
-#include <cstdlib>
-#endif
 
 using namespace ac;
 static int64_t clockNow(void *context) {
@@ -32,13 +27,6 @@ static MoveRequest request(const char *from, const char *to) {
     return move;
 }
 int main() {
-    std::set_terminate([] { std::fputs("Unexpected termination while injecting allocation failure\n", stderr); std::_Exit(9); });
-#ifdef _WIN32
-    _set_error_mode(_OUT_TO_STDERR);
-    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-#endif
     static_assert(!std::is_copy_constructible_v<Session>);
     static_assert(std::is_nothrow_move_constructible_v<Session>);
     static_assert(std::is_nothrow_move_assignable_v<Session>);

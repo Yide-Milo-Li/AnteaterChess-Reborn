@@ -1,60 +1,75 @@
 # AnteaterChess Reborn
 
-A C++20 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
+A C++20 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, with Ants and
+chain-capturing Anteaters. The maintained implementation has a Qt-independent
+core and preserves the original variant's rules and frozen AI regression results.
 
----
+## Current version and status
 
-## Highlights & Features
+Reviewed on 2026-10-05 against source commit
+`cf2f30b7db09edac42cade7e7b61ad0db483d2a1`, now integrated into `main`. [VERSION](VERSION) remains `2.0.1`; identify native
+packages by their `SOURCE_REVISION`, rather than the version number alone.
 
-- **Modern Obsidian Slate UI**: Clean, minimalist dark theme (`#0e1017` / `#161922`) with refined ivory/walnut board squares, warm gold glow accents, and monospace coordinate grids.
-- **HiDPI Dynamic Piece Scaling**: Real-time adaptive SVG rasterization scales piece graphics dynamically ($32\text{px} \sim 160\text{px}$) through Qt Quick as the window resizes or toggles fullscreen.
-- **Independent C++20 Core Engine**: Complete decoupling of core rules, board representation, and AI search from Qt/GTK/GLib. The core library compiles independently without desktop dependencies.
-- **Interactive Architecture Diagram**: Explorable standalone HTML architecture map with guided views and component boundaries in [docs/architecture/architecture.html](docs/architecture/architecture.html).
-- **Multiple Game Modes**: Human vs Human, Human vs AI, and AI vs AI.
-- **Desktop Controls & Ergonomics**: Click-to-move and typed coordinate input, valid move and hint highlighting, multi-level undo, promotion pickers, turn clocks, Tournament time pools, and game diagnostic logs.
-- **Asynchronous AI Worker**: A snapshot-owning `QThread` worker keeps search off the UI thread, with cooperative cancellation and session revision validation.
+- C++20 source migration, Windows/Linux packages and no-Git source rebuilds are complete.
+- [Windows and Linux CI](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/runs/37358903929) passed for that source commit.
+- Clean-Windows and manual desktop acceptance are complete per the user's 2026-10-05 confirmation. Individual acceptance receipts were not supplied; see the [validation ledger](docs/development/native-migration/validation.md).
+- `main` includes the native migration. The native implementation has not been published as a GitHub Release.
 
----
+The [published v2.0.1 release](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
+is the earlier C11/GTK implementation at `6d92663`. Its archives do not contain
+the current C++20/Qt implementation.
 
-## Interactive Architecture
+## Features
 
-Explore the full system architecture, module boundaries, and data paths in the [Interactive Architecture Diagram](docs/architecture/architecture.html).
+- Human vs Human, Human vs AI and AI vs AI.
+- Ant movement, Anteater capture chains, castling, en passant and four promotion choices.
+- Dark Qt Quick interface, SVG pieces rasterized for board size and display pixel ratio, and F11/Escape fullscreen controls.
+- Click and coordinate input, legal-move and hint highlights, undo, turn timers and Tournament time budgets.
+- Owning AI requests run on a QThread with cooperative cancellation; stale results are checked before application.
+- Per-game diagnostic logs in `logs/` beside the actual executable.
 
-| Layer / Subsystem | Path | Responsibility |
-| --- | --- | --- |
-| **Desktop Shell** | `apps/qt/{app,models,qml,async}/` | Application commands, pages, reusable presentation, worker threads |
-| **Session Engine** | `src/session/` | Transactional state management, revision tracking, undo history, clock ticking |
-| **Rules Engine** | `src/rules/` | Move generation, legality verification, 80-square board, Zobrist hashing |
-| **AI Search** | `src/ai/` | Iterative deepening, alpha-beta pruning, transposition tables, budget management |
-| **Platform Adapter** | `apps/qt/runtime/` | Executable paths, monotonic clocks and atomic diagnostic logs |
-| **Assets** | `assets/{pieces,icons}/` | 14 chess pieces and 4 UI icons compiled into Qt resources |
+The [user manual](docs/user/manual.md) defines the variant's rules and timing/undo
+policies. Experimental difficulty has been removed. There is no networking or
+saved-game import/export.
 
----
+## Run a native package
 
-## Quick Start
+Use a native archive delivered for the source revision above, or build and package
+this checkout using the [development guide](docs/development/guide.md).
 
-### Download Prebuilt Binaries
+- **Windows x64:** extract the complete ZIP to a writable directory and launch `anteater-chess.exe`. Keep DLLs, `plugins/`, `qml/` and `qt.conf` with it. The game opens without a console; no development tools are required.
+- **Ubuntu 24.04 x64:** extract the TGZ, install the system Qt dependencies listed in the package's `INSTALL.md`, then run `./anteater-chess` in a graphical session. The [Linux installation template](tools/packaging/templates/INSTALL-linux.md) lists those packages.
 
-Previously published archives are available under [Releases](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases).
+Each native archive includes `SOURCE_REVISION`, `FILES.sha256`, dependency/license
+records and `INSTALL.md`. A different working directory or a Linux symlink does
+not change the log location. macOS is outside the supported distribution targets.
 
-- **Windows x64**: Extract the ZIP package and launch `anteater-chess.exe` (keep accompanying DLLs in place).
-- **Ubuntu 24.04 x64**: Install runtime libraries (`sudo apt install libqt6quick6 libqt6quickcontrols2-6 libqt6svg6 qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-templates qml6-module-qtqml-workerscript`), extract, and run `./anteater-chess`.
+## Build from source
 
-The Qt migration produces local candidates under `dist/`; see [validation](docs/development/validation.md) for their acceptance status.
+### Windows: native PowerShell
 
-Extract to a writable directory. Windows game builds open without a console window.
-On both platforms, game logs are stored in `logs/` beside the actual executable.
+Install Visual Studio's v143 **14.44 x64** component, a Windows SDK, native
+CMake >= 3.25, Ninja and Python 3, and the official **Qt 6.11.2 MSVC 2022 x64**
+kit with Shader Tools. The environment script defaults to
+`C:\Qt\6.11.2\msvc2022_64`; initialize each new PowerShell process:
 
----
+```powershell
+. ./tools/native/Enter-NativeEnvironment.ps1 -RequireQt -RequirePython
+cmake --preset windows-release
+cmake --build --preset windows-release
+ctest --preset windows-release
+./build/windows-release/bin/anteater-chess.exe
+```
 
-## Build from Source
+The Release desktop preset enables distribution receipts and therefore requires
+Python. MinGW/MSYS2 is not a supported Windows build toolchain.
 
 ### Ubuntu 24.04
 
-Install GCC, CMake >= 3.25, Ninja and system Qt 6.4.2 development/QML modules.
-Optional development checks and candidate dependency receipts use native Python 3.
+Use GCC, CMake >= 3.25, Ninja, Python 3 and system Qt 6.4.2:
 
 ```sh
+sudo apt-get update
 sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-shader-baker qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
 cmake --preset linux-release
 cmake --build --preset linux-release
@@ -62,53 +77,41 @@ ctest --preset linux-release
 ./build/linux-release/bin/anteater-chess
 ```
 
-### Windows (native PowerShell)
-
-Install the v143 14.44 x64 component in Visual Studio, a Windows SDK, native
-CMake/Ninja/Python, and the official Qt 6.11.2 MSVC 2022 x64 kit with Shader Tools
-under `C:\Qt`. Initialize **each new PowerShell process** before configuring:
-
-```powershell
-. ./tools/native/Enter-NativeEnvironment.ps1 -RequireQt
-cmake --preset windows-release
-cmake --build --preset windows-release
-ctest --preset windows-release
-./build/windows-release/bin/anteater-chess.exe
-```
-
 ### Core and sanitizer builds
 
-Use `linux-debug-core`, `linux-release-core`, `windows-debug-core` or
-`windows-release-core` to compile/test without discovering Qt. Use
-`linux-sanitizer` for ASan/UBSan. With `BUILD_TESTING=OFF` and
-`AC_BUILD_DEV_TOOLS=OFF`, core-only builds do not require Python.
+`windows-debug-core`, `windows-release-core`, `linux-debug-core` and
+`linux-release-core` build and test without Qt or Python discovery.
+`linux-sanitizer` runs core tests with ASan/UBSan. Production core-only builds
+disable desktop, testing, development tools and distribution; see the
+[development guide](docs/development/guide.md).
 
-The [native migration ledger](docs/development/native-migration/validation.md)
-records stage status. Existing release archives describe earlier implementations;
-they are not candidates for the current migration. CMake install and CPack own
-the current archives; each includes a source revision, dependency/license
-inventory and checksums. External acceptance remains pending until the ledger
-records its checks.
+## Architecture and documentation
 
----
+| Module | Path | Responsibility |
+| --- | --- | --- |
+| Desktop | `apps/qt/{app,models,qml,async}/` | ApplicationController, typed models, pages and background jobs |
+| Session | `src/session/` | Sole live game owner, transactions, history, revisions and clocks |
+| Rules | `src/rules/` | Position, legal moves, reversible execution and endgame rules |
+| Policy | `src/policy/` | Configuration validation, depth selection and Tournament budgets |
+| AI | `src/ai/` | Owning search contexts/requests, evaluation and search |
+| Runtime | `apps/qt/runtime/` | Executable paths, injected monotonic clock and atomic diagnostic logs |
 
-## Documentation
+Start at the [documentation index](docs/README.md). The
+[software specification](docs/architecture/software-specification.md) defines
+current contracts; the [interactive architecture](docs/architecture/architecture.html)
+shows their relationships. Build, test and packaging instructions are in the
+[development guide](docs/development/guide.md), with measured results in the
+[native validation ledger](docs/development/native-migration/validation.md).
 
-- [Documentation index](docs/README.md): Navigation by audience and purpose.
-- [User manual](docs/user/manual.md): Gameplay rules, controls, setup options, troubleshooting.
-- [Software specification](docs/architecture/software-specification.md): Ownership invariants, API contracts, lifecycle state machine.
-- [Interactive Architecture Diagram](docs/architecture/architecture.html): Visual architecture layout with guided inspection views.
-- [Development guide](docs/development/guide.md): Build targets, test conventions, packaging, and release processes.
-- [Migration guide](docs/development/migration.md): Baseline history, deprecated APIs, and interface mapping.
-- [Test migration inventory](docs/development/test-migration.md): Mapping and status of original test scenarios.
-- [Release notes](docs/development/release-notes.md) & [Validation record](docs/development/validation.md).
-- [Agent instructions](AGENTS.md): Architectural invariants and pair-programming guidelines.
-- Historical course PDFs: [User manual](docs/legacy/Chess_UserManual.pdf), [Software specification](docs/legacy/Chess_SoftwareSpec.pdf).
+[Historical documents](docs/legacy/README.md) are archived and receive no ongoing
+behavior updates. The current manual and specification are authoritative.
 
----
+## Authors and rights
 
-## Authors & Rights
+Originally developed for UC Irvine EECS 22L by **Team 22: DeepAnteater**:
+Yao Li, Benjamin Feng, Yide Li, Yurang Li, Yasith Diunugala and Max Zhang.
+The original 215-commit course history is retained.
 
-Originally developed for UC Irvine EECS 22L by **Team 22: DeepAnteater**: Yao Li, Benjamin Feng, Yide Li, Yurang Li, Yasith Diunugala, and Max Zhang. The complete 215-commit baseline history is retained.
-
-The original [COPYRIGHT](COPYRIGHT) terms remain unchanged. All rights remain reserved by the authors. Third-party dependencies retain their respective open-source licenses, bundled with binary distributions.
+[COPYRIGHT](COPYRIGHT) and team attribution remain unchanged. All rights remain
+reserved by the authors. Third-party dependencies retain their respective
+licenses; native packages include dependency and license inventories.

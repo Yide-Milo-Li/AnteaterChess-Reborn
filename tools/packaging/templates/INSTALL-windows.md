@@ -14,6 +14,8 @@ licenses/ contains Qt's vendor SBOM, license texts/attributions and Microsoft
 notices. Qt shared libraries remain replaceable by compatible modified versions.
 The original application COPYRIGHT remains unchanged.
 
-SOURCE_REVISION binds this candidate to its source commit. FILES.sha256 covers
-the archive payload. A local candidate is not independent clean Windows or
-human desktop acceptance; consult the delivered validation attachments.
+SOURCE_REVISION identifies this archive's source commit; VERSION alone does not
+distinguish it from the older published C11/GTK release. FILES.sha256 covers the
+archive payload. Package-verification receipts establish local deployment checks.
+Clean-Windows and human desktop acceptance are recorded separately in the
+delivered validation ledger, with their evidence source identified.

@@ -2,6 +2,24 @@
 
 Baseline: `32da9759f3dfe1555de57b26c3d3b37ec4636f2a`.
 
+## Current acceptance status
+
+The user confirmed on 2026-10-05 that acceptance is complete, including the
+independent clean-Windows and manual desktop gates. This closes the gates that
+were pending in the earlier stage records below. The confirmation did not include
+per-check observations, machine details, screenshots or separate acceptance
+receipts; this ledger records the status as user-confirmed without adding results
+that were not supplied. The verified software candidate remains commit
+`cf2f30b7db09edac42cade7e7b61ad0db483d2a1`.
+
+[The final remote run](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/runs/37358903929)
+passed both Windows and Linux jobs at that commit. VERSION remains 2.0.1; the
+[published v2.0.1 release](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
+is the earlier C11/GTK implementation at 6d92663. The native migration is integrated
+into main. No native Release is published. Stage records below retain the
+status and test counts measured at their respective stages; their historical
+pending statements are superseded by this current status.
+
 ## Environment gate
 
 Passed locally on 2026-10-05 before any tracked source edit. Windows Debug and
@@ -31,12 +49,12 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Transaction and budget policy isolation | Passed locally | Independent policy module; Tournament and timeout failure matrix; four 25/25 runs |
 | Search ownership | Passed locally | RAII contexts/requests, stop tokens, progressive failures and frozen output; four 26/26 runs |
 | Desktop | Passed locally | Four 26/26 stage runs; calibrated native Windows/Xvfb checks verify actual DPR 1/1.5/2 |
-| Distribution and cleanup | Implementation and local matrix passed; final candidates pending | Nine presets, official deploy/system dependency receipts; formal CPack verification follows the clean commit |
-| Remote CI | Not run | Must be bound to the final tested commit |
-| Clean Windows and manual acceptance | Pending | No new VM is provisioned |
+| Distribution and cleanup | Passed locally | Nine presets; final Windows and Linux candidates and source archive verified |
+| Remote CI | Passed | Windows and Linux jobs passed at `cf2f30b7db09edac42cade7e7b61ad0db483d2a1` |
+| Clean Windows and manual acceptance | Complete per user confirmation | Confirmed 2026-10-05; detailed observations were not included with the confirmation |
 
-Source migration, local candidate verification and external acceptance are separate
-milestones. No release is published automatically.
+Source migration, local candidate verification and external acceptance are recorded
+as separate milestones. All are complete; no Release is published automatically.
 
 ## Protected data and driver changes
 
@@ -224,8 +242,8 @@ on an unsupported installer --wait argument (87); setup.exe now uses PowerShell'
 process wait. The next attempt reached Qt installation, where aqt 3.3 could not
 resolve Qt 6.11's new kit-specific repository hierarchy. CI now reads the pinned
 official metadata directly, verifies archive checksums and records extraction
-results. Failed attempts remain attachments. Remote Windows acceptance is still
-pending until the repaired job completes for the final tested commit.
+results. Failed attempts remain attachments. Remote Windows and Linux CI passed for
+the final tested commit; their receipts and logs are included in the delivery.
 
 The b03a39a remote Windows job subsequently passed all four build/test presets,
 three effective DPI runs, official deployment and portable startup checks. Its
@@ -235,3 +253,44 @@ The driver now uses wmain and filesystem's native wide path on Windows; the same
 unchanged fixture then passed all 27 comparisons (exit 0). Linux retains its native
 UTF-8 main. Final candidates and CI are rerun at the repair commit. Candidate
 command logs are included in CI artifacts so failures can be inspected directly.
+
+## Documentation alignment on 2026-10-05
+
+README, the documentation index, manual, specification, development/CI guides,
+release notes, migration-plan status and runtime templates were reviewed against
+the maintained code, CMake presets/install graph, package receipts and GitHub run
+37358903929. Local main contains cf2f30b; remote main was verified at 6d92663.
+The older published v2.0.1 release still contains C11/GTK. No application source,
+rule, AI expectation or historical report was changed in this documentation pass.
+
+The interactive diagram now keeps QThread inside the Qt desktop boundary,
+identifies the independent budget policy, and shows only the injected clock
+entering Session. Logs remain a desktop effect after accepted commands.
+Archify's final showcase validation/delivery passed all nine checks with zero
+errors/warnings. Visual containment passed at 1440×900, 1600×1000, 1920×1080 and
+2048×1320; light/dark captures at the smallest/largest sizes were inspected.
+
+Windows checks used v143 14.44.35207 x64, Qt 6.11.2 MSVC 2022 x64, native
+CMake 4.3/Ninja and Python 3.14. The source code remains at cf2f30b with uncommitted
+documentation changes; configuration identifies this checkout as `-dirty`.
+
+| Check | Command or method | Result |
+| --- | --- | --- |
+| Documentation/resources/layout | `python tools/dev/check.py` | Exit 0 |
+| Whitespace | `git diff --check` | Exit 0 |
+| Native Release configuration | `cmake --preset windows-release` | Exit 0 |
+| Source CPack | `cpack --config build/windows-release/CPackSourceConfig.cmake -B ../migration-evidence/dr5/source` | Exit 0 |
+| Windows runtime CPack | `cpack --config build/windows-release/CPackConfig.cmake -B ../migration-evidence/dr5/runtime` | Exit 0; 90 binary closures verified |
+| Runtime documentation payload | Compare archived README, INSTALL, manual, archive index and PDFs with checkout bytes | Six files match; 14 maintained relative links resolve |
+| Protected data | SHA-256 against protected-files.json and the authorized structural adjustment | 27/27 match; four archived-report hashes also match |
+
+Raw command/exit/hash receipts and diagram captures are retained outside build
+at `migration-evidence/2026-10-05-documentation-review/` beside the repository.
+Diagram specification SHA-256:
+`b936daad8d5397d211f789bbfbcb770129a582e2a45e4dc7b970e035128d6c1d`.
+Delivered HTML SHA-256:
+`2fba1bd6e625053a4e9a484d4edb033e9352d86aed61a77602cf3d5e0071e9d1`.
+The generated check packages are dirty-checkout documentation evidence, not new
+formal candidates. Original accepted archive hashes remain unchanged in their
+delivery. Application CTest and desktop interaction tests were not rerun for this
+documentation pass; the existing code results above remain bound to cf2f30b.

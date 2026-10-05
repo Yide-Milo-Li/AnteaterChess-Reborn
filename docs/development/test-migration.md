@@ -257,5 +257,6 @@ all modes, real AI/hint completion, stale results on moves/undo/timeouts/replace
 cooperative close, promotion/cancellation, left/right clicks, coordinate fields,
 keyboard focus, F11/Escape and all embedded SVGs. The original C rule/session/AI
 fixtures remain, with an additional invalid difficulty test and immutable 27-position
-AI score/SEE/search reference. See the migration validation record for remaining
-physical-desktop and clean-machine acceptance.
+AI score/SEE/search reference. See the [native validation ledger](native-migration/validation.md)
+for measured coverage and clean-Windows/manual acceptance, which is complete per
+user confirmation. The older stage records retain their status at the time of each run.

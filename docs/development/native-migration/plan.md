@@ -1,7 +1,8 @@
 # C++20 / MSVC / official Qt migration
 
-Accepted scope: the user instruction of 2026-10-05. This local execution record
-does not replace current repository documentation before the environment gate.
+Accepted scope: the user instruction of 2026-10-05. This implemented execution
+plan preserves the original gate and verification requirements. Use the current
+manual and specification for behavior, and the validation ledger for results.
 
 ## Baseline and gate
 
@@ -82,9 +83,13 @@ does not replace current repository documentation before the environment gate.
 
 ## Current status
 
-The environment gate and build, rules, Session, policy, search and desktop stages
-passed locally. Distribution and cleanup implementation and all nine local presets
-passed. Formal clean-commit candidates, no-Git rebuilds and remote CI are the final
-engineering gates; independent clean Windows and human acceptance remain pending.
-See [the validation ledger](validation.md) for current evidence. Earlier blocked
-installer reports remain historical attachments, not the current status.
+Completed at source commit `cf2f30b7db09edac42cade7e7b61ad0db483d2a1`.
+The environment gate, source migration, distribution/cleanup and all nine local
+presets passed. Windows/Linux packages, no-Git rebuilds and remote CI passed for
+that commit. Independent clean-Windows and human desktop acceptance are complete
+per the user's 2026-10-05 confirmation; per-check receipts were not supplied.
+The native migration is integrated into main.
+No native Release is published.
+See [the validation ledger](validation.md) for evidence and the distinction between
+measured results and user-confirmed acceptance. Earlier blocked installer reports
+remain historical attachments.

@@ -14,3 +14,7 @@ including when launched through a symlink or from another working directory.
 Move that directory with the program to retain its logs. An unwritable log directory
 reports a diagnostic while game actions still apply. The runtime uses system Qt
 libraries. See COPYRIGHT for application terms.
+
+SOURCE_REVISION identifies this archive's source commit; VERSION alone does not
+distinguish it from the older published C11/GTK release. FILES.sha256 covers the
+payload, and DEPENDENCIES.json records measured system dependencies and licenses.

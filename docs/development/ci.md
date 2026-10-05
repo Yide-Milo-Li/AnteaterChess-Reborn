@@ -1,5 +1,11 @@
 # Continuous integration
 
+The [final native migration run](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/actions/runs/37358903929)
+completed successfully for source commit
+`cf2f30b7db09edac42cade7e7b61ad0db483d2a1` on 2026-10-05. Both Windows and
+Linux jobs passed. This result applies to that tested commit; later documentation
+edits have their own local checks in the [native ledger](native-migration/validation.md).
+
 .github/workflows/ci.yml tests the pushed commit with native Windows v143 14.44
 and official Qt 6.11.2 MSVC 2022 x64 (including Shader Tools), and Ubuntu 24.04
 GCC/system Qt 6.4.2. Windows installs only a missing pinned component and refuses

@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Public interfaces: [types](../../include/anteater/types.hpp), [rules](../../include/anteater/rules.hpp), [session](../../include/anteater/session.hpp), [AI](../../include/anteater/ai.hpp). Maintained public library interfaces use the `ac` namespace, scoped enums and C++20 value types. Qt desktop internals are private to the application.
+Public interfaces: [types](../../include/anteater/types.hpp), [rules](../../include/anteater/rules.hpp), [session](../../include/anteater/session.hpp), [policy](../../include/anteater/policy.hpp), [AI](../../include/anteater/ai.hpp). Maintained public library interfaces use the `ac` namespace, scoped enums and C++20 value types. Qt desktop internals are private to the application.
 
 ```mermaid
 flowchart TD
@@ -22,7 +22,7 @@ flowchart TD
 
 An [interactive architecture diagram](architecture.html) is also available.
 
-The session has no GTK or GLib dependency. Platform callbacks are injected. It uses independent configuration and budget policies and never initiates a search. Search consumes copied positions and historical hashes and never mutates a live session. The former Controller/event queue/FSM contracts are replaced by synchronous session commands and application-owned navigation.
+The session has no Qt, GTK or GLib dependency. Platform callbacks are injected. It uses independent configuration and budget policies and never initiates a search. Search consumes copied positions and historical hashes and never mutates a live session. The former Controller/event queue/FSM contracts are replaced by synchronous session commands and application-owned navigation.
 
 ## Values, ownership, and lifetime
 
@@ -115,4 +115,4 @@ Runtime contracts: [QThread](https://doc.qt.io/qt-6/qthread.html), [Qt resources
 
 Commands use `ac::Status`: success, invalid argument, illegal move, allocation failure, capacity, cancellation, stale result, unavailable operation, and external I/O failure. Boolean predicates and selection enums explicitly have their own return conventions. Borrowed pointers are never freed by callers. Core APIs do not terminate the process. Qt's allocation behavior applies inside the desktop adapters. Logs use QSaveFile atomic replacement; failure is diagnostic after accepted operations.
 
-See [test migration](../development/test-migration.md) and [validation](../development/validation.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require semantic restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. Qt Test and Quick Test exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.
+See [test migration](../development/test-migration.md) and [native validation](../development/native-migration/validation.md). Baseline fixtures compare the original move ordering-independent fingerprint, a fixed 50-ply sequence, special boards, and variant perft counts. Random legal apply/unmake checks require semantic restoration and full hash recomputation agreement. Session tests cover injected failures, isolation, clocks, repetition and stale results. Qt Test and Quick Test exercise pages, all three modes, hints, undo and shutdown during search. CI supplements these with sanitizers, source rebuilds and runtime smoke tests.

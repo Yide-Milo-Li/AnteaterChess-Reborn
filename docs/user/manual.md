@@ -2,12 +2,17 @@
 
 ## Install and launch
 
-Supported release targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install the Qt runtime packages listed in INSTALL.md with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported release target. Building from source is described in [Development](../development/guide.md).
+Supported native distribution targets are Windows x64 and Ubuntu 24.04 x64. Extract the complete platform archive. On Windows launch `anteater-chess.exe`; on Ubuntu install the Qt runtime packages listed in INSTALL.md with apt and launch `./anteater-chess`. No MSYS2 installation is needed for the Windows runtime package. macOS is not a supported distribution target. Building from source is described in the [repository development guide](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/blob/main/docs/development/guide.md).
 
 Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their QML, plugins and configuration directories with the executable.
 
+The native C++20/Qt implementation can be identified by SOURCE_REVISION in its
+archive. VERSION alone is insufficient: the older published v2.0.1 release uses
+C11/GTK. In a source checkout, docs/development/release-notes.md records
+publication and acceptance status.
+
 Windows game builds open the game window without allocating a console. Developer
-console builds are available as described in the development guide.
+console builds use AC_WINDOWS_CONSOLE=ON as described in the development guide.
 
 ## Start a game
 
@@ -48,6 +53,9 @@ An Anteater's first capture can be diagonal or orthogonal; subsequent captures c
 ## Difficulty and clocks
 
 Easy uses a 350 ms default search budget, Medium 2,200 ms, and Hard 7,000 ms. The optional AI time override is expressed in seconds. Depth limits and early completed searches can finish before the allotted budget.
+
+The selectable difficulties are Easy, Medium, Hard and Tournament. Experimental
+has been removed; its former numeric value 4 is invalid in Session configuration.
 
 Tournament preserves the original per-color total of 600,999 ms, a 7,000 ms base allocation, and a pool of saved time. Its budget is base plus one quarter of that pool, capped at 10,000 ms, with a 30,000 ms reserve and a 180,000 ms saved-time pool cap. Exhausting the Tournament total awards the win to the opponent. Undo does not refund Tournament time.
 

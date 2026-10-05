@@ -9,19 +9,37 @@
       {
         "id": "game-flow",
         "label": "Primary Gameplay Flow",
-        "focus": ["player", "qt-app", "session", "rules", "board-state"],
+        "focus": [
+          "player",
+          "qt-app",
+          "session",
+          "rules",
+          "board-state"
+        ],
         "note": "Follow synchronous user moves through transactional session management to rule execution."
       },
       {
         "id": "ai-search-path",
         "label": "Asynchronous AI Search",
-        "focus": ["qt-app", "async-worker", "ai-search", "rules", "board-state"],
+        "focus": [
+          "qt-app",
+          "async-worker",
+          "ai-search",
+          "rules",
+          "board-state"
+        ],
         "note": "AI search runs in an isolated worker thread using owning SearchRequest values and cooperative cancellation."
       },
       {
         "id": "platform-and-assets",
         "label": "Platform & Assets Integration",
-        "focus": ["resources", "qt-app", "platform", "session", "budget"],
+        "focus": [
+          "resources",
+          "qt-app",
+          "platform",
+          "session",
+          "budget"
+        ],
         "note": "Inspect runtime paths and executable-side logs, with assets/pieces and icons compiled into Qt resources."
       }
     ]
@@ -32,24 +50,42 @@
       "type": "external",
       "label": "Player / User",
       "sublabel": "Mouse & Key Input",
-      "pos": [40, 270],
-      "size": [130, 60]
+      "pos": [
+        40,
+        350
+      ],
+      "size": [
+        130,
+        60
+      ]
     },
     {
       "id": "resources",
       "type": "frontend",
       "label": "Qt resources",
       "sublabel": "14 Pieces + 4 Icons",
-      "pos": [240, 90],
-      "size": [150, 60]
+      "pos": [
+        240,
+        70
+      ],
+      "size": [
+        150,
+        60
+      ]
     },
     {
       "id": "qt-app",
       "type": "frontend",
       "label": "Qt 6 Desktop Shell",
       "sublabel": "app / models / qml / async",
-      "pos": [240, 270],
-      "size": [150, 60],
+      "pos": [
+        240,
+        350
+      ],
+      "size": [
+        150,
+        60
+      ],
       "tag": "C++20 / typed QML"
     },
     {
@@ -57,41 +93,71 @@
       "type": "security",
       "label": "Platform Runtime",
       "sublabel": "runtime / logging",
-      "pos": [240, 450],
-      "size": [150, 60]
+      "pos": [
+        240,
+        480
+      ],
+      "size": [
+        150,
+        60
+      ]
     },
     {
       "id": "async-worker",
       "type": "frontend",
       "label": "QThread Worker",
       "sublabel": "Background Thread",
-      "pos": [460, 90],
-      "size": [140, 60]
+      "pos": [
+        240,
+        210
+      ],
+      "size": [
+        140,
+        60
+      ]
     },
     {
       "id": "session",
       "type": "backend",
       "label": "ac::Session",
       "sublabel": "Transactional State",
-      "pos": [460, 270],
-      "size": [140, 60],
+      "pos": [
+        460,
+        350
+      ],
+      "size": [
+        140,
+        60
+      ],
       "tag": "Single-Owner"
     },
     {
       "id": "budget",
       "type": "backend",
       "label": "Budget Allocator",
-      "sublabel": "Tournament & Turn Clocks",
-      "pos": [460, 450],
-      "size": [140, 60]
+      "sublabel": "Tournament Budgets",
+      "pos": [
+        460,
+        480
+      ],
+      "size": [
+        140,
+        60
+      ]
     },
     {
       "id": "ai-search",
       "type": "backend",
       "label": "ac::SearchContext",
       "sublabel": "Negamax / Alpha-Beta",
-      "pos": [680, 90],
-      "size": [150, 60],
+      "pos": [
+        680,
+        210
+      ],
+      "size": [
+        150,
+        60
+      ],
       "tag": "Worker-Owned"
     },
     {
@@ -99,29 +165,52 @@
       "type": "backend",
       "label": "Rules Engine",
       "sublabel": "MoveGen, Resolver, EndGame",
-      "pos": [680, 270],
-      "size": [150, 60]
+      "pos": [
+        680,
+        350
+      ],
+      "size": [
+        150,
+        60
+      ]
     },
     {
       "id": "board-state",
       "type": "database",
       "label": "ac::Position & Hash",
       "sublabel": "Compact 80-Square Board",
-      "pos": [900, 270],
-      "size": [150, 60],
+      "pos": [
+        900,
+        350
+      ],
+      "size": [
+        150,
+        60
+      ],
       "tag": "Zobrist Hash"
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "C++20 RAII Core Engine (Zero GTK/GLib Dependency)",
-      "wraps": ["session", "budget", "ai-search", "rules", "board-state"]
+      "label": "C++20 RAII Core Engine (No Qt / GTK / GLib)",
+      "wraps": [
+        "session",
+        "budget",
+        "ai-search",
+        "rules",
+        "board-state"
+      ]
     },
     {
       "kind": "security-group",
       "label": "Qt 6 Desktop Shell & Platform Adapters",
-      "wraps": ["resources", "qt-app", "platform", "async-worker"]
+      "wraps": [
+        "resources",
+        "qt-app",
+        "platform",
+        "async-worker"
+      ]
     }
   ],
   "connections": [
@@ -130,32 +219,33 @@
       "from": "player",
       "to": "qt-app",
       "label": "User Input",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "labelDy": 50
     },
     {
       "id": "load-resources",
       "from": "resources",
       "to": "qt-app",
       "label": "Load Assets",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "labelDy": 30
+      "fromSide": "left",
+      "toSide": "left",
+      "labelDy": 57
     },
     {
-      "id": "gtk-to-session",
+      "id": "qt-to-session",
       "from": "qt-app",
       "to": "session",
       "label": "Commands",
       "variant": "emphasis"
     },
     {
-      "id": "gtk-to-worker",
+      "id": "qt-to-worker",
       "from": "qt-app",
       "to": "async-worker",
       "label": "Spawn Job",
       "variant": "dashed",
       "fromSide": "top",
-      "toSide": "left"
+      "toSide": "bottom"
     },
     {
       "id": "worker-to-ai",
@@ -183,7 +273,7 @@
       "id": "session-to-budget",
       "from": "session",
       "to": "budget",
-      "label": "Time Check",
+      "label": "Budget Policy",
       "fromSide": "bottom",
       "toSide": "top",
       "labelDy": 30
@@ -196,10 +286,10 @@
       "variant": "emphasis"
     },
     {
-      "id": "gtk-to-platform",
+      "id": "qt-to-platform",
       "from": "qt-app",
       "to": "platform",
-      "label": "Callbacks",
+      "label": "Clock / Logs",
       "fromSide": "bottom",
       "toSide": "top",
       "labelDy": 30
@@ -208,7 +298,7 @@
       "id": "platform-to-session",
       "from": "platform",
       "to": "session",
-      "label": "Clock & Log",
+      "label": "Injected Clock",
       "fromSide": "right",
       "toSide": "left"
     }
@@ -220,14 +310,14 @@
       "items": [
         "Qt 6 desktop application with modern obsidian dark theme",
         "HiDPI dynamic piece scaling based on board cell geometry",
-        "Snapshot worker performs AI search outside the UI thread"
+        "Desktop logs follow accepted Session commands"
       ]
     },
     {
       "dot": "emerald",
       "title": "Session & Rules Isolation",
       "items": [
-        "Core C++20 modules compile cleanly without GTK or GLib",
+        "Core C++20 modules compile without Qt, GTK or GLib",
         "ac::Session enforces transactional state, revision checking, and undo",
         "8x10 board variant rules with Ants and chain-capturing Anteaters"
       ]
@@ -238,7 +328,7 @@
       "items": [
         "Iterative deepening with aspiration windows and alpha-beta pruning",
         "Context-owned transposition tables, killer/history heuristics",
-        "Cooperative cancellation via monotonic deadline and GUI generation tokens"
+        "Owned SearchRequest, stop_token and stale-result checks"
       ]
     }
   ]

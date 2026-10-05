@@ -21,6 +21,7 @@ jobs:
           path: |
             dist/*
             build/ci-evidence
+            build/ci-candidate/RESULT.json
   windows:
     runs-on: windows-2022
     defaults:
@@ -38,8 +39,9 @@ jobs:
           $present = @(& $vswhere -all -products '*' -requires $component -property installationPath)
           if ($present.Count -eq 0) {
             $instance = & $vswhere -latest -products '*' -property installationPath
-            $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-            $process = Start-Process -FilePath $installer -ArgumentList @('modify','--installPath',('"' + $instance + '"'),'--add',$component,'--quiet','--wait','--norestart') -WindowStyle Hidden -PassThru -Wait
+            $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+            # --wait belongs to the bootstrapper. Start-Process waits for setup.exe.
+            $process = Start-Process -FilePath $installer -ArgumentList @('modify','--installPath',('"' + $instance + '"'),'--add',$component,'--quiet','--norestart') -WindowStyle Hidden -PassThru -Wait
             if ($process.ExitCode -ne 0) { throw "v143 installer exit $($process.ExitCode); 3010 requires a fresh post-reboot gate." }
           }
       - name: Install official Qt archive kit
@@ -64,3 +66,4 @@ jobs:
           path: |
             dist/*
             build/ci-evidence
+            build/ci-candidate/RESULT.json

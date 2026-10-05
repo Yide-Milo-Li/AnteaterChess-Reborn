@@ -1,5 +1,5 @@
 """Verify CPack candidates, portable startup/logging, and no-Git source rebuilds."""
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import argparse
 import concurrent.futures
 import hashlib
@@ -56,20 +56,36 @@ def main():
                    'checks': records, 'externalAcceptance': 'pending'}
         (work/'RESULT.json').write_text(json.dumps(receipt, indent=2)+'\n', encoding='utf-8')
 
-    unpack = work/'path with spaces 棋'
-    unpack.mkdir()
-    for archive in (args.runtime, args.source):
+    runtime, source = work/'runtime 棋', work/'source 棋'
+    for archive, destination in ((args.runtime, runtime), (args.source, source)):
+        destination.mkdir()
+        prefix = archive.name.removesuffix('.zip').removesuffix('.tar.gz')
+
+        def relative(name):
+            path = PurePosixPath(name)
+            if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != prefix:
+                raise RuntimeError('Unsafe archive path or unexpected package root')
+            return Path(*path.parts[1:])
+
+        # Strip only the known CPack root. Short Unicode/space working names
+        # keep ordinary Windows paths bounded without changing machine policy.
         if archive.suffix == '.zip':
             with zipfile.ZipFile(archive) as contents:
-                for name in contents.namelist():
-                    if not (unpack/name).resolve().is_relative_to(unpack):
+                for member in contents.infolist():
+                    path = destination/relative(member.filename)
+                    if not path.resolve().is_relative_to(destination):
                         raise RuntimeError('Unsafe archive path')
-                contents.extractall(unpack)
+                    if member.is_dir():
+                        path.mkdir(parents=True, exist_ok=True)
+                    else:
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        with contents.open(member) as incoming, path.open('wb') as outgoing:
+                            shutil.copyfileobj(incoming, outgoing)
         else:
             with tarfile.open(archive) as contents:
-                contents.extractall(unpack, filter='data')
-    runtime = next(unpack.glob('*-'+('windows-x64' if os.name == 'nt' else 'linux-x64')))
-    source = next(unpack.glob('*-source'))
+                members = [member.replace(name=relative(member.name).as_posix())
+                           for member in contents.getmembers() if relative(member.name) != Path('.')]
+                contents.extractall(destination, members=members, filter='data')
     if (source/'.git').exists():
         raise RuntimeError('Source archive includes Git')
     for tree in (source, runtime):

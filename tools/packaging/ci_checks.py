@@ -5,6 +5,7 @@ root=Path(__file__).resolve().parents[2]
 parser=argparse.ArgumentParser()
 parser.add_argument('platform', choices=('windows','linux'))
 parser.add_argument('--evidence', type=Path, default=root/'build/ci-evidence')
+parser.add_argument('--candidate-work', type=Path, default=root/'build/ci-candidate')
 args=parser.parse_args()
 platform=args.platform
 evidence=args.evidence.resolve()
@@ -48,4 +49,4 @@ version=(root/'VERSION').read_text().strip()
 extension='.zip' if platform=='windows' else '.tar.gz'
 env=os.environ.copy()
 env.update(QT_QPA_PLATFORM='windows' if platform=='windows' else 'xcb',QT_QUICK_BACKEND='software')
-run([sys.executable,'-X','utf8','tools/packaging/verify_candidate.py','--runtime',str(root/f'dist/AnteaterChess-Reborn-{version}-{platform}-x64{extension}'),'--source',str(root/f'dist/AnteaterChess-Reborn-{version}-source.tar.gz'),'--work',str(evidence/'candidate'),'--rebuild'],env)
+run([sys.executable,'-X','utf8','tools/packaging/verify_candidate.py','--runtime',str(root/f'dist/AnteaterChess-Reborn-{version}-{platform}-x64{extension}'),'--source',str(root/f'dist/AnteaterChess-Reborn-{version}-source.tar.gz'),'--work',str(args.candidate_work.resolve()),'--rebuild'],env)

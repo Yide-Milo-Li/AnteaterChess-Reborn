@@ -30,8 +30,8 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Session ownership | Passed locally | Owning snapshots, resource lifetime, moves and progressive allocation failures; four 24/24 runs |
 | Transaction and budget policy isolation | Passed locally | Independent policy module; Tournament and timeout failure matrix; four 25/25 runs |
 | Search ownership | Passed locally | RAII contexts/requests, stop tokens, progressive failures and frozen output; four 26/26 runs |
-| Desktop | Passed locally | Four 26/26 runs; native Windows/Xvfb software rendering at 100/150/200% |
-| Distribution and cleanup | Pending | CPack, dependency and license manifests |
+| Desktop | Passed locally | Four 26/26 stage runs; calibrated native Windows/Xvfb checks verify actual DPR 1/1.5/2 |
+| Distribution and cleanup | Implementation and local matrix passed; final candidates pending | Nine presets, official deploy/system dependency receipts; formal CPack verification follows the clean commit |
 | Remote CI | Not run | Must be bound to the final tested commit |
 | Clean Windows and manual acceptance | Pending | No new VM is provisioned |
 
@@ -154,3 +154,49 @@ visual evidence, not accepted screenshots. Tests cover maximized and ordinary
 F11/Escape restoration, input, promotion, focus, scrolling and task lifecycles.
 All 27 protected files remain unchanged. These automated local checks do not
 replace independent clean Windows or human desktop acceptance.
+
+## Distribution, cleanup and final matrix
+
+The final maintained comparator is a single C++ executable reading the original
+AI fixture. Retiring the duplicate Python packaging test changes the final CTest
+count to 25 desktop and 22 core. Windows/Linux Debug and Release desktop each
+passed 25/25; all four core presets and Linux ASan/UBSan passed 22/22. Production
+core builds also passed with Qt/Python discovery explicitly disabled. New atomic
+log replacement failures preserve existing bytes and recover on the next write.
+
+The checked-in CMake install graph and CPack configurations replace custom
+archivers. Windows installation uses Qt's official QML deployment API and validates
+90 deployed x64 binary closures against official Qt, v143 14.44 Release REDIST
+and permitted SDK D3D REDIST origins. Versions, hashes and licenses are recorded.
+Linux installation independently validates 37 executable/plugin/QML ELF closures,
+system package versions, QML modules and license records; Qt 6.4's library deployment
+limitation is explicit. Prototype install logs are retained; they are not formal
+clean-commit candidates. Final candidate receipts must identify one clean commit.
+
+Repeated native initialization initially accumulated PATH beyond cmd's limit.
+The script now restores its original process inputs; six successive initializations
+produce a stable 3790-character PATH and the same compiler/Release REDIST locally.
+The interrupted Release core preset then passed. No machine PATH was changed.
+
+Earlier scale-factor-only screenshots did not prove effective 100/150/200%:
+this Windows display reports native DPR 2. The calibrated helper first measures
+the window, then checks eight page captures at actual DPR 1, 1.5 and 2. Both
+platforms passed all three 18-case software-rendered desktop runs. Captures were
+inspected locally; human desktop acceptance remains pending. Earlier empty Windows
+QtTest logs came from shell argument parsing and are insufficient evidence; new
+runs use an absolute QtTest report argument and separate console logs.
+
+Only the authorized resource alias adjustment changes a protected file:
+[structural-changes.json](structural-changes.json) records before/after hashes of
+assets/resources.qrc. All 26 other protected files remain byte-identical, including
+SVGs, PDFs, COPYRIGHT and fixtures. .gitattributes preserves their original Windows
+checkout CRLF bytes on both platforms while maintained source uses LF. Frozen
+expected values are unchanged. Historical probes and migration reports are archived
+with applicability notes; old candidates/cache inputs are preserved outside dist.
+
+Commands, real exits and log/screenshot hashes are in stage7-final, stage7-final-r2,
+stage7-production-core, stage7-repeated-environment and stage7-calibrated attachment
+receipts. The external CURRENT.md and final artifact index will record formal
+candidate and remote CI outcomes after this source commit; this avoids changing
+the tested commit merely to embed its own generated checksums. Clean Windows and
+manual acceptance remain separate open gates. No Release is published.

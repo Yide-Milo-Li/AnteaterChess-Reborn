@@ -1,0 +1,11 @@
+{
+  "authorization": "Approved native migration: necessary resource manifest restructuring only; SVG and frozen expected data remain unchanged.",
+  "files": [
+    {
+      "path": "assets/resources.qrc",
+      "sha256Before": "89150bfc5a90b9b54821c3cdf322a953a7efb6c87fb009240642bea25c7d1a24",
+      "sha256After": "e23ecd32a4036bc582f07c982a15e321b1a5bd09f7fc12b3ce4834fbc752cd63",
+      "reason": "Unify WhiteAnt.svg alias with original physical SVG name; retire desktop exception."
+    }
+  ]
+}

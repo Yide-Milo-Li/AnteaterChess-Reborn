@@ -61,3 +61,4 @@ coverage/
 .cache/
 .codex
 compile_commands.json
+CMakeUserPresets.json

@@ -7,6 +7,12 @@
 #include <stdlib.h>
 #include <memory>
 #include <string.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
+// The maintained driver computes and compares the immutable fixture itself.
+static std::ostringstream actual;
 
 using namespace ac;
 
@@ -59,10 +65,12 @@ static void emit(const Position *p, int index) {
         s = error->status;
     else
         r = std::get<SearchResult>(outcome);
-    printf("%d hash=%" PRIu64 " absolute=%d relative=%d moves=%d see=%" PRIu64
+    char line[512];
+    std::snprintf(line, sizeof(line), "%d hash=%" PRIu64 " absolute=%d relative=%d moves=%d see=%" PRIu64
            " status=%d depth=%d nodes=%d move=%" PRIu64 "\n",
            index, p->hash, ai_evaluate_absolute(p), ai_evaluate_relative(p), list->count, see, value(s),
            r.completedDepth, r.nodes, s == Status::Ok ? signature(&r.move) : 0);
+    actual << line;
 }
 static void clear(Position *p) {
     position_init(p);
@@ -73,7 +81,7 @@ static void clear(Position *p) {
 static void put(Position *p, int r, int c, PieceType t, Color color) {
     set_piece(&p->board, Square{r, c}, create_piece(t, color));
 }
-int main(void) {
+int main(int argc, char **argv) {
     Position p;
     auto ownedMoves = std::make_unique<MoveList>();
     auto *moves = ownedMoves.get();
@@ -114,5 +122,26 @@ int main(void) {
     p.enPassant = Square{3, 5};
     p.hash = position_hash(&p);
     emit(&p, 26);
+    if (argc != 2) {
+        std::cerr << "Usage: ai_reference frozen-fixture\n";
+        return 2;
+    }
+    std::ifstream fixture(argv[1]);
+    std::istringstream computed(actual.str());
+    std::string expected, observed;
+    int index = 0;
+    if (!fixture) return 2;
+    while (std::getline(computed, observed)) {
+        if (!std::getline(fixture, expected)) return 1;
+        if (!expected.empty() && expected.back() == '\r') expected.pop_back();
+        if (expected != observed) {
+            std::cerr << "Frozen AI mismatch at position " << index << "\nexpected: "
+                      << expected << "\nobserved: " << observed << '\n';
+            return 1;
+        }
+        ++index;
+    }
+    if (std::getline(fixture, expected) || index != 27) return 1;
+    std::cout << "AI reference: 27 positions match score, SEE, legal/chosen moves, depth and nodes\n";
     return 0;
 }

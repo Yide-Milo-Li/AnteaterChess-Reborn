@@ -4,7 +4,7 @@ All 19 baseline test programs and their named scenarios are retained in [the mac
 
 ## test_ai.c
 
-Replacement: `tests/ai/test_search.c` and `tests/ai/test_special_positions.c`; search contract, isolation, budget, check evasion, terminal, promotion and en-passant tests. Hints also run in `tests/gtk/test_desktop.c`.
+Replacement: `tests/ai/test_search.cpp` and `tests/ai/test_special_positions.cpp`; search contract, isolation, budget, check evasion, terminal, promotion and en-passant tests. Hints also run in `tests/qt/test_desktop.cpp`.
 
 - `test_ai_rejects_null_arguments`
 - `test_ai_returns_legal_move_without_mutating_initial_state`
@@ -19,7 +19,7 @@ Replacement: `tests/ai/test_search.c` and `tests/ai/test_special_positions.c`; s
 
 ## test_board.c
 
-Replacement: `tests/rules/test_board.c` (public rules interface).
+Replacement: `tests/rules/test_board.cpp` (public rules interface).
 
 - `test_board_initialization`
 - `test_board_mutation`
@@ -28,7 +28,7 @@ Replacement: `tests/rules/test_board.c` (public rules interface).
 
 ## test_clock.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_clock_initialization_and_progress`
 - `test_clock_pause_and_resume`
@@ -36,7 +36,7 @@ Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replac
 
 ## test_controller.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_init_controller_resets_state_and_queue`
 - `test_controller_enqueue_event_routes_by_priority`
@@ -72,7 +72,7 @@ Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replac
 
 ## test_control_flow.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_controller_applies_valid_move`
 - `test_controller_rejects_illegal_move`
@@ -88,7 +88,7 @@ Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replac
 
 ## test_endgame.c
 
-Replacement: `tests/rules/test_endgame.c` (public rules interface).
+Replacement: `tests/rules/test_endgame.cpp` (public rules interface).
 
 - `test_is_in_check_detects_attacks_and_blockers`
 - `test_checkmate_detection_finds_forced_mate`
@@ -103,14 +103,14 @@ Replacement: `tests/rules/test_endgame.c` (public rules interface).
 
 ## test_error.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_known_error_messages`
 - `test_unknown_error_message`
 
 ## test_event.c
 
-Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `tests/session/test_session.c` cover observable navigation/session behavior.
+Replacement: retired queue/FSM implementation; `tests/qt/test_desktop.cpp` and `tests/session/test_session.cpp` cover observable navigation/session behavior.
 
 - `test_event_constructors`
 - `test_zero_initialized_queue_is_empty`
@@ -119,7 +119,7 @@ Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `t
 
 ## test_fsm.c
 
-Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `tests/session/test_session.c` cover observable navigation/session behavior.
+Replacement: retired queue/FSM implementation; `tests/qt/test_desktop.cpp` and `tests/session/test_session.cpp` cover observable navigation/session behavior.
 
 - `test_forward_state_progression`
 - `test_transition_validation`
@@ -130,7 +130,7 @@ Replacement: retired queue/FSM implementation; `tests/gtk/test_desktop.c` and `t
 
 ## test_game_state.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_game_state_initialization_defaults`
 - `test_game_state_player_setup_follows_mode`
@@ -141,14 +141,14 @@ Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replac
 
 ## test_log.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_log_lifecycle_and_history_rebuild`
 - `test_log_default_ai_budget_header`
 
 ## test_move.c
 
-Replacement: `tests/rules/test_move.c` (public rules interface).
+Replacement: `tests/rules/test_move.cpp` (public rules interface).
 
 - `test_create_move_defaults`
 - `test_move_path_and_captures`
@@ -158,7 +158,7 @@ Replacement: `tests/rules/test_move.c` (public rules interface).
 
 ## test_movegen.c
 
-Replacement: `tests/rules/test_movegen.c` (public rules interface).
+Replacement: `tests/rules/test_movegen.cpp` (public rules interface).
 
 - `test_generate_moves_only_for_current_turn`
 - `test_ant_moves_and_capture`
@@ -175,7 +175,7 @@ Replacement: `tests/rules/test_movegen.c` (public rules interface).
 
 ## test_move_execution.c
 
-Replacement: `tests/rules/test_position.c` and `tests/rules/test_special_roundtrip.c` (both-color reversible special moves, hash, random sequences); history policy in session tests.
+Replacement: `tests/rules/test_position.cpp` and `tests/rules/test_special_roundtrip.cpp` (both-color reversible special moves, hash, random sequences); history policy in session tests.
 
 - `test_apply_move_updates_board_history_and_turn`
 - `test_apply_move_rejects_invalid_requests`
@@ -197,7 +197,7 @@ Replacement: `tests/rules/test_position.c` and `tests/rules/test_special_roundtr
 
 ## test_move_request_parser.c
 
-Replacement: `tests/rules/test_move_request_parser.c` (public rules interface).
+Replacement: `tests/rules/test_move_request_parser.cpp` (public rules interface).
 
 - `test_parse_move_request_fields_accepts_standard_fields`
 - `test_parse_move_request_fields_accepts_trimmed_lowercase_fields`
@@ -207,7 +207,7 @@ Replacement: `tests/rules/test_move_request_parser.c` (public rules interface).
 
 ## test_move_resolver.c
 
-Replacement: `tests/rules/test_move_resolver.c` (public rules interface).
+Replacement: `tests/rules/test_move_resolver.cpp` (public rules interface).
 
 - `test_resolve_simple_move`
 - `test_resolve_castling`
@@ -218,7 +218,7 @@ Replacement: `tests/rules/test_move_resolver.c` (public rules interface).
 
 ## test_piece.c
 
-Replacement: `tests/rules/test_piece.c` (public rules interface).
+Replacement: `tests/rules/test_piece.cpp` (public rules interface).
 
 - `test_create_piece`
 - `test_same_color_checks`
@@ -227,7 +227,7 @@ Replacement: `tests/rules/test_piece.c` (public rules interface).
 
 ## test_rulecheck.c
 
-Replacement: `tests/rules/test_rulecheck.c` (public rules interface).
+Replacement: `tests/rules/test_rulecheck.cpp` (public rules interface).
 
 - `test_validate_selection_reports_expected_result_codes`
 - `test_validate_move_accepts_basic_ant_advance`
@@ -241,7 +241,7 @@ Replacement: `tests/rules/test_rulecheck.c` (public rules interface).
 
 ## test_timer.c
 
-Replacement: `tests/session/test_session.c` / `tests/gtk/test_desktop.c`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
+Replacement: `tests/session/test_session.cpp` / `tests/qt/test_desktop.cpp`; replaced by session commands or desktop behavior; obsolete raw state/queue/clock-control interfaces retired.
 
 - `test_turn_helpers_report_expected_active_side`
 - `test_turn_helpers_reject_invalid_state`

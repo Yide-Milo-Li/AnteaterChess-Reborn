@@ -1,0 +1,26 @@
+[
+  {
+    "original": "docs/development/validation.md",
+    "archive": "docs/legacy/migrations/validation.md",
+    "sha256Original": "bf21a7d0520ed4ed427c0c0af77efba5e8ca0f90bcc4c35cfd3ffc118ec642c0",
+    "sha256Archived": "83edc861e789a79899038c8a7b3039e6afbc9174a654c4106ec9618d301f08a0"
+  },
+  {
+    "original": "docs/development/runtime-layout-validation.md",
+    "archive": "docs/legacy/migrations/runtime-layout-validation.md",
+    "sha256Original": "8542a305c55bd0351c9101cd1e4eaa920d02f7009c6f78f24dad0d34a08ec82c",
+    "sha256Archived": "95f597a2d17b8e10894551828abec46e6b24218292801a4167aa9f8d915be5ad"
+  },
+  {
+    "original": "docs/development/qt-migration-plan.md",
+    "archive": "docs/legacy/migrations/qt-migration-plan.md",
+    "sha256Original": "c9e20e90995954c9c2d45fa818e055911a17a8fdf3ec5f7811475b611a9b483d",
+    "sha256Archived": "a4c0041d64c53a81e3f6946a5caf72ad556d3aa68b0ab1db5b0f85c1c56dcbf3"
+  },
+  {
+    "original": "docs/development/qt-migration-validation.md",
+    "archive": "docs/legacy/migrations/qt-migration-validation.md",
+    "sha256Original": "e6d58a27719933c71754872a5eb303ec93f60f50bc19ed542e8306788b055c85",
+    "sha256Archived": "5301989e9d4a1a8b802d0e4f31508acb0a6f9c78342352759122d482aef5dd65"
+  }
+]

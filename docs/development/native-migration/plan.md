@@ -83,6 +83,8 @@ does not replace current repository documentation before the environment gate.
 ## Current status
 
 The environment gate and build, rules, Session, policy, search and desktop stages
-passed locally. Distribution, cleanup and final candidate verification are next.
+passed locally. Distribution and cleanup implementation and all nine local presets
+passed. Formal clean-commit candidates, no-Git rebuilds and remote CI are the final
+engineering gates; independent clean Windows and human acceptance remain pending.
 See [the validation ledger](validation.md) for current evidence. Earlier blocked
 installer reports remain historical attachments, not the current status.

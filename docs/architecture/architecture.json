@@ -16,7 +16,7 @@
         "id": "ai-search-path",
         "label": "Asynchronous AI Search",
         "focus": ["qt-app", "async-worker", "ai-search", "rules", "board-state"],
-        "note": "AI search runs in an isolated worker thread using cloned board snapshots and cooperative cancellation."
+        "note": "AI search runs in an isolated worker thread using owning SearchRequest values and cooperative cancellation."
       },
       {
         "id": "platform-and-assets",
@@ -50,7 +50,7 @@
       "sublabel": "app / models / qml / async",
       "pos": [240, 270],
       "size": [150, 60],
-      "tag": "C11 + C++17 / QML"
+      "tag": "C++20 / typed QML"
     },
     {
       "id": "platform",
@@ -71,7 +71,7 @@
     {
       "id": "session",
       "type": "backend",
-      "label": "AcSession",
+      "label": "ac::Session",
       "sublabel": "Transactional State",
       "pos": [460, 270],
       "size": [140, 60],
@@ -88,7 +88,7 @@
     {
       "id": "ai-search",
       "type": "backend",
-      "label": "AcSearchContext",
+      "label": "ac::SearchContext",
       "sublabel": "Negamax / Alpha-Beta",
       "pos": [680, 90],
       "size": [150, 60],
@@ -105,7 +105,7 @@
     {
       "id": "board-state",
       "type": "database",
-      "label": "AcPosition & Hash",
+      "label": "ac::Position & Hash",
       "sublabel": "Compact 80-Square Board",
       "pos": [900, 270],
       "size": [150, 60],
@@ -115,7 +115,7 @@
   "boundaries": [
     {
       "kind": "region",
-      "label": "Pure C11 Core Engine (Zero GTK/GLib Dependency)",
+      "label": "C++20 RAII Core Engine (Zero GTK/GLib Dependency)",
       "wraps": ["session", "budget", "ai-search", "rules", "board-state"]
     },
     {
@@ -227,8 +227,8 @@
       "dot": "emerald",
       "title": "Session & Rules Isolation",
       "items": [
-        "Core C11 modules compile cleanly without GTK or GLib",
-        "AcSession enforces transactional state, revision checking, and undo",
+        "Core C++20 modules compile cleanly without GTK or GLib",
+        "ac::Session enforces transactional state, revision checking, and undo",
         "8x10 board variant rules with Ants and chain-capturing Anteaters"
       ]
     },

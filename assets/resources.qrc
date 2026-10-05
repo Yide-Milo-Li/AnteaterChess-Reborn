@@ -12,7 +12,7 @@
     <file alias="icon-history-dark.svg">icons/icon-history-dark.svg</file>
     <file alias="icon-info-dark.svg">icons/icon-info-dark.svg</file>
     <file alias="WhiteAnteater.svg">pieces/WhiteAnteater.svg</file>
-    <file alias="WhiteAntsvg.svg">pieces/WhiteAnt.svg</file>
+    <file alias="WhiteAnt.svg">pieces/WhiteAnt.svg</file>
     <file alias="WhiteBishop.svg">pieces/WhiteBishop.svg</file>
     <file alias="WhiteKing.svg">pieces/WhiteKing.svg</file>
     <file alias="WhiteKnight.svg">pieces/WhiteKnight.svg</file>

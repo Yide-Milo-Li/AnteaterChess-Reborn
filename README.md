@@ -52,7 +52,7 @@ On both platforms, game logs are stored in `logs/` beside the actual executable.
 ### Ubuntu 24.04
 
 Install GCC, CMake >= 3.25, Ninja and system Qt 6.4.2 development/QML modules.
-Tests and development tools also use native Python 3.
+Optional development checks and candidate dependency receipts use native Python 3.
 
 ```sh
 sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-shader-baker qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
@@ -85,8 +85,10 @@ Use `linux-debug-core`, `linux-release-core`, `windows-debug-core` or
 
 The [native migration ledger](docs/development/native-migration/validation.md)
 records stage status. Existing release archives describe earlier implementations;
-they are not candidates for the current migration. Packaging and external
-acceptance remain pending until the ledger records their checks.
+they are not candidates for the current migration. CMake install and CPack own
+the current archives; each includes a source revision, dependency/license
+inventory and checksums. External acceptance remains pending until the ledger
+records its checks.
 
 ---
 

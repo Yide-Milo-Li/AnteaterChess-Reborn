@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+<!-- codeattributions.qdoc -->
+  <meta name="description" content="BSD 3-clause &quot;New&quot; or &quot;Revised&quot; License with PCRE2 binary-like Packages Exception">
+  <title>PCRE2, version 10.47 | Qt Core | Qt 6.11.2</title>
+  <link rel="stylesheet" type="text/css" href="style/offline-simple.css" />
+  <script type="text/javascript">
+    document.getElementsByTagName("link").item(0).setAttribute("href", "style/offline.css");
+    // loading style sheet breaks anchors that were jumped to before
+    // so force jumping to anchor again
+    setTimeout(function() {
+        var anchor = location.hash;
+        // need to jump to different anchor first (e.g. none)
+        location.hash = "#";
+        setTimeout(function() {
+            location.hash = anchor;
+        }, 0);
+    }, 0);
+  </script>
+</head>
+<body>
+<div class="header" id="qtdocheader">
+    <div class="main">
+    <div class="main-rounded">
+        <div class="navigationbar">
+        <ul>
+<li><a href="../qtdoc/index.html">Qt 6.11</a></li>
+<li><a href="qtcore-index.html">Qt Core</a></li>
+<li>PCRE2, version 10.47</li>
+<li id="buildversion"><a href="qtcore-index.html">Qt 6.11.2 Reference Documentation</a></li>
+    </ul>
+    </div>
+</div>
+<div class="content">
+<div class="line">
+<div class="content mainContent">
+<div class="sidebar"><div class="sidebar-content" id="sidebar-content"></div></div>
+<h1 class="title">PCRE2, version 10.47</h1>
+<!-- $$$qtcore-attribution-pcre2.html-description -->
+<div class="descr" id="details">
+<span id="pcre2"></span><p>The PCRE library is a set of functions that implement regular expression pattern matching using the same syntax and semantics as Perl 5.</p>
+<p>Used in Qt Core (<a href="qregularexpression.html" translate="no">QRegularExpression</a>).</p>
+<p>The sources can be found in qtbase/src/3rdparty/pcre2.</p>
+<p><a href="http://www.pcre.org/">Project Homepage</a>, upstream version: <a href="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2">10.47</a></p>
+<pre class="cpp plain" translate="no">
+ Copyright (c) 1997-2007 University of Cambridge
+ Copyright (c) 2007-2024 Philip Hazel
+ Copyright (c) 2010-2024 Zoltan Herczeg
+</pre>
+<p>BSD 3-clause &quot;New&quot; or &quot;Revised&quot; License with PCRE2 binary-like Packages Exception.</p>
+<pre class="cpp plain" translate="no">
+ PCRE2 Licence
+ =============
+
+ | SPDX-License-Identifier: | BSD-3-Clause WITH PCRE2-exception |
+ |---------|-------|
+
+ PCRE2 is a library of functions to support regular expressions whose syntax
+ and semantics are as close as possible to those of the Perl 5 language.
+
+ Releases 10.00 and above of PCRE2 are distributed under the terms of the &quot;BSD&quot;
+ licence, as specified below, with one exemption for certain binary
+ redistributions. The documentation for PCRE2, supplied in the &quot;doc&quot; directory,
+ is distributed under the same terms as the software itself. The data in the
+ testdata directory is not copyrighted and is in the public domain.
+
+ The basic library functions are written in C and are freestanding. Also
+ included in the distribution is a just-in-time compiler that can be used to
+ optimize pattern matching. This is an optional feature that can be omitted when
+ the library is built. The just-in-time compiler is separately licensed under the
+ &quot;2-clause BSD&quot; licence.
+
+
+ COPYRIGHT
+ ---------
+
+ ### The basic library functions
+
+     Written by:       Philip Hazel
+     Email local part: Philip.Hazel
+     Email domain:     gmail.com
+
+     Retired from University of Cambridge Computing Service,
+     Cambridge, England.
+
+     Copyright (c) 1997-2007 University of Cambridge
+     Copyright (c) 2007-2024 Philip Hazel
+     All rights reserved.
+
+ ### PCRE2 Just-In-Time compilation support
+
+     Written by:       Zoltan Herczeg
+     Email local part: hzmester
+     Email domain:     freemail.hu
+
+     Copyright (c) 2010-2024 Zoltan Herczeg
+     All rights reserved.
+
+ ### Stack-less Just-In-Time compiler
+
+     Written by:       Zoltan Herczeg
+     Email local part: hzmester
+     Email domain:     freemail.hu
+
+     Copyright (c) 2009-2024 Zoltan Herczeg
+     All rights reserved.
+
+ The code in the `deps/sljit` directory has its own LICENSE file.
+
+ ### All other contributions
+
+ Many other contributors have participated in the authorship of PCRE2. As PCRE2
+ has never required a Contributor Licensing Agreement, or other copyright
+ assignment agreement, all contributions have copyright retained by each
+ original contributor or their employer.
+
+
+ THE &quot;BSD&quot; LICENCE
+ -----------------
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notices,
+   this list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright
+   notices, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+ * Neither the name of the University of Cambridge nor the names of any
+   contributors may be used to endorse or promote products derived from this
+   software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot;
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGE.
+
+
+ EXEMPTION FOR BINARY LIBRARY-LIKE PACKAGES
+ ------------------------------------------
+
+ The second condition in the BSD licence (covering binary redistributions) does
+ not apply all the way down a chain of software. If binary package A includes
+ PCRE2, it must respect the condition, but if package B is software that
+ includes package A, the condition is not imposed on package B unless it uses
+ PCRE2 independently.
+</pre>
+</div>
+<!-- @@@qtcore-attribution-pcre2.html -->
+        </div>
+       </div>
+   </div>
+   </div>
+</div>
+<div class="footer">
+   <p>
+   <abbr title="Copyright">&copy;</abbr> 2025 <span translate="no">The Qt Company Ltd.</span>
+   Documentation contributions included herein are the copyrights of
+   their respective owners.<br/>    The documentation provided herein is licensed under the terms of the    <a href="http://www.gnu.org/licenses/fdl.html">GNU Free Documentation    License version 1.3</a> as published by the <span translate="no">Free Software Foundation</span>.<br/>    <span translate="no">Qt</span> and respective logos are <a href="https://doc.qt.io/qt/trademarks.html">    trademarks</a> of <span translate="no">The Qt Company Ltd.</span> in Finland and/or other countries
+   worldwide. All other trademarks are property of their respective owners. </p>
+</div>
+</body>
+</html>

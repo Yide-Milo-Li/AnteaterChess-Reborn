@@ -1,0 +1,3 @@
+include("@QT_DEPLOY_SUPPORT@")
+message(STATUS "Linux system Qt 6.4.2: external runtime libraries are verified, not bundled.")
+qt_deploy_qml_imports(TARGET anteater-chess NO_QT_IMPORTS)

@@ -58,7 +58,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "AC_BUILD_DESKTOP": "ON",
         "BUILD_TESTING": "ON",
-        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}",
+        "AC_BUILD_DISTRIBUTION": "ON"
       }
     },
     {
@@ -115,7 +116,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "AC_BUILD_DESKTOP": "ON",
-        "BUILD_TESTING": "ON"
+        "BUILD_TESTING": "ON",
+        "AC_BUILD_DISTRIBUTION": "ON"
       }
     },
     {

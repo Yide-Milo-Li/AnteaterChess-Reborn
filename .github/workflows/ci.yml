@@ -1,4 +1,4 @@
-name: Build, test and package
+name: Native build, test and candidates
 on:
   push:
   pull_request:
@@ -10,68 +10,57 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build python3 xvfb qt6-base-dev qt6-declarative-dev qt6-svg-dev qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
-      - name: Core without Qt
-        run: make -j4 BUILD=build/no-qt test
-      - name: Release and desktop tests
-        run: |
-          make -j4 CONFIG=release test gui test-platform check
-          QT_QPA_PLATFORM=xcb xvfb-run -a make CONFIG=release test-gui
-      - name: Sanitizers
-        env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: |
-          make -j4 CONFIG=sanitize test
-          QT_QPA_PLATFORM=xcb ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 xvfb-run -a make -j4 CONFIG=sanitize test-gui
-      - name: Packages and rebuild
-        run: |
-          make -s CONFIG=release benchmark > build/performance.txt
-          make CONFIG=release package-source package
-          QT_QPA_PLATFORM=xcb xvfb-run -a python3 tools/packaging/verify.py
+      - name: Install Ubuntu system Qt and tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build python3 xvfb qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-shader-baker qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
+      - name: Build, test, package and no-Git rebuild
+        run: xvfb-run -a -s '-screen 0 2560x1600x24' python3 tools/packaging/ci_checks.py linux
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: linux-x64
+          name: linux-${{ github.sha }}
           path: |
-            dist/*.tar.gz
-            dist/SHA256SUMS
-            build/performance.txt
+            dist/*
+            build/ci-evidence
   windows:
     runs-on: windows-2022
     defaults:
       run:
-        shell: msys2 {0}
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
+      - uses: actions/setup-python@v5
         with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            make
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-declarative
-            mingw-w64-ucrt-x86_64-qt6-svg
-            mingw-w64-ucrt-x86_64-python
-      - name: Core without Qt
-        run: make -j4 BUILD=build/no-qt test
-      - name: Release and desktop tests
+          python-version: '3.14'
+      - name: Ensure pinned v143 component
         run: |
-          make -j4 CONFIG=release test gui test-platform check
-          make CONFIG=release test-gui
-      - name: Packages and rebuild
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $component = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
+          $present = @(& $vswhere -all -products '*' -requires $component -property installationPath)
+          if ($present.Count -eq 0) {
+            $instance = & $vswhere -latest -products '*' -property installationPath
+            $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+            $process = Start-Process -FilePath $installer -ArgumentList @('modify','--installPath',('"' + $instance + '"'),'--add',$component,'--quiet','--wait','--norestart') -WindowStyle Hidden -PassThru -Wait
+            if ($process.ExitCode -ne 0) { throw "v143 installer exit $($process.ExitCode); 3010 requires a fresh post-reboot gate." }
+          }
+      - name: Install official Qt archive kit
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.2'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          dir: 'C:\'
+          cache: false
+      - name: Initialize and verify native candidates
         run: |
-          make -s CONFIG=release benchmark > build/performance.txt
-          make CONFIG=release package-source package
-          python3 tools/packaging/verify.py
+          . ./tools/native/Enter-NativeEnvironment.ps1 -QtRoot $env:QT_ROOT_DIR -RequireQt -RequirePython
+          python -X utf8 tools/packaging/ci_checks.py windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: windows-x64
+          name: windows-${{ github.sha }}
           path: |
-            dist/*.zip
-            dist/SHA256SUMS
-            build/performance.txt
+            dist/*
+            build/ci-evidence

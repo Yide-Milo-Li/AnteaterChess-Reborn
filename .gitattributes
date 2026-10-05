@@ -1,0 +1,14 @@
+# Maintained text uses LF. Frozen baseline text retains the measured CRLF bytes
+# from the Windows baseline checkout, regardless of the checkout platform.
+* text=auto eol=lf
+COPYRIGHT text eol=crlf
+assets/**/*.svg text eol=crlf
+assets/resources.qrc text eol=crlf
+tests/fixtures/BASELINE text eol=crlf
+tests/fixtures/ai-evaluation-baseline.txt text eol=crlf
+tests/fixtures/baseline.h text eol=crlf
+tests/fixtures/legacy-scenarios.json text eol=crlf
+tests/fixtures/probe.h text eol=crlf
+*.pdf -text
+# Preserve upstream notices exactly, including their intentional whitespace.
+third-party/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

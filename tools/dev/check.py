@@ -10,6 +10,8 @@ for directory in ['include/anteater', 'src/rules', 'src/session', 'src/ai', 'src
                   'docs/legacy', 'tools/packaging', 'tools/dev', 'tools/legacy']:
     if not (root/directory).is_dir(): errors.append('Missing '+directory)
 for path in [*root.glob('*.md'), * (root/'docs').rglob('*.md')]:
+    if path.is_relative_to(root/'docs/legacy/migrations'):
+        continue  # Archived source/package references belong to their historical commit.
     text=path.read_text(encoding='utf-8')
     for link in re.findall(r'\]\(([^)]+)\)',text):
         target=link.split('#')[0]
@@ -30,5 +32,4 @@ for module in ['rules','session','ai','policy']:
             errors.append('Desktop dependency in core: '+str(path.relative_to(root)))
 if errors:
     sys.exit('\n'.join(errors))
-subprocess.run([sys.executable, root/'tests/packaging/test_dependencies.py'], check=True)
 print('Documentation links, resources and maintained layout: OK')

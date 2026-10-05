@@ -57,18 +57,18 @@ Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits f
 
 ## Rule engine
 
-[movegen.c](../../src/rules/movegen.cpp) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.c](../../src/rules/resolver.cpp) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.c](../../src/rules/position.cpp) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.c](../../src/rules/endgame.cpp) determines check, no-legal-move outcomes, and the retained material policy. The [manual](../user/manual.md) is the rules reference.
+[movegen.cpp](../../src/rules/movegen.cpp) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.cpp](../../src/rules/resolver.cpp) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.cpp](../../src/rules/position.cpp) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.cpp](../../src/rules/endgame.cpp) determines check, no-legal-move outcomes, and the retained material policy. The [manual](../user/manual.md) is the rules reference.
 
 Hashes include pieces, side, castling rights, and a capturable en-passant file. Numeric keys intentionally differ from the old engine. They support repetition and transposition identity; they are not a persistent storage format or cryptographic guarantee.
 
 ## Search
 
-[search.c](../../src/ai/search.cpp) retains iterative deepening, aspiration windows,
+[search.cpp](../../src/ai/search.cpp) retains iterative deepening, aspiration windows,
 principal-variation alpha-beta, null-move pruning, late-move reductions and quiescence.
 Evaluation is split into material/position tables, heuristic attacks and SEE,
 mobility, strategic features and aggregation; each exposes a narrow private header.
-[ordering.c](../../src/ai/ordering.cpp) owns killer/history and capture ordering;
-[table.c](../../src/ai/table.cpp) owns context-local transpositions.
+[ordering.cpp](../../src/ai/ordering.cpp) owns killer/history and capture ordering;
+[table.cpp](../../src/ai/table.cpp) owns context-local transpositions.
 Experimental has been removed. Valid difficulty values are 0, 1, 2, 3 and 5;
 4 is rejected by explicit Session configuration validation. Tournament remains 5.
 

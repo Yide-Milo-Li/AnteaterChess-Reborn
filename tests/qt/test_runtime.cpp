@@ -4,6 +4,10 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace ac;
 class RuntimeTest : public QObject {
@@ -131,6 +135,42 @@ class RuntimeTest : public QObject {
         QCOMPARE(controller.state().historyCount, 1);
         QCOMPARE(controller.diagnostic(), Status::IoError);
         QVERIFY(controller.statusError());
+    }
+    void atomicFailurePreservesLastSnapshot() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        SessionLog log(directory.path());
+        SessionSnapshot snapshot{};
+        snapshot.gameId = 1;
+        snapshot.elapsedMs = 42;
+        QCOMPARE(log.write(snapshot), Status::Ok);
+        QFile previous(log.path());
+        QVERIFY(previous.open(QIODevice::ReadOnly));
+        const auto bytes = previous.readAll();
+        previous.close();
+        snapshot.elapsedMs = 99;
+#ifdef _WIN32
+        // Deny replacement while allowing reads: QSaveFile can write its temp
+        // file, but committing over the last accepted snapshot must fail.
+        const auto path = log.path().toStdWString();
+        HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        QVERIFY(handle != INVALID_HANDLE_VALUE);
+        const auto status = log.write(snapshot);
+        CloseHandle(handle);
+#else
+        const auto permissions = QFile::permissions(directory.path());
+        QVERIFY(QFile::setPermissions(directory.path(), QFile::ReadOwner | QFile::ExeOwner));
+        const auto status = log.write(snapshot);
+        QVERIFY(QFile::setPermissions(directory.path(), permissions));
+#endif
+        QCOMPARE(status, Status::IoError);
+        QVERIFY(previous.open(QIODevice::ReadOnly));
+        QCOMPARE(previous.readAll(), bytes);
+        previous.close();
+        QCOMPARE(log.write(snapshot), Status::Ok);
+        QVERIFY(previous.open(QIODevice::ReadOnly));
+        QVERIFY(previous.readAll().contains("Elapsed ms: 99"));
     }
 };
 QTEST_GUILESS_MAIN(RuntimeTest)

@@ -1,0 +1,9 @@
+execute_process(COMMAND "@Python3_EXECUTABLE@" -X utf8 "@CMAKE_SOURCE_DIR@/tools/packaging/manifest.py"
+    --stage "${CMAKE_INSTALL_PREFIX}" --source "@CMAKE_SOURCE_DIR@"
+    --qt "@AC_QT_PREFIX@" --redist "@AC_REDIST_DIR@"
+    --compiler "@CMAKE_CXX_COMPILER_ID@ @CMAKE_CXX_COMPILER_VERSION@"
+    --commit "@AC_SOURCE_COMMIT@"
+    RESULT_VARIABLE ac_exit)
+if(NOT ac_exit EQUAL 0)
+    message(FATAL_ERROR "Dependency and license receipt failed: ${ac_exit}")
+endif()

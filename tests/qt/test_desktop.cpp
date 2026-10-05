@@ -346,6 +346,12 @@ class DesktopTest : public QObject {
             QTest::qWait(150);
             QImage image = window->grabWindow();
             QVERIFY(!image.isNull());
+            qInfo() << "Capture" << name << "devicePixelRatio" << window->devicePixelRatio()
+                    << "logicalSize" << window->size() << "imageSize" << image.size();
+            if (qEnvironmentVariableIsSet("AC_EXPECT_DEVICE_PIXEL_RATIO")) {
+                const auto expected = qEnvironmentVariable("AC_EXPECT_DEVICE_PIXEL_RATIO").toDouble();
+                QVERIFY(qAbs(window->devicePixelRatio() - expected) < 0.01);
+            }
             if (!captures.isEmpty())
                 QVERIFY(image.save(QDir(captures).filePath(name + ".png")));
         };

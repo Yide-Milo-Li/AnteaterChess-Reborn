@@ -63,8 +63,6 @@ QString pieceAsset(Piece piece) {
     if (piece.type < PieceType::Ant || piece.type > PieceType::Anteater || piece.color > Color::Black)
         return {};
     QString name = QString(piece.color == Color::White ? "White" : "Black") + names[enum_index(piece.type)];
-    if (piece.type == PieceType::Ant && piece.color == Color::White)
-        name = "WhiteAntsvg";
     return "qrc:/org/anteater/reborn/" + name + ".svg";
 }
 bool verifyResources() {

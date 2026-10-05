@@ -206,7 +206,7 @@ static void audit_random_playout_invariants(void) {
             }
         }
 
-        /* Unmake all moves back to root and assert byte-exact match */
+        /* Unmake all moves back to root and assert semantic equality */
         Position root;
         position_init(&root);
 
@@ -221,47 +221,30 @@ static void audit_random_playout_invariants(void) {
     free(moves);
 }
 
-/* Dummy clock and log for session test */
-typedef struct {
+/* Injected clock for timeout/stale-result policy. Logs are a desktop concern. */
+struct MockEnv {
     int64_t nowMs;
-    int logFail;
-    int logCount;
-} MockEnv;
-
-static int64_t mock_clock(void *ctx) {
-    return ((MockEnv *)ctx)->nowMs;
-}
-
-static Status mock_log(void *ctx, const Snapshot *snap) {
-    (void)snap;
-    MockEnv *env = static_cast<MockEnv *>(ctx);
-    ++env->logCount;
-    return env->logFail ? Status::IoError : Status::Ok;
+};
+static int64_t mock_clock(void *p) {
+    return static_cast<MockEnv *>(p)->nowMs;
 }
 
 /* 5. Audit Session Transactions and Stale Result Rejection */
 static void audit_session_robustness(void) {
-    MockEnv env = {.nowMs = 1000, .logFail = 0, .logCount = 0};
-    SessionOptions opts = {
-        .clock = {mock_clock, &env},
-        .log = mock_log,
-        .logContext = &env,
-        .allocate = NULL,
-        .deallocate = NULL,
-        .allocatorContext = NULL
-    };
-
-    Session *session = session_create(&opts);
+    MockEnv env{1000};
+    auto owner = Session::create(SessionOptions{
+        {mock_clock, &env}
+    });
+    Session *session = std::get_if<Session>(&owner);
     assert(session);
-
     GameConfig cfg;
     init_game_config_for_mode(&cfg, GameMode::HumanVsHuman);
     cfg.timerEnabled = 1;
     cfg.initialTimeSeconds = 10;
-    assert(session_start(session, &cfg) == Status::Ok);
+    assert(session->start(cfg) == Status::Ok);
 
-    Snapshot snap;
-    assert(session_snapshot(session, &snap) == Status::Ok);
+    SessionState snap;
+    snap = session->state();
     uint64_t rev = snap.revision;
 
     /* Move validation */
@@ -272,23 +255,19 @@ static void audit_session_robustness(void) {
     env.nowMs += 11000;
 
     /* Submit move on timed out position: must reject as stale because tick updated the turn */
-    assert(session_submit(session, req) == Status::StaleResult);
+    assert(session->submit(req) == Status::StaleResult);
 
     /* Verify session switched turn cleanly without corrupting position */
-    assert(session_snapshot(session, &snap) == Status::Ok);
+    snap = session->state();
     assert(snap.position.currentTurn == Color::Black);
     assert(snap.revision > rev);
 
-    /* Verify diagnostic decoupling: log write failure does not roll back move */
-    env.logFail = 1;
+    /* The next side can submit after the timeout. */
     assert(parse_move_request_fields("E7", "E5", PromotionChoice::None, &req) == Status::Ok);
-    assert(session_submit(session, req) == Status::Ok);
+    assert(session->submit(req) == Status::Ok);
 
-    assert(session_snapshot(session, &snap) == Status::Ok);
+    snap = session->state();
     assert(snap.historyCount == 1);
-    assert(snap.diagnostic == Status::IoError); /* Diagnostic records failure */
-
-    session_destroy(session);
 }
 
 int main(void) {

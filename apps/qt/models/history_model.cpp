@@ -22,19 +22,20 @@ QVariant HistoryModel::data(const QModelIndex &i, int role) const {
         text += "  promotion";
     return text;
 }
-void HistoryModel::update(const Snapshot &s) {
+void HistoryModel::update(const SessionSnapshot &s) {
     // Append incrementally; ticking clocks must not reset delegates or scroll.
     if (gameId_ != s.gameId || s.historyCount < rowCount()) {
+        std::vector<Move> prepared;
+        if (!s.history.empty()) prepared.assign(s.history.begin(), s.history.end());
         beginResetModel();
-        moves_.clear();
-        if (s.historyCount)
-            moves_.assign(s.history, s.history + s.historyCount);
+        moves_.swap(prepared);
         gameId_ = s.gameId;
         endResetModel();
     } else if (s.historyCount > rowCount()) {
         int old = rowCount();
+        moves_.reserve(s.history.size());
         beginInsertRows({}, old, s.historyCount - 1);
-        moves_.insert(moves_.end(), s.history + old, s.history + s.historyCount);
+        moves_.insert(moves_.end(), s.history.begin() + old, s.history.end());
         endInsertRows();
     }
 }

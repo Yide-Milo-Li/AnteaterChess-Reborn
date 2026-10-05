@@ -94,10 +94,10 @@ class DesktopTest : public QObject {
         QCOMPARE(a.fromText(), QString("E2"));
         a.selectSquare(4, 4, 2);
         QCOMPARE(a.historyCount(), 1);
-        auto before = a.snapshot();
+        auto before = a.state();
         a.setMoveFields("A9", "E9");
         QVERIFY(!a.submitFields());
-        QCOMPARE(a.snapshot().position.hash, before.position.hash);
+        QCOMPARE(a.state().position.hash, before.position.hash);
     }
     void promotionCancellation() {
         Clock clock;
@@ -122,12 +122,12 @@ class DesktopTest : public QObject {
         a.setMoveFields("C7", "B8");
         QVERIFY(!a.submitFields());
         QCOMPARE(requested.count(), 1);
-        uint64_t hash = a.snapshot().position.hash;
+        uint64_t hash = a.state().position.hash;
         a.cancelPromotion();
-        QCOMPARE(a.snapshot().position.hash, hash);
+        QCOMPARE(a.state().position.hash, hash);
         QVERIFY(!a.submitFields());
         QVERIFY(a.submitFields(value(PromotionChoice::Knight)));
-        auto promoted = a.snapshot();
+        auto promoted = a.state();
         QCOMPARE(get_piece(&promoted.position.board, {0, 1}).type, PieceType::Knight);
     }
     void hintInvalidatedByMoveAndUndo() {
@@ -164,7 +164,7 @@ class DesktopTest : public QObject {
         a.tick();
         QTRY_VERIFY_WITH_TIMEOUT(!a.busy(), 5000);
         QCOMPARE(a.historyCount(), 0);
-        QCOMPARE(a.snapshot().position.currentTurn, Color::Black);
+        QCOMPARE(a.state().position.currentTurn, Color::Black);
     }
     void replacementNavigationAndClose() {
         Clock clock;
@@ -197,7 +197,7 @@ class DesktopTest : public QObject {
         QCOMPARE(a.start(config()), Status::Ok);
         ac::SearchJobs jobs;
         QSignalSpy completed(&jobs, &ac::SearchJobs::completed);
-        QVERIFY(jobs.start(a.snapshot(), 1, true, 100, 1));
+        QVERIFY(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 1, true, 100, 1));
         auto *thread = jobs.findChild<QThread *>();
         QVERIFY(thread);
         // Join without pumping the GUI queue: finished has been posted, but its
@@ -206,7 +206,7 @@ class DesktopTest : public QObject {
         QVERIFY(jobs.busy());
         jobs.shutdown();
         QVERIFY(!jobs.busy());
-        QVERIFY(jobs.start(a.snapshot(), 2, true, 100, 1));
+        QVERIFY(jobs.start(std::get<SessionSnapshot>(a.snapshot()), 2, true, 100, 1));
         QTRY_COMPARE_WITH_TIMEOUT(completed.count(), 1, 5000);
         QCOMPARE(jobs.outcome().generation, uint64_t(2));
         QVERIFY(!jobs.busy());
@@ -301,13 +301,13 @@ class DesktopTest : public QObject {
         QVERIFY(promotion);
         QTRY_VERIFY(promotion->property("visible").toBool());
         capture("promotion");
-        uint64_t before = a.snapshot().position.hash;
+        uint64_t before = a.state().position.hash;
         auto *cancel = window->findChild<QQuickItem *>("promotionCancel");
         QVERIFY(cancel);
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
                           cancel->mapToScene(QPointF(cancel->width() / 2, cancel->height() / 2)).toPoint());
         QTRY_VERIFY(!promotion->property("visible").toBool());
-        QCOMPARE(a.snapshot().position.hash, before);
+        QCOMPARE(a.state().position.hash, before);
         auto *confirmation = window->findChild<QObject *>("confirmationDialog");
         QVERIFY(confirmation);
         confirmation->setProperty("action", "finish");

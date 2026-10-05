@@ -5,6 +5,7 @@
 #include "models/history_model.h"
 #include "runtime/runtime.h"
 #include <QTimer>
+#include <optional>
 
 namespace ac {
 // Commands mutate Session; getters read the last published projection only.
@@ -34,10 +35,11 @@ class SessionAdapter : public QObject {
   public:
     enum Page { MainMenu, ModeMenu, Setup, Gameplay, EndGame };
     Q_ENUM(Page)
-    explicit SessionAdapter(const SessionOptions *options = nullptr, QObject *parent = nullptr);
+    explicit SessionAdapter(const SessionOptions *options = nullptr, QObject *parent = nullptr,
+                            SessionLog log = SessionLog::besideExecutable());
     ~SessionAdapter() override;
     bool valid() const {
-        return session_ != nullptr;
+        return session_.has_value();
     }
     QObject *boardModel() {
         return &board_;
@@ -82,7 +84,13 @@ class SessionAdapter : public QObject {
     bool toValid() const {
         return toValid_;
     }
-    Snapshot snapshot() const;
+    SessionState state() const;
+    Result<SessionSnapshot> snapshot() const {
+        return session_ ? session_->snapshot() : Result<SessionSnapshot>{Error{Status::Unavailable, "No Session"}};
+    }
+    Status diagnostic() const {
+        return diagnostic_;
+    }
     Status start(const GameConfig &config);
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void chooseMode(int mode);
@@ -112,13 +120,14 @@ class SessionAdapter : public QObject {
     void searchCompleted();
     void report(Status status);
     QString timerText(Color color) const;
-    Session *session_ = nullptr;
+    std::optional<Session> session_;
     SessionLog log_;
     BoardModel board_;
     HistoryModel history_;
     SearchJobs jobs_;
     QTimer timer_;
-    Snapshot state_{}; // History/hash pointers are cleared after projection.
+    SessionState state_{};
+    Status diagnostic_ = Status::Ok;
     Page page_ = MainMenu;
     uint64_t generation_ = 0, promotionRevision_ = 0;
     int failedCount_ = -1;

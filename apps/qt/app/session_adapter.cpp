@@ -27,13 +27,13 @@ static QString duration(int64_t seconds) {
         .arg(seconds / 60 % 60, 2, 10, QChar('0'))
         .arg(seconds % 60, 2, 10, QChar('0'));
 }
-SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent)
-    : QObject(parent), log_(SessionLog::besideExecutable()) {
+SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent, SessionLog log)
+    : QObject(parent), log_(std::move(log)) {
     SessionOptions defaults{};
     defaults.clock = {monotonicMilliseconds, nullptr};
-    defaults.log = SessionLog::writeCallback;
-    defaults.logContext = &log_;
-    session_ = session_create(options ? options : &defaults);
+    auto created = Session::create(options ? *options : defaults);
+    if (auto *owner = std::get_if<Session>(&created))
+        session_.emplace(std::move(*owner));
     connect(&jobs_, &SearchJobs::completed, this, &SessionAdapter::searchCompleted);
     connect(&jobs_, &SearchJobs::busyChanged, this, &SessionAdapter::stateChanged);
     connect(&timer_, &QTimer::timeout, this, &SessionAdapter::tick);
@@ -43,13 +43,9 @@ SessionAdapter::SessionAdapter(const SessionOptions *options, QObject *parent)
 SessionAdapter::~SessionAdapter() {
     timer_.stop();
     jobs_.shutdown();
-    session_destroy(session_);
 }
-Snapshot SessionAdapter::snapshot() const {
-    Snapshot s{};
-    if (session_)
-        session_snapshot(session_, &s);
-    return s;
+SessionState SessionAdapter::state() const {
+    return session_ ? session_->state() : SessionState{};
 }
 bool SessionAdapter::humanTurn() const {
     return page_ == Gameplay && state_.phase == SessionPhase::Active &&
@@ -129,7 +125,7 @@ void SessionAdapter::newGame() {
     if (closing_)
         return;
     invalidate();
-    session_finish(session_);
+    session_->finish();
     page_ = ModeMenu;
     report(Status::Ok);
     refresh();
@@ -146,15 +142,15 @@ void SessionAdapter::back() {
     if (closing_)
         return;
     invalidate();
-    session_finish(session_);
+    session_->finish();
     page_ = page_ == Setup ? ModeMenu : MainMenu;
     report(Status::Ok);
     refresh();
 }
 Status SessionAdapter::start(const GameConfig &c) {
-    if (closing_)
+    if (closing_ || !session_)
         return Status::Unavailable;
-    Status s = session_start(session_, &c);
+    Status s = session_->start(c);
     if (s == Status::Ok) {
         invalidate();
         page_ = Gameplay;
@@ -198,16 +194,20 @@ void SessionAdapter::updateHighlights() {
     std::array<bool, Rows * Columns> legal{};
     Square from = parse_position(from_.toUtf8().constData());
     fromValid_ = humanTurn() && validate_selection(&state_.position, from) == SelectionResult::Valid;
-    if (fromValid_) {
-        auto moves = std::make_unique<MoveList>();
-        Status status = generate_legal_moves_for_position(&state_.position, from, moves.get());
-        if (status == Status::Ok) {
-            for (int i = 0; i < moves->count; ++i) {
-                Square to = moves->moves[i].to;
-                legal[size_t(to.row * Columns + to.col)] = true;
-            }
-        } else
-            report(Status(status));
+    try {
+        if (fromValid_) {
+            auto moves = std::make_unique<MoveList>();
+            Status status = generate_legal_moves_for_position(&state_.position, from, moves.get());
+            if (status == Status::Ok) {
+                for (int i = 0; i < moves->count; ++i) {
+                    Square to = moves->moves[i].to;
+                    legal[size_t(to.row * Columns + to.col)] = true;
+                }
+            } else
+                report(Status(status));
+        }
+    } catch (const std::bad_alloc &) {
+        report(Status::OutOfMemory);
     }
     Square to = parse_position(to_.toUtf8().constData());
     toValid_ = is_valid_position(to) && legal[size_t(to.row * Columns + to.col)];
@@ -243,21 +243,25 @@ bool SessionAdapter::submitFields(int promotion) {
         report(Status::InvalidArgument);
         return false;
     }
-    int needed = 0;
-    if (!promotion && session_promotion(session_, request, &needed) == Status::Ok && needed) {
+    auto needed = session_->promotion(request);
+    if (auto *failure = std::get_if<Error>(&needed)) {
+        report(failure->status);
+        return false;
+    }
+    if (!promotion && std::get<bool>(needed)) {
         promotionPending_ = true;
         promotionRevision_ = state_.revision;
         emit promotionRequested();
         emit stateChanged();
         return false;
     }
-    if (promotionPending_ && promotionRevision_ != snapshot().revision) {
+    if (promotionPending_ && promotionRevision_ != state().revision) {
         cancelPromotion();
         report(Status::StaleResult);
         return false;
     }
     invalidate();
-    Status s = session_submit(session_, request);
+    Status s = session_->submit(request);
     if (s == Status::Ok) {
         from_.clear();
         to_.clear();
@@ -276,7 +280,7 @@ void SessionAdapter::undo() {
     if (closing_)
         return;
     invalidate();
-    report(session_undo(session_));
+    report(session_->undo());
     refresh();
     updateHighlights();
 }
@@ -285,9 +289,19 @@ bool SessionAdapter::hint() {
         report(Status::Unavailable);
         return false;
     }
-    Snapshot s = snapshot();
+    auto owned = session_->snapshot();
+    if (auto *failure = std::get_if<Error>(&owned)) {
+        report(failure->status);
+        return false;
+    }
+    const auto &s = std::get<SessionSnapshot>(owned);
     board_.hint(nullptr);
-    bool started = jobs_.start(s, generation_, true, get_ai_time_budget_ms(&s.config, Difficulty::Medium), 8);
+    bool started = false;
+    try {
+        started = jobs_.start(s, generation_, true, get_ai_time_budget_ms(&s.config, Difficulty::Medium), 8);
+    } catch (const std::bad_alloc &) {
+        report(Status::OutOfMemory);
+    }
     if (started) {
         status_ = "Hint thinking…";
         error_ = false;
@@ -299,7 +313,7 @@ void SessionAdapter::finish() {
     if (closing_)
         return;
     invalidate();
-    report(session_finish(session_));
+    report(session_->finish());
     refresh();
 }
 bool SessionAdapter::requestClose() {
@@ -307,7 +321,8 @@ bool SessionAdapter::requestClose() {
         closing_ = true;
         timer_.stop();
         invalidate();
-        session_finish(session_);
+        session_->finish();
+        refresh();
         emit stateChanged();
     }
     return !busy();
@@ -315,9 +330,9 @@ bool SessionAdapter::requestClose() {
 void SessionAdapter::tick() {
     if (closing_ || !session_)
         return;
-    Snapshot previous = snapshot();
-    session_tick(session_);
-    if (snapshot().revision != previous.revision)
+    SessionState previous = state();
+    session_->tick();
+    if (state().revision != previous.revision)
         invalidate();
     refresh();
 }
@@ -326,13 +341,10 @@ void SessionAdapter::refresh() {
         report(Status::OutOfMemory);
         return;
     }
-    Snapshot s = snapshot();
+    SessionState s = state();
     bool changed = s.revision != state_.revision;
     board_.update(s.position);
-    history_.update(s);
     state_ = s;
-    state_.history = nullptr;
-    state_.hashes = nullptr;
     if (page_ == Gameplay && s.phase == SessionPhase::Finished) {
         page_ = EndGame;
         invalidate();
@@ -344,23 +356,52 @@ void SessionAdapter::refresh() {
             cancelPromotion();
         updateHighlights();
     }
-    if (s.diagnostic != Status::Ok) {
-        status_ = status_message(s.diagnostic);
-        error_ = true;
-    }
-    if (!closing_ && page_ == Gameplay && session_is_ai(&s.config, s.position.currentTurn) && !busy() &&
-        !(failedCount_ == s.historyCount && failedTurn_ == s.position.currentTurn)) {
-        Difficulty d = s.position.currentTurn == Color::White ? s.config.aiDifficultyWhite : s.config.aiDifficultyBlack;
-        if (jobs_.start(s, generation_, false, session_ai_budget(session_), search_depth(d))) {
-            status_ = "AI thinking…";
-            error_ = false;
+    const bool searchWanted = !closing_ && page_ == Gameplay && s.phase == SessionPhase::Active &&
+                              session_is_ai(&s.config, s.position.currentTurn) && !busy() &&
+                              !(failedCount_ == s.historyCount && failedTurn_ == s.position.currentTurn);
+    // Clock polling takes no snapshot. Allocation or logging failures cannot
+    // turn a command already accepted by the core into a failed command.
+    if (changed || searchWanted) {
+        auto owned = session_->snapshot();
+        if (auto *failure = std::get_if<Error>(&owned)) {
+            diagnostic_ = failure->status;
+            report(diagnostic_);
+            if (searchWanted) {
+                failedCount_ = s.historyCount;
+                failedTurn_ = s.position.currentTurn;
+            }
+        } else {
+            try {
+                const auto &snapshot = std::get<SessionSnapshot>(owned);
+                if (changed) {
+                    history_.update(snapshot);
+                    diagnostic_ = log_.write(snapshot);
+                    if (diagnostic_ != Status::Ok)
+                        report(diagnostic_);
+                }
+                if (searchWanted) {
+                    Difficulty d = s.position.currentTurn == Color::White ? s.config.aiDifficultyWhite
+                                                                          : s.config.aiDifficultyBlack;
+                    if (jobs_.start(snapshot, generation_, false, session_->ai_budget(), search_depth(d))) {
+                        status_ = "AI thinking…";
+                        error_ = false;
+                    }
+                }
+            } catch (const std::bad_alloc &) {
+                diagnostic_ = Status::OutOfMemory;
+                report(diagnostic_);
+                if (searchWanted) {
+                    failedCount_ = s.historyCount;
+                    failedTurn_ = s.position.currentTurn;
+                }
+            }
         }
     }
     emit stateChanged();
 }
 void SessionAdapter::searchCompleted() {
     const SearchOutcome out = jobs_.outcome();
-    Snapshot s = snapshot();
+    SessionState s = state();
     bool current =
         !closing_ && page_ == Gameplay && out.generation == generation_ && out.revision == s.revision && !out.cancelled;
     if (current && out.result.status == Status::Ok) {
@@ -369,7 +410,7 @@ void SessionAdapter::searchCompleted() {
             status_ = "Hint: " + coordinate(out.result.move.from) + " → " + coordinate(out.result.move.to);
             error_ = false;
         } else
-            report(session_submit_ai(session_, out.result.move, out.revision, out.budgetMs, out.result.elapsedMs));
+            report(session_->submit_ai(out.result.move, out.revision, out.budgetMs, out.result.elapsedMs));
     } else if (current && out.result.status != Status::Cancelled) {
         if (!out.hint) {
             failedCount_ = s.historyCount;

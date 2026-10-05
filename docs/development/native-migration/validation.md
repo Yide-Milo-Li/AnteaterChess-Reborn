@@ -27,7 +27,8 @@ Windows combination probes then passed. An installer exit alone is not a gate.
 | Environment | Passed locally | Four combination probes; attachment hashes above |
 | Build and conventions | Passed locally | Four desktop builds, 22/22 each; two core runs, 19/19 each |
 | Rules and evaluation | Passed locally | Typed C++ API, semantic comparisons, injected rule-workspace failures; four 23/23 runs |
-| Session ownership and transactions | Pending | Allocation-failure and lifetime matrix |
+| Session ownership | Passed locally | Owning snapshots, resource lifetime, moves and progressive allocation failures; four 24/24 runs |
+| Transaction and budget policy isolation | Pending | Tournament rollback and Session-to-rules dependency cutover |
 | Search ownership | Pending | Owned requests, cancellation and frozen AI output |
 | Desktop | Pending | Narrow models, lifecycle and interaction checks |
 | Distribution and cleanup | Pending | CPack, dependency and license manifests |
@@ -78,3 +79,22 @@ now detects /showIncludes using Ninja's actual encoding, then a clean native
 rebuild passed. `ninja -t deps` records rules.hpp and types.hpp (two valid direct
 project dependencies) for board.cpp. Raw failed and successful receipts remain
 outside the disposable build tree. This adjustment does not modify installed MSVC.
+
+## Session ownership verification
+
+Session is noncopyable and movable. State polling allocates nothing. Snapshot
+history and hashes remain valid across mutation, undo, restart and destruction.
+Progressive failure injection checks all construction, snapshot and human move
+preparation allocations, no partial publication and complete resource cleanup.
+Move construction/assignment, including assignment across resources, allocates
+nothing. Desktop logging now follows committed state; a failed path preserves an
+accepted move and displays a separate diagnostic.
+
+Windows/Linux Debug and Release passed 24/24. Linux ASan/UBSan passed 21/21.
+All frozen rule/AI comparisons pass and all 27 protected files remain unchanged.
+Raw failures and successful commands/hashes are retained in stage3 attachments.
+MSVC Debug initially terminated during snapshot failure injection: the installed
+standard library allocates an iterator proxy inside its noexcept vector allocator
+constructor. Exact-sized resource-owned sequences now avoid that hidden allocation
+without disabling Debug iterator checks. The repaired Debug ownership test and
+full matrix pass. Search ownership and narrow desktop model migration remain pending.

@@ -10,28 +10,28 @@ static int64_t now(void *unused) {
 int main(void) {
     SessionOptions options = {};
     options.clock = Clock{now, NULL};
-    Session *session = session_create(&options);
+    auto owner = Session::create(options);
+    Session *session = std::get_if<Session>(&owner);
     assert(session);
     GameConfig config;
     init_game_config_for_mode(&config, GameMode::HumanVsComputer);
     Difficulty levels[] = {Difficulty::Easy, Difficulty::Medium, Difficulty::Hard, Difficulty::Tournament};
     for (unsigned i = 0; i < sizeof(levels) / sizeof(levels[0]); ++i) {
         config.aiDifficultyBlack = levels[i];
-        assert(session_start(session, &config) == Status::Ok);
+        assert(session->start(config) == Status::Ok);
     }
-    Snapshot before, after;
-    session_snapshot(session, &before);
+    SessionState before, after;
+    before = session->state();
     int invalid[] = {-1, 4, 6};
     for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         config.aiDifficultyBlack = (Difficulty)invalid[i];
-        assert(session_start(session, &config) == Status::InvalidArgument);
-        session_snapshot(session, &after);
+        assert(session->start(config) == Status::InvalidArgument);
+        after = session->state();
         assert(after.revision == before.revision && after.gameId == before.gameId);
         assert(after.position.hash == before.position.hash);
     }
     config.aiDifficultyBlack = Difficulty::Easy;
     config.aiDifficultyWhite = (Difficulty)4;
-    assert(session_start(session, &config) == Status::InvalidArgument);
-    session_destroy(session);
+    assert(session->start(config) == Status::InvalidArgument);
     return 0;
 }

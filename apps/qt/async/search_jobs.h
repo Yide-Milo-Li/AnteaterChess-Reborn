@@ -23,7 +23,7 @@ class SearchJobs : public QObject {
     bool busy() const {
         return thread_ != nullptr;
     }
-    bool start(const Snapshot &snapshot, uint64_t generation, bool hint, int budgetMs, int maxDepth);
+    bool start(const SessionSnapshot &snapshot, uint64_t generation, bool hint, int budgetMs, int maxDepth);
     void cancel();
     void shutdown();
     const SearchOutcome &outcome() const {

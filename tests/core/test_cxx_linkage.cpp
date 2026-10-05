@@ -12,11 +12,11 @@ int main() {
     assert(p.hash == position_hash(&p));
     SessionOptions options{};
     options.clock = {now, nullptr};
-    Session *s = session_create(&options);
+    auto owner = Session::create(options);
+    Session *s = std::get_if<Session>(&owner);
     assert(s);
     GameConfig c{};
     init_default_game_config(&c);
-    assert(session_start(s, &c) == Status::Ok);
-    session_destroy(s);
+    assert(s->start(c) == Status::Ok);
     return 0;
 }

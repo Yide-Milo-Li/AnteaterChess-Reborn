@@ -1,4 +1,5 @@
 #include "runtime/runtime.h"
+#include "app/session_adapter.h"
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -16,7 +17,7 @@ class RuntimeTest : public QObject {
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
         ac::SessionLog a(directory.path()), b(directory.path());
-        Snapshot snapshot{};
+        SessionSnapshot snapshot{};
         snapshot.gameId = 1;
         QCOMPARE(a.write(snapshot), Status::Ok);
         QCOMPARE(b.write(snapshot), Status::Ok);
@@ -42,22 +43,16 @@ class RuntimeTest : public QObject {
         ac::SessionLog log("");
         SessionOptions options{};
         options.clock = {ac::monotonicMilliseconds, nullptr};
-        options.log = ac::SessionLog::writeCallback;
-        options.logContext = &log;
-        Session *s = session_create(&options);
-        QVERIFY(s);
+        SessionAdapter controller(&options, nullptr, std::move(log));
+        QVERIFY(controller.valid());
         GameConfig c{};
         init_default_game_config(&c);
-        QCOMPARE(session_start(s, &c), Status::Ok);
-        MoveRequest request{};
-        QCOMPARE(parse_move_request_fields("E2", "E4", PromotionChoice::None, &request), Status::Ok);
-        QCOMPARE(session_submit(s, request), Status::Ok);
-        Snapshot snapshot{};
-        session_snapshot(s, &snapshot);
-        QCOMPARE(snapshot.historyCount, 1);
-        QCOMPARE(snapshot.diagnostic, Status::IoError);
-        QVERIFY(log.path().isEmpty());
-        session_destroy(s);
+        QCOMPARE(controller.start(c), Status::Ok);
+        controller.setMoveFields("E2", "E4");
+        QVERIFY(controller.submitFields());
+        QCOMPARE(controller.state().historyCount, 1);
+        QCOMPARE(controller.diagnostic(), Status::IoError);
+        QVERIFY(controller.statusError());
     }
 };
 QTEST_GUILESS_MAIN(RuntimeTest)

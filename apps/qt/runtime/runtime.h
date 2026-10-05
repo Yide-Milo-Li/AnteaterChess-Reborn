@@ -15,8 +15,7 @@ class SessionLog {
   public:
     explicit SessionLog(const QString &directory);
     static SessionLog besideExecutable();
-    static Status writeCallback(void *context, const Snapshot *snapshot);
-    Status write(const Snapshot &snapshot);
+    Status write(const SessionSnapshot &snapshot);
     const QString &path() const {
         return path_;
     }

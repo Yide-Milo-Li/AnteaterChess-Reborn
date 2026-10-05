@@ -7,12 +7,12 @@ namespace ac {
 SearchJobs::~SearchJobs() {
     shutdown();
 }
-bool SearchJobs::start(const Snapshot &s, uint64_t generation, bool hint, int budget, int depth) {
+bool SearchJobs::start(const SessionSnapshot &s, uint64_t generation, bool hint, int budget, int depth) {
     if (busy())
         return false;
     auto j = std::make_shared<Job>();
     j->position = s.position;
-    j->hashes.assign(s.hashes, s.hashes + s.historyCount + 1);
+    j->hashes.assign(s.hashes.begin(), s.hashes.end());
     j->outcome.revision = s.revision;
     j->outcome.generation = generation;
     j->outcome.hint = hint;

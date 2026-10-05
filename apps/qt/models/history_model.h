@@ -16,7 +16,7 @@ class HistoryModel : public QAbstractListModel {
             {Qt::UserRole + 1, "moveText"}
         };
     }
-    void update(const Snapshot &snapshot);
+    void update(const SessionSnapshot &snapshot);
 
   private:
     std::vector<Move> moves_;

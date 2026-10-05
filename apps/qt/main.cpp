@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
             init_default_game_config(&config);
             ok = backend.start(config) == Status::Ok && ok;
             backend.finish();
-            ok = backend.snapshot().diagnostic == Status::Ok && ok;
+            ok = backend.diagnostic() == Status::Ok && ok;
             backend.requestClose();
             app.exit(ok ? 0 : 1);
         });

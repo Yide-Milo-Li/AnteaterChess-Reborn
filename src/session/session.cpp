@@ -6,32 +6,47 @@
 
 namespace ac {
 
-struct Session {
+namespace detail {
+struct SessionData {
+    explicit SessionData(SessionOptions selected)
+        : options(selected), moves(MaxMoves, selected.resource), undo(MaxMoves, selected.resource),
+          hashes(MaxMoves + 1, selected.resource) {
+        position_init(&position);
+        init_default_game_config(&config);
+        hashes[0] = position.hash;
+        init_ai_time_manager(&tournament);
+    }
     SessionOptions options;
-    Position position;
-    GameConfig config;
-    SessionPhase phase;
-    GameResult result;
-    Status diagnostic;
-    uint64_t revision;
-    uint64_t gameId;
-    Move *moves;
-    Undo *undo;
-    uint64_t *hashes;
-    int count;
-    int64_t startMs, turnMs, finishedMs;
-    AITimeManager tournament;
+    Position position{};
+    GameConfig config{};
+    SessionPhase phase = SessionPhase::Idle;
+    GameResult result = GameResult::None;
+    uint64_t revision = 0, gameId = 0;
+    std::pmr::vector<Move> moves;
+    std::pmr::vector<Undo> undo;
+    std::pmr::vector<uint64_t> hashes;
+    int count = 0;
+    int64_t startMs = 0, turnMs = 0, finishedMs = 0;
+    AITimeManager tournament{};
 };
-static void *default_allocate(void *context, size_t n) {
-    (void)context;
-    return malloc(n);
-}
-static void default_free(void *context, void *p) {
-    (void)context;
-    free(p);
-}
-static int64_t now(const Session *s) {
+} // namespace detail
+using detail::SessionData;
+static int64_t now(const SessionData *s) noexcept {
     return s->options.clock.now(s->options.clock.context);
+}
+Session::Session(detail::OwnedObject<SessionData> data) noexcept : data_(std::move(data)) {
+}
+Session::~Session() = default;
+Session::Session(Session &&) noexcept = default;
+Session &Session::operator=(Session &&) noexcept = default;
+Result<Session> Session::create(SessionOptions options) noexcept {
+    if (!options.clock.now || !options.resource)
+        return Error{Status::InvalidArgument, "A clock and memory resource are required"};
+    try {
+        return Session{detail::make_owned<SessionData>(options.resource, options)};
+    } catch (const std::bad_alloc &) {
+        return Error{Status::OutOfMemory, "Session allocation failed"};
+    }
 }
 static int64_t nonnegative_delta(int64_t a, int64_t b) {
     return a > b ? a - b : 0;
@@ -40,78 +55,48 @@ int session_is_ai(const GameConfig *c, Color color) {
     return c && (c->mode == GameMode::ComputerVsComputer ||
                  (c->mode == GameMode::HumanVsComputer && color != c->playerColor));
 }
-Session *session_create(const SessionOptions *options) {
-    if (!options || !options->clock.now || (!!options->allocate != !!options->deallocate))
-        return NULL;
-    SessionOptions o = *options;
-    if (!o.allocate) {
-        o.allocate = default_allocate;
-        o.deallocate = default_free;
-    }
-    Session *s = static_cast<Session *>(o.allocate(o.allocatorContext, sizeof(*s)));
+SessionState Session::state() const noexcept {
+    SessionState out{};
+    const auto *s = data_.get();
     if (!s)
-        return NULL;
-    memset(s, 0, sizeof(*s));
-    s->options = o;
-    s->moves = static_cast<Move *>(o.allocate(o.allocatorContext, MaxMoves * sizeof(*s->moves)));
-    s->undo = static_cast<Undo *>(o.allocate(o.allocatorContext, MaxMoves * sizeof(*s->undo)));
-    s->hashes = static_cast<uint64_t *>(o.allocate(o.allocatorContext, (MaxMoves + 1) * sizeof(*s->hashes)));
-    if (!s->moves || !s->undo || !s->hashes) {
-        session_destroy(s);
-        return NULL;
-    }
-    position_init(&s->position);
-    init_default_game_config(&s->config);
-    s->hashes[0] = s->position.hash;
-    init_ai_time_manager(&s->tournament);
-    return s;
-}
-void session_destroy(Session *s) {
-    if (!s)
-        return;
-    SessionOptions o = s->options;
-    if (s->moves)
-        o.deallocate(o.allocatorContext, s->moves);
-    if (s->undo)
-        o.deallocate(o.allocatorContext, s->undo);
-    if (s->hashes)
-        o.deallocate(o.allocatorContext, s->hashes);
-    o.deallocate(o.allocatorContext, s);
-}
-Status session_snapshot(const Session *s, Snapshot *out) {
-    if (!s || !out)
-        return Status::InvalidArgument;
-    memset(out, 0, sizeof(*out));
-    out->position = s->position;
-    out->config = s->config;
-    out->phase = s->phase;
-    out->result = s->result;
-    out->revision = s->revision;
-    out->gameId = s->gameId;
-    out->history = s->moves;
-    out->historyCount = s->count;
-    out->hashes = s->hashes;
-    out->diagnostic = s->diagnostic;
-    int64_t at = s->phase == SessionPhase::Finished ? s->finishedMs : now(s);
-    out->elapsedMs = s->phase == SessionPhase::Idle ? 0 : nonnegative_delta(at, s->startMs);
+        return out;
+    out.position = s->position;
+    out.config = s->config;
+    out.phase = s->phase;
+    out.result = s->result;
+    out.revision = s->revision;
+    out.gameId = s->gameId;
+    out.historyCount = s->count;
+    const int64_t at = s->phase == SessionPhase::Finished ? s->finishedMs : now(s);
+    out.elapsedMs = s->phase == SessionPhase::Idle ? 0 : nonnegative_delta(at, s->startMs);
     for (int c = 0; c < 2; ++c) {
         int64_t remaining = s->config.initialTimeSeconds;
-        if (s->config.timerEnabled && c == (int)s->position.currentTurn)
+        if (s->config.timerEnabled && c == value(s->position.currentTurn))
             remaining -= nonnegative_delta(at, s->turnMs) / 1000;
-        out->remaining[c] = remaining < 0 ? 0 : remaining > INT_MAX ? INT_MAX : (int)remaining;
-        out->tournamentRemainingMs[c] = s->tournament.remainingMs[c];
+        out.remaining[c] = remaining < 0 ? 0 : remaining > INT_MAX ? INT_MAX : int(remaining);
+        out.tournamentRemainingMs[c] = s->tournament.remainingMs[c];
     }
-    return Status::Ok;
+    return out;
 }
-static void publish(Session *s) {
+Result<SessionSnapshot> Session::snapshot(std::pmr::memory_resource *resource) const noexcept {
+    if (!data_)
+        return Error{Status::Unavailable, "The Session has been moved"};
+    if (!resource)
+        resource = data_->options.resource;
+    try {
+        SessionSnapshot out{resource};
+        static_cast<SessionState &>(out) = state();
+        out.history.assign(data_->moves.begin(), data_->moves.begin() + data_->count);
+        out.hashes.assign(data_->hashes.begin(), data_->hashes.begin() + data_->count + 1);
+        return out;
+    } catch (const std::bad_alloc &) {
+        return Error{Status::OutOfMemory, "Snapshot allocation failed"};
+    }
+}
+static void publish(SessionData *s) noexcept {
     ++s->revision;
-    if (s->options.log) {
-        Snapshot snap;
-        session_snapshot(s, &snap);
-        s->diagnostic = s->options.log(s->options.logContext, &snap);
-    }
 }
-static void end(Session *s, GameResult result) {
+static void end(SessionData *s, GameResult result) {
     s->phase = SessionPhase::Finished;
     s->result = result;
     s->finishedMs = now(s);
@@ -129,7 +114,9 @@ static int valid_difficulty(Difficulty difficulty) {
         return 0;
     }
 }
-Status session_start(Session *s, const GameConfig *c) {
+Status Session::start(const GameConfig &config) noexcept {
+    auto *s = data_.get();
+    const GameConfig *c = &config;
     if (!s || !c || c->mode < GameMode::HumanVsHuman || c->mode > GameMode::ComputerVsComputer ||
         !valid_difficulty(c->aiDifficultyWhite) || !valid_difficulty(c->aiDifficultyBlack) ||
         (c->mode == GameMode::HumanVsComputer && c->playerColor != Color::White && c->playerColor != Color::Black) ||
@@ -143,13 +130,13 @@ Status session_start(Session *s, const GameConfig *c) {
     s->phase = SessionPhase::Active;
     ++s->gameId;
     s->result = GameResult::None;
-    s->diagnostic = Status::Ok;
     s->startMs = s->turnMs = now(s);
     init_ai_time_manager(&s->tournament);
     publish(s);
     return Status::Ok;
 }
-Status session_tick(Session *s) {
+Status Session::tick() noexcept {
+    auto *s = data_.get();
     if (!s)
         return Status::InvalidArgument;
     if (s->phase != SessionPhase::Active || !s->config.timerEnabled)
@@ -164,7 +151,7 @@ Status session_tick(Session *s) {
     }
     return Status::Ok;
 }
-static Status commit_move(Session *s, Move move) {
+static Status commit_move(SessionData *s, Move move) {
     if (s->count == MaxMoves) {
         end(s, GameResult::Draw);
         publish(s);
@@ -173,10 +160,10 @@ static Status commit_move(Session *s, Move move) {
     Position next = s->position;
     Undo undo;
     GameResult result;
-    Status status = position_apply(&next, move, &undo);
+    Status status = position_apply(&next, move, &undo, s->options.resource);
     if (status != Status::Ok)
         return status;
-    status = position_result(&next, &result);
+    status = position_result(&next, &result, s->options.resource);
     if (status != Status::Ok)
         return status;
     if (result == GameResult::None && s->config.mode == GameMode::ComputerVsComputer) {
@@ -198,26 +185,28 @@ static Status commit_move(Session *s, Move move) {
     publish(s);
     return Status::Ok;
 }
-Status session_submit(Session *s, MoveRequest request) {
+Status Session::submit(MoveRequest request) noexcept {
+    auto *s = data_.get();
     if (!s)
         return Status::InvalidArgument;
     uint64_t revision = s->revision;
-    session_tick(s);
+    tick();
     if (s->revision != revision)
         return Status::StaleResult;
     if (s->phase != SessionPhase::Active || session_is_ai(&s->config, s->position.currentTurn))
         return Status::Unavailable;
     Move move;
-    Status resolved = resolve_move_request(&s->position, request, &move);
+    Status resolved = resolve_move_request(&s->position, request, &move, s->options.resource);
     if (resolved != Status::Ok)
         return resolved == Status::OutOfMemory || resolved == Status::Capacity ? static_cast<Status>(resolved)
                                                                                : Status::IllegalMove;
     return commit_move(s, move);
 }
-Status session_submit_ai(Session *s, Move move, uint64_t revision, int budgetMs, int elapsedMs) {
+Status Session::submit_ai(Move move, uint64_t revision, int budgetMs, int elapsedMs) noexcept {
+    auto *s = data_.get();
     if (!s || budgetMs <= 0 || elapsedMs < 0)
         return Status::InvalidArgument;
-    session_tick(s);
+    tick();
     if (revision != s->revision)
         return Status::StaleResult;
     if (s->phase != SessionPhase::Active || !session_is_ai(&s->config, s->position.currentTurn))
@@ -240,11 +229,12 @@ Status session_submit_ai(Session *s, Move move, uint64_t revision, int budgetMs,
     }
     return commit_move(s, move);
 }
-Status session_undo(Session *s) {
+Status Session::undo() noexcept {
+    auto *s = data_.get();
     if (!s)
         return Status::InvalidArgument;
     uint64_t revision = s->revision;
-    session_tick(s);
+    tick();
     if (revision != s->revision)
         return Status::StaleResult;
     if (s->phase != SessionPhase::Active || s->count == 0)
@@ -267,7 +257,8 @@ Status session_undo(Session *s) {
     publish(s);
     return Status::Ok;
 }
-Status session_finish(Session *s) {
+Status Session::finish() noexcept {
+    auto *s = data_.get();
     if (!s)
         return Status::InvalidArgument;
     if (s->phase == SessionPhase::Active) {
@@ -276,19 +267,19 @@ Status session_finish(Session *s) {
     }
     return Status::Ok;
 }
-Status session_promotion(const Session *s, MoveRequest r, int *needed) {
-    if (!s || !needed)
-        return Status::InvalidArgument;
-    *needed = 0;
-    if (s->phase != SessionPhase::Active)
-        return Status::Unavailable;
-    Move m;
-    if (resolve_move_request(&s->position, r, &m) != Status::Ok)
-        return Status::IllegalMove;
-    *needed = is_promotion_special_move(m.specialType);
-    return Status::Ok;
+Result<bool> Session::promotion(MoveRequest request) const noexcept {
+    const auto *s = data_.get();
+    if (!s || s->phase != SessionPhase::Active)
+        return Error{Status::Unavailable, "Promotion is unavailable"};
+    Move move{};
+    Status status = resolve_move_request(&s->position, request, &move, s->options.resource);
+    if (status != Status::Ok)
+        return Error{status == Status::OutOfMemory || status == Status::Capacity ? status : Status::IllegalMove,
+                     "Cannot resolve promotion"};
+    return bool(is_promotion_special_move(move.specialType));
 }
-int session_ai_budget(const Session *s) {
+int Session::ai_budget() const noexcept {
+    const auto *s = data_.get();
     if (!s || s->phase != SessionPhase::Active)
         return 0;
     Color c = s->position.currentTurn;

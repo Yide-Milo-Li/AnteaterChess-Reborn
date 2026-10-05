@@ -1,47 +1,71 @@
-#ifndef ANTEATER_SESSION_H
-#define ANTEATER_SESSION_H
+#pragma once
 #include "anteater/rules.hpp"
+#include "anteater/memory.hpp"
+#include <memory_resource>
+#include <vector>
 
 namespace ac {
-struct Session;
 enum class SessionPhase { Idle, Active, Finished };
-struct Snapshot {
-    Position position;
-    GameConfig config;
-    SessionPhase phase;
-    GameResult result;
-    uint64_t revision;
-    uint64_t gameId;
-    const Move *history; /* borrowed until next session mutation */
-    const uint64_t *hashes;
-    int historyCount;
-    int64_t elapsedMs;
-    int remaining[2];
-    int tournamentRemainingMs[2];
-    Status diagnostic;
+// Polling clocks reads this value without allocating or borrowing Session data.
+struct SessionState {
+    Position position{};
+    GameConfig config{};
+    SessionPhase phase = SessionPhase::Idle;
+    GameResult result = GameResult::None;
+    uint64_t revision = 0, gameId = 0;
+    int historyCount = 0;
+    int64_t elapsedMs = 0;
+    std::array<int, 2> remaining{}, tournamentRemainingMs{};
+    bool operator==(const SessionState &) const = default;
 };
-typedef Status (*LogWrite)(void *context, const Snapshot *snapshot);
+// The resource outlives this owning snapshot, including after its originating
+// Session is modified, moved or destroyed. Copying requires an explicit resource.
+struct SessionSnapshot : SessionState {
+    explicit SessionSnapshot(std::pmr::memory_resource *resource = std::pmr::get_default_resource())
+        : history(resource), hashes(resource) {
+    }
+    SessionSnapshot(const SessionSnapshot &) = delete;
+    SessionSnapshot &operator=(const SessionSnapshot &) = delete;
+    SessionSnapshot(SessionSnapshot &&) noexcept = default;
+    SessionSnapshot &operator=(SessionSnapshot &&) noexcept = default;
+    detail::OwnedSequence<Move> history;
+    detail::OwnedSequence<uint64_t> hashes;
+};
 struct SessionOptions {
-    Clock clock;
-    LogWrite log;
-    void *logContext;
-    void *(*allocate)(void *context, size_t size);
-    void (*deallocate)(void *context, void *pointer);
-    void *allocatorContext;
+    Clock clock{};
+    std::pmr::memory_resource *resource = std::pmr::get_default_resource();
 };
-Session *session_create(const SessionOptions *options);
-void session_destroy(Session *session);
-Status session_start(Session *session, const GameConfig *config);
-Status session_snapshot(const Session *session, Snapshot *out);
-Status session_tick(Session *session);
-Status session_submit(Session *session, MoveRequest request);
-Status session_submit_ai(Session *session, Move move, uint64_t revision, int budgetMs, int elapsedMs);
-Status session_undo(Session *session);
-Status session_finish(Session *session);
-Status session_promotion(const Session *session, MoveRequest request, int *needed);
-int session_is_ai(const GameConfig *config, Color color);
-int session_ai_budget(const Session *session);
-const char *status_message(Status status);
+namespace detail {
+struct SessionData;
+}
+class Session {
+  public:
+    // Clock callbacks must not throw. The clock context and resource outlive
+    // this owner; the resource also outlives snapshots that use it.
+    static Result<Session> create(SessionOptions options) noexcept;
+    ~Session();
+    Session(const Session &) = delete;
+    Session &operator=(const Session &) = delete;
+    Session(Session &&) noexcept;
+    Session &operator=(Session &&) noexcept;
+    bool valid() const noexcept {
+        return bool(data_);
+    }
+    SessionState state() const noexcept;
+    Result<SessionSnapshot> snapshot(std::pmr::memory_resource *resource = nullptr) const noexcept;
+    Status start(const GameConfig &config) noexcept;
+    Status tick() noexcept;
+    Status submit(MoveRequest request) noexcept;
+    Status submit_ai(Move move, uint64_t revision, int budgetMs, int elapsedMs) noexcept;
+    Status undo() noexcept;
+    Status finish() noexcept;
+    Result<bool> promotion(MoveRequest request) const noexcept;
+    int ai_budget() const noexcept;
 
+  private:
+    explicit Session(detail::OwnedObject<detail::SessionData> data) noexcept;
+    detail::OwnedObject<detail::SessionData> data_;
+};
+int session_is_ai(const GameConfig *config, Color color);
+const char *status_message(Status status);
 } // namespace ac
-#endif

@@ -102,10 +102,7 @@ SessionLog SessionLog::besideExecutable() {
     QString base = executableDirectory();
     return SessionLog(base.isEmpty() ? QString() : QDir(base).filePath("logs"));
 }
-Status SessionLog::writeCallback(void *context, const Snapshot *s) {
-    return context && s ? static_cast<SessionLog *>(context)->write(*s) : Status::IoError;
-}
-Status SessionLog::write(const Snapshot &s) {
+Status SessionLog::write(const SessionSnapshot &s) {
     if (directory_.isEmpty())
         return Status::IoError;
     if (path_.isEmpty() || gameId_ != s.gameId) {

@@ -1,6 +1,6 @@
 # AnteaterChess Reborn
 
-A C11 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
+A C++20 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, featuring Ants and chain-capturing Anteaters. Reborn modernizes the original game with a decoupled architecture, high-definition visual design, and real-time HiDPI piece scaling while preserving full rules integrity and gameplay authenticity.
 
 ---
 
@@ -8,7 +8,7 @@ A C11 / Qt 6 + QML desktop chess variant on an **8 × 10 board**, featuring Ants
 
 - **Modern Obsidian Slate UI**: Clean, minimalist dark theme (`#0e1017` / `#161922`) with refined ivory/walnut board squares, warm gold glow accents, and monospace coordinate grids.
 - **HiDPI Dynamic Piece Scaling**: Real-time adaptive SVG rasterization scales piece graphics dynamically ($32\text{px} \sim 160\text{px}$) through Qt Quick as the window resizes or toggles fullscreen.
-- **Pure C11 Core Engine**: Complete decoupling of core rules, board representation, and AI search from Qt/GTK/GLib. The core library compiles independently without desktop dependencies.
+- **Independent C++20 Core Engine**: Complete decoupling of core rules, board representation, and AI search from Qt/GTK/GLib. The core library compiles independently without desktop dependencies.
 - **Interactive Architecture Diagram**: Explorable standalone HTML architecture map with guided views and component boundaries in [docs/architecture/architecture.html](docs/architecture/architecture.html).
 - **Multiple Game Modes**: Human vs Human, Human vs AI, and AI vs AI.
 - **Desktop Controls & Ergonomics**: Click-to-move and typed coordinate input, valid move and hint highlighting, multi-level undo, promotion pickers, turn clocks, Tournament time pools, and game diagnostic logs.
@@ -51,32 +51,42 @@ On both platforms, game logs are stored in `logs/` beside the actual executable.
 
 ### Ubuntu 24.04
 
-```sh
-sudo apt-get update
-sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
-make -j4
-make test
-make test-gui
-make run
-```
-
-### Windows (MSYS2 UCRT64)
-
-Install MSYS2 and run inside the **UCRT64** environment:
+Install GCC, CMake >= 3.25, Ninja and system Qt 6.4.2 development/QML modules.
+Tests and development tools also use native Python 3.
 
 ```sh
-pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative mingw-w64-ucrt-x86_64-qt6-svg mingw-w64-ucrt-x86_64-python
-make -j4
-make test
-make test-gui
-make run
+sudo apt-get install build-essential cmake ninja-build python3 qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-shader-baker qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
+cmake --preset linux-release
+cmake --build --preset linux-release
+ctest --preset linux-release
+./build/linux-release/bin/anteater-chess
 ```
 
-### Headless & Release Builds
+### Windows (native PowerShell)
 
-- Build and test core logic without Qt: `make headless test`
-- Release optimized binaries: `make CONFIG=release gui test test-gui`
-- Source & binary distribution packaging: `make CONFIG=release package-source package`
+Install the v143 14.44 x64 component in Visual Studio, a Windows SDK, native
+CMake/Ninja/Python, and the official Qt 6.11.2 MSVC 2022 x64 kit with Shader Tools
+under `C:\Qt`. Initialize **each new PowerShell process** before configuring:
+
+```powershell
+. ./tools/native/Enter-NativeEnvironment.ps1 -RequireQt
+cmake --preset windows-release
+cmake --build --preset windows-release
+ctest --preset windows-release
+./build/windows-release/bin/anteater-chess.exe
+```
+
+### Core and sanitizer builds
+
+Use `linux-debug-core`, `linux-release-core`, `windows-debug-core` or
+`windows-release-core` to compile/test without discovering Qt. Use
+`linux-sanitizer` for ASan/UBSan. With `BUILD_TESTING=OFF` and
+`AC_BUILD_DEV_TOOLS=OFF`, core-only builds do not require Python.
+
+The [native migration ledger](docs/development/native-migration/validation.md)
+records stage status. Existing release archives describe earlier implementations;
+they are not candidates for the current migration. Packaging and external
+acceptance remain pending until the ledger records their checks.
 
 ---
 

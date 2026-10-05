@@ -1,0 +1,300 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "AC_BUILD_DEV_TOOLS": "OFF"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AC_BUILD_DESKTOP": "ON",
+        "BUILD_TESTING": "ON",
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+      }
+    },
+    {
+      "name": "windows-debug-core",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AC_BUILD_DESKTOP": "OFF",
+        "BUILD_TESTING": "ON",
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+      }
+    },
+    {
+      "name": "windows-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AC_BUILD_DESKTOP": "ON",
+        "BUILD_TESTING": "ON",
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+      }
+    },
+    {
+      "name": "windows-release-core",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AC_BUILD_DESKTOP": "OFF",
+        "BUILD_TESTING": "ON",
+        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AC_BUILD_DESKTOP": "ON",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "linux-debug-core",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AC_BUILD_DESKTOP": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "linux-release",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AC_BUILD_DESKTOP": "ON",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "linux-release-core",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AC_BUILD_DESKTOP": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "linux-sanitizer",
+      "inherits": "linux-debug-core",
+      "cacheVariables": {
+        "AC_SANITIZE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "jobs": 2
+    },
+    {
+      "name": "windows-debug-core",
+      "configurePreset": "windows-debug-core",
+      "jobs": 2
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "jobs": 2
+    },
+    {
+      "name": "windows-release-core",
+      "configurePreset": "windows-release-core",
+      "jobs": 2
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "jobs": 2
+    },
+    {
+      "name": "linux-debug-core",
+      "configurePreset": "linux-debug-core",
+      "jobs": 2
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "jobs": 2
+    },
+    {
+      "name": "linux-release-core",
+      "configurePreset": "linux-release-core",
+      "jobs": 2
+    },
+    {
+      "name": "linux-sanitizer",
+      "configurePreset": "linux-sanitizer",
+      "jobs": 2
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "windows-debug-core",
+      "configurePreset": "windows-debug-core",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "windows-release-core",
+      "configurePreset": "windows-release-core",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "linux-debug-core",
+      "configurePreset": "linux-debug-core",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "linux-release-core",
+      "configurePreset": "linux-release-core",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    },
+    {
+      "name": "linux-sanitizer",
+      "configurePreset": "linux-sanitizer",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_QUICK_BACKEND": "software",
+        "QT_QUICK_CONTROLS_STYLE": "Basic"
+      }
+    }
+  ]
+}

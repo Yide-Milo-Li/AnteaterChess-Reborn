@@ -1,10 +1,10 @@
 #include "internal.h"
 AcSearchContext *ac_search_create(void) {
-    AcSearchContext *ctx = calloc(1, sizeof(*ctx));
+    AcSearchContext *ctx = static_cast<AcSearchContext *>(calloc(1, sizeof(*ctx)));
     if (!ctx)
         return NULL;
-    ctx->transpositionTable = calloc(AC_TT_SIZE, sizeof(TTEntry));
-    ctx->moveBuffers = calloc(AI_MAX_PLY + 1, sizeof(AcMoveList));
+    ctx->transpositionTable = static_cast<TTEntry *>(calloc(AC_TT_SIZE, sizeof(TTEntry)));
+    ctx->moveBuffers = static_cast<AcMoveList *>(calloc(AI_MAX_PLY + 1, sizeof(AcMoveList)));
     if (!ctx->transpositionTable || !ctx->moveBuffers) {
         ac_search_destroy(ctx);
         return NULL;

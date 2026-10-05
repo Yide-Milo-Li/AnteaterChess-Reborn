@@ -26,7 +26,7 @@ int main(void) {
     initial = p;
     AcUndo undo[200];
     unsigned rng = 12345;
-    AcMoveList *moves = malloc(sizeof(*moves));
+    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
     assert(moves);
     int played = 0;
     for (; played < 150; ++played) {

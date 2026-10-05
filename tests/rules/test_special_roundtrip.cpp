@@ -6,7 +6,7 @@ static void put(AcPosition *p, int r, int c, AcPieceType type, AcColor color) {
     ac_set_piece(&p->board, ac_create_position(r, c), ac_create_piece(type, color));
 }
 int main(void) {
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     assert(list);
     for (int side = 0; side < 2; ++side)
         for (int fixture = 0; fixture < 3; ++fixture) {

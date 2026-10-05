@@ -1,9 +1,9 @@
 #include "anteater/session.h"
 #include <assert.h>
-_Static_assert(AC_DIFFICULTY_TOURNAMENT == 5, "Tournament must retain its value");
+static_assert(AC_DIFFICULTY_TOURNAMENT == 5, "Tournament must retain its value");
 static int64_t now(void *unused) { (void)unused; return 0; }
 int main(void) {
-    AcSessionOptions options = {0}; options.clock = (AcClock){now,NULL};
+    AcSessionOptions options = {}; options.clock = AcClock{now,NULL};
     AcSession *session = ac_session_create(&options); assert(session);
     AcGameConfig config;
     ac_init_game_config_for_mode(&config,AC_MODE_HUMAN_VS_COMPUTER);

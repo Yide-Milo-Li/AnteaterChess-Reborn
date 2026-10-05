@@ -64,7 +64,7 @@ static void audit_parser_fuzzing(void) {
 
 /* 2. Audit MoveList Capacity and Bound Invariants */
 static void audit_movelist_bounds(void) {
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     assert(list);
 
     ac_init_move_list(list);
@@ -146,7 +146,7 @@ static void audit_budget_arithmetic(void) {
 /* 4. Audit Deep Random Playout: Hash Consistency & Apply/Unmake Invariants */
 static void audit_random_playout_invariants(void) {
     uint32_t rng = 0x12345678;
-    AcMoveList *moves = malloc(sizeof(*moves));
+    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
     assert(moves);
 
     for (int game = 0; game < 20; ++game) {
@@ -213,7 +213,7 @@ static int64_t mock_clock(void *ctx) {
 
 static AcStatus mock_log(void *ctx, const AcSnapshot *snap) {
     (void)snap;
-    MockEnv *env = ctx;
+    MockEnv *env = static_cast<MockEnv *>(ctx);
     ++env->logCount;
     return env->logFail ? AC_IO_ERROR : AC_OK;
 }

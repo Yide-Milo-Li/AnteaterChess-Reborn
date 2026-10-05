@@ -1,0 +1,113 @@
+{
+  "baseline": "32da9759f3dfe1555de57b26c3d3b37ec4636f2a",
+  "files": [
+    {
+      "path": "COPYRIGHT",
+      "sha256": "09d7d3afaf0b27079e01cb9e6aff93fdd602101fcaeb8973ed95a43487872a74"
+    },
+    {
+      "path": "docs/legacy/Chess_SoftwareSpec.pdf",
+      "sha256": "7ccec2f1c3a82cefeca4e053ebfb20a9c2774b6888901e22757c4fb53aa7d8fe"
+    },
+    {
+      "path": "docs/legacy/Chess_UserManual.pdf",
+      "sha256": "60ce3a20325c93e24a97a3e8eb5345b3261a4a6b371c395c982800ce4035e4ee"
+    },
+    {
+      "path": "assets/icons/icon-alert-dark.svg",
+      "sha256": "7fff01170684da0cdfce50b5d8adae5f82782a6d665d15e4e677a8ffbf5bda93"
+    },
+    {
+      "path": "assets/icons/icon-hint-dark.svg",
+      "sha256": "184d9b7b09777fb267d4bfd8cba00bcb9b8cda32203e1426683c4997bd801a8e"
+    },
+    {
+      "path": "assets/icons/icon-history-dark.svg",
+      "sha256": "0c648c911dba731e003a2caeec845a2af26450da214b4fadbcb68aaa3ab8bf31"
+    },
+    {
+      "path": "assets/icons/icon-info-dark.svg",
+      "sha256": "9debc7be9000bef991beff345df06fb172fbd66c0ac8c8dd94d599c2fa2624fc"
+    },
+    {
+      "path": "assets/pieces/BlackAnt.svg",
+      "sha256": "466e4d91d61e5935bc0b9c1a4ca8cd51b4b8db61d4ec791f5175d9446da185ba"
+    },
+    {
+      "path": "assets/pieces/BlackAnteater.svg",
+      "sha256": "84f4ba96f41bc6f2702ab15175cf54ec71c2665f6cf9a65ea6f7a9c5f25efde4"
+    },
+    {
+      "path": "assets/pieces/BlackBishop.svg",
+      "sha256": "a768453dfebc15e58f2d18a14fc37c902bf9f580b80ed863d2168e8cca7d0b2a"
+    },
+    {
+      "path": "assets/pieces/BlackKing.svg",
+      "sha256": "525f35a733fd5d238d333599110f5a98dd8a50584765d8ba25c2cdc98be5b8d1"
+    },
+    {
+      "path": "assets/pieces/BlackKnight.svg",
+      "sha256": "e0b582fc26b9e7256e286ed52ffd03142546e2687432b00e1ca69399355ab48d"
+    },
+    {
+      "path": "assets/pieces/BlackQueen.svg",
+      "sha256": "c3afba37bfa7cd3dfa267d995d86c298df758dc24306545a1a7c1a05a050edae"
+    },
+    {
+      "path": "assets/pieces/BlackRook.svg",
+      "sha256": "d364773fb79c9a4f7f51631ad7f30285166771565d689305f3ebc659261b295d"
+    },
+    {
+      "path": "assets/pieces/WhiteAnt.svg",
+      "sha256": "0ac41996161db2a9ca1bd4044ccdd070b67b8e7071ac8604fcfb5ceca5d804b6"
+    },
+    {
+      "path": "assets/pieces/WhiteAnteater.svg",
+      "sha256": "3531b53d0bb03f1b284f2097e3da10c046d0b241cbe8c68da3a9439c08c7bc16"
+    },
+    {
+      "path": "assets/pieces/WhiteBishop.svg",
+      "sha256": "d32aebd9c3b4149a541d0036223d337f19317f2bf84db7a696de77615611f9bd"
+    },
+    {
+      "path": "assets/pieces/WhiteKing.svg",
+      "sha256": "4032acfa7ea12561d56e42130e857dbacbd8a106852032e81e1dbb35de4f3143"
+    },
+    {
+      "path": "assets/pieces/WhiteKnight.svg",
+      "sha256": "49e9018c0735f13b9193654fbda69bf3d1afc098f7ff17ce788da529177a4c47"
+    },
+    {
+      "path": "assets/pieces/WhiteQueen.svg",
+      "sha256": "5a636213122fccd300cccd76677e51b3f72e516691a01c46b9c418047170669c"
+    },
+    {
+      "path": "assets/pieces/WhiteRook.svg",
+      "sha256": "cbbc55fda9c5fb61a15a7e9e858a36d82be9485bc727e2c5812f6bc1fa7dabcd"
+    },
+    {
+      "path": "assets/resources.qrc",
+      "sha256": "89150bfc5a90b9b54821c3cdf322a953a7efb6c87fb009240642bea25c7d1a24"
+    },
+    {
+      "path": "tests/fixtures/BASELINE",
+      "sha256": "ce17f39875cc8c42897a58eaca4e134104eb7bb20f4336d1387c1f74bde9b708"
+    },
+    {
+      "path": "tests/fixtures/ai-evaluation-baseline.txt",
+      "sha256": "7c1496d79f5743bd91c63bfaf5d63de482dfaaa1cb1393a486bd7997ef89f22d"
+    },
+    {
+      "path": "tests/fixtures/baseline.h",
+      "sha256": "0726ac482c3cb3f9f87806adee6c06d1a20ce270810a3e22dc041c5defeeb81e"
+    },
+    {
+      "path": "tests/fixtures/legacy-scenarios.json",
+      "sha256": "b8c4f596d74c303be394f41213b3b95c2c1dcd3fe90f23cf58d375953e37cd94"
+    },
+    {
+      "path": "tests/fixtures/probe.h",
+      "sha256": "1aa4ae24d7ccf82c8d64006ce62d32ba4fa8b2523f6c84f87f847ef030196888"
+    }
+  ]
+}

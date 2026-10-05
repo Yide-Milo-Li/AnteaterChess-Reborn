@@ -1,0 +1,77 @@
+{
+  "sourceModifiedBeforeGate": false,
+  "localEvidence": true,
+  "remoteCi": "not-run",
+  "failureRemediation": {
+    "correctedInstallerExitCode": 0,
+    "correctedComponent": "qt.qt6.6112.addons.qtshadertools",
+    "originalShaderChild": "virtual component skipped despite installer exit 0"
+  },
+  "status": "passed",
+  "probes": [
+    {
+      "platform": "windows",
+      "configureExitCode": 0,
+      "buildExitCode": 0,
+      "command": "cmake -S probe -B probe/build-windows-debug -G Ninja -DCMAKE_BUILD_TYPE=debug; cmake --build; ctest --verbose",
+      "sha256": "92f5fa7246484576d3900a16fadcbc996e08ef40e866bfaada5a119389cb3724",
+      "testExitCode": 0,
+      "attachment": "probe\\build-windows-debug\\Testing\\Temporary\\LastTest.log",
+      "status": "passed",
+      "configuration": "debug"
+    },
+    {
+      "platform": "windows",
+      "configureExitCode": 0,
+      "buildExitCode": 0,
+      "command": "cmake -S probe -B probe/build-windows-release -G Ninja -DCMAKE_BUILD_TYPE=release; cmake --build; ctest --verbose",
+      "sha256": "6afb8b5f93c6a451c81d3423ef4cc930651bc34fae495de563ab49a2e8b42d90",
+      "testExitCode": 0,
+      "attachment": "probe\\build-windows-release\\Testing\\Temporary\\LastTest.log",
+      "status": "passed",
+      "configuration": "release"
+    },
+    {
+      "platform": "linux",
+      "configureExitCode": 0,
+      "buildExitCode": 0,
+      "command": "cmake -S probe -B probe/build-linux-debug -G Ninja -DCMAKE_BUILD_TYPE=debug; cmake --build; ctest --verbose",
+      "sha256": "0525b1ff39bf3d4e70c1985862256f8eac6ced308da8f01991493b45065a9ff7",
+      "testExitCode": 0,
+      "attachment": "probe\\build-linux-debug\\Testing\\Temporary\\LastTest.log",
+      "status": "passed",
+      "configuration": "debug"
+    },
+    {
+      "platform": "linux",
+      "configureExitCode": 0,
+      "buildExitCode": 0,
+      "command": "cmake -S probe -B probe/build-linux-release -G Ninja -DCMAKE_BUILD_TYPE=release; cmake --build; ctest --verbose",
+      "sha256": "c747a49d22be91ebfb0e960ab59ec894ab8827bec290db7f8297505a13767b00",
+      "testExitCode": 0,
+      "attachment": "probe\\build-linux-release\\Testing\\Temporary\\LastTest.log",
+      "status": "passed",
+      "configuration": "release"
+    }
+  ],
+  "manualAcceptance": "pending",
+  "windows": {
+    "qt": "6.11.2",
+    "kit": "C:\\Qt\\6.11.2\\msvc2022_64",
+    "sdk": "10.0.26100.0",
+    "architecture": "x64",
+    "toolset": "14.44.35207",
+    "compiler": "MSVC 19.44.35228.0",
+    "shaderTools": "6.11.2"
+  },
+  "linux": {
+    "compiler": "GCC 13.3.0",
+    "distributionMode": "system packages",
+    "qt": "6.4.2",
+    "distribution": "Ubuntu 24.04"
+  },
+  "protectedFiles": 27,
+  "recordedAt": "2026-10-05T13:47:12.7455014+00:00",
+  "baseline": "32da9759f3dfe1555de57b26c3d3b37ec4636f2a",
+  "protectedMismatches": 0
+}

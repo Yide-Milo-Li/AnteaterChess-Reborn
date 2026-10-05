@@ -8,7 +8,7 @@ typedef struct {
     int ticks, stop;
 } Env;
 static int64_t now(void *p) {
-    Env *e = p;
+    Env *e = static_cast<Env *>(p);
     return e->now + (e->ticks++ / 100);
 }
 static int cancelled(void *p) {
@@ -20,7 +20,7 @@ int main(void) {
     before = p;
     AcSearchContext *a = ac_search_create(), *b = ac_search_create();
     assert(a && b);
-    Env e = {0};
+    Env e = {};
     AcSearchOptions o = {
         {now, &e},
         1000, 2, cancelled, &e, NULL, 0
@@ -29,13 +29,13 @@ int main(void) {
     assert(!ac_search(a, &p, &o, &ra));
     assert(ac_validate_move(&p, ra.move));
     assert(!memcmp(&p, &before, sizeof(p)));
-    e = (Env){0};
+    e = Env{};
     assert(!ac_search(b, &p, &o, &rb));
     assert(!memcmp(&ra.move, &rb.move, sizeof(AcMove)));
     e.stop = 1;
     assert(ac_search(a, &p, &o, &ra) == AC_CANCELLED);
     assert(!memcmp(&p, &before, sizeof(p)));
-    e = (Env){0};
+    e = Env{};
     o.budgetMs = 1;
     o.maxDepth = 24;
     assert(!ac_search(a, &p, &o, &ra));

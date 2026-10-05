@@ -53,22 +53,22 @@ Start validates configuration and resets history, position, clocks, diagnostics,
 
 Move processing: parse coordinates → resolve canonical special move/path → apply to a temporary position → determine terminal state → append history and undo → publish a new revision → write the diagnostic log. A move's status reports whether the command applied. Log failure is separately available as snapshot `diagnostic`, so callers never retry an already accepted move merely because logging failed.
 
-Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.c](../../src/ai/budget.c).
+Timing uses injected monotonic milliseconds. No core test sleeps or busy-waits for a clock. Elapsed game time freezes on finish; turn time resets on move/undo/skip. Tournament totals and saved-time pools are owned by each session and are not refunded by undo. Its arithmetic and limits live in [budget.c](../../src/ai/budget.cpp).
 
 ## Rule engine
 
-[movegen.c](../../src/rules/movegen.c) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.c](../../src/rules/resolver.c) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.c](../../src/rules/position.c) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.c](../../src/rules/endgame.c) determines check, no-legal-move outcomes, and the retained material policy. The [manual](../user/manual.md) is the rules reference.
+[movegen.c](../../src/rules/movegen.cpp) generates variant pseudo-legal candidates, then excludes self-check and king captures. [resolver.c](../../src/rules/resolver.cpp) selects explicit promotion variants and rejects multiple non-promotion paths sharing an endpoint. [position.c](../../src/rules/position.cpp) executes and restores compact positions and updates the hash by XORing changed piece/right components. [endgame.c](../../src/rules/endgame.cpp) determines check, no-legal-move outcomes, and the retained material policy. The [manual](../user/manual.md) is the rules reference.
 
 Hashes include pieces, side, castling rights, and a capturable en-passant file. Numeric keys intentionally differ from the old engine. They support repetition and transposition identity; they are not a persistent storage format or cryptographic guarantee.
 
 ## Search
 
-[search.c](../../src/ai/search.c) retains iterative deepening, aspiration windows,
+[search.c](../../src/ai/search.cpp) retains iterative deepening, aspiration windows,
 principal-variation alpha-beta, null-move pruning, late-move reductions and quiescence.
 Evaluation is split into material/position tables, heuristic attacks and SEE,
 mobility, strategic features and aggregation; each exposes a narrow private header.
-[ordering.c](../../src/ai/ordering.c) owns killer/history and capture ordering;
-[table.c](../../src/ai/table.c) owns context-local transpositions.
+[ordering.c](../../src/ai/ordering.cpp) owns killer/history and capture ordering;
+[table.c](../../src/ai/table.cpp) owns context-local transpositions.
 Experimental has been removed. Valid difficulty values are 0, 1, 2, 3 and 5;
 4 is rejected by explicit Session configuration validation. Tournament remains 5.
 

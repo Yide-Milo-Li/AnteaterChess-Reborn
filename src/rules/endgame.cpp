@@ -126,10 +126,10 @@ int ac_is_insufficient_material(const AcPosition *state) {
 AcStatus ac_position_result(const AcPosition *s, AcGameResult *result) {
     if (!s || !result)
         return AC_INVALID_ARGUMENT;
-    AcMoveList *moves = malloc(sizeof(*moves));
+    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
     if (!moves)
         return AC_OUT_OF_MEMORY;
-    AcStatus status = ac_generate_legal_moves(s, moves);
+    AcStatus status = static_cast<AcStatus>(ac_generate_legal_moves(s, moves));
     int count = moves->count;
     free(moves);
     if (status != AC_OK)

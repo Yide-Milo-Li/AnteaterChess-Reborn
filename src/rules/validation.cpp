@@ -131,7 +131,7 @@ static int resolve_with_workspace(const AcPosition *state, AcMove move, AcMoveLi
 }
 
 int ac_validate_move(const AcPosition *s, AcMove m) {
-    AcMoveList *l = malloc(sizeof(*l));
+    AcMoveList *l = static_cast<AcMoveList *>(malloc(sizeof(*l)));
     if (!l)
         return 0;
     int result = resolve_with_workspace(s, m, l);

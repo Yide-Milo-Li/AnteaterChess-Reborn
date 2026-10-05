@@ -10,20 +10,20 @@ static int64_t clock_now(void *p) {
     return ((Env *)p)->ms;
 }
 static AcStatus log_write(void *p, const AcSnapshot *s) {
-    Env *e = p;
+    Env *e = static_cast<Env *>(p);
     (void)s;
     ++e->writes;
     return e->fail ? AC_IO_ERROR : AC_OK;
 }
 static void *alloc(void *p, size_t n) {
-    Env *e = p;
+    Env *e = static_cast<Env *>(p);
     if (++e->allocs == e->failAt)
         return NULL;
     ++e->live;
     return malloc(n);
 }
 static void dealloc(void *p, void *x) {
-    Env *e = p;
+    Env *e = static_cast<Env *>(p);
     --e->live;
     free(x);
 }
@@ -41,12 +41,12 @@ static AcStatus move(AcSession *s, const char *a, const char *b) {
 }
 int main(void) {
     for (int i = 1; i <= 4; ++i) {
-        Env e = {0};
+        Env e = {};
         e.failAt = i;
         assert(!create(&e));
         assert(!e.live);
     }
-    Env a = {0}, b = {0};
+    Env a = {}, b = {};
     AcSession *x = create(&a), *y = create(&b);
     assert(x && y);
     AcGameConfig config;
@@ -89,7 +89,7 @@ int main(void) {
     config.aiDifficultyWhite = config.aiDifficultyBlack = AC_DIFFICULTY_EASY;
     assert(!ac_session_start(x, &config));
     ac_session_snapshot(x, &sx);
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     assert(list);
     assert(!ac_generate_legal_moves(&sx.position, list));
     uint64_t revision = sx.revision;
@@ -124,7 +124,7 @@ int main(void) {
     assert(sx.result == AC_RESULT_DRAW && sx.historyCount == AC_MAX_MOVES);
     for (int color = AC_WHITE; color <= AC_BLACK; ++color) {
         ac_init_game_config_for_mode(&config, AC_MODE_HUMAN_VS_COMPUTER);
-        config.playerColor = color;
+        config.playerColor = static_cast<AcColor>(color);
         assert(!ac_session_start(x, &config));
         for (int ply = 0; ply < 4; ++ply) {
             ac_session_snapshot(x, &sx);

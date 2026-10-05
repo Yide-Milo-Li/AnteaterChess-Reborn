@@ -46,14 +46,14 @@ AcSession *ac_session_create(const AcSessionOptions *options) {
         o.allocate = default_allocate;
         o.deallocate = default_free;
     }
-    AcSession *s = o.allocate(o.allocatorContext, sizeof(*s));
+    AcSession *s = static_cast<AcSession *>(o.allocate(o.allocatorContext, sizeof(*s)));
     if (!s)
         return NULL;
     memset(s, 0, sizeof(*s));
     s->options = o;
-    s->moves = o.allocate(o.allocatorContext, AC_MAX_MOVES * sizeof(*s->moves));
-    s->undo = o.allocate(o.allocatorContext, AC_MAX_MOVES * sizeof(*s->undo));
-    s->hashes = o.allocate(o.allocatorContext, (AC_MAX_MOVES + 1) * sizeof(*s->hashes));
+    s->moves = static_cast<AcMove *>(o.allocate(o.allocatorContext, AC_MAX_MOVES * sizeof(*s->moves)));
+    s->undo = static_cast<AcUndo *>(o.allocate(o.allocatorContext, AC_MAX_MOVES * sizeof(*s->undo)));
+    s->hashes = static_cast<uint64_t *>(o.allocate(o.allocatorContext, (AC_MAX_MOVES + 1) * sizeof(*s->hashes)));
     if (!s->moves || !s->undo || !s->hashes) {
         ac_session_destroy(s);
         return NULL;
@@ -208,7 +208,7 @@ AcStatus ac_session_submit(AcSession *s, AcMoveRequest request) {
     AcMove move;
     int resolved = ac_resolve_move_request(&s->position, request, &move);
     if (resolved)
-        return resolved == AC_OUT_OF_MEMORY || resolved == AC_CAPACITY ? resolved : AC_ILLEGAL_MOVE;
+        return resolved == AC_OUT_OF_MEMORY || resolved == AC_CAPACITY ? static_cast<AcStatus>(resolved) : AC_ILLEGAL_MOVE;
     return commit_move(s, move);
 }
 AcStatus ac_session_submit_ai(AcSession *s, AcMove move, uint64_t revision, int budgetMs, int elapsedMs) {

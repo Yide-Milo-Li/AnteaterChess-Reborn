@@ -24,7 +24,8 @@ for manifest in ['assets/resources.qrc','apps/qt/qml/qml.qrc']:
             if alias in aliases: errors.append('Duplicate resource alias '+alias)
             aliases.add(alias)
 for module in ['rules','session','ai']:
-    for path in (root/'src'/module).glob('*.[ch]'):
+    for path in (root/'src'/module).iterdir():
+        if path.suffix not in {'.h', '.hpp', '.cpp'}: continue
         if re.search(r'#include\s*[<"](?:Q[A-Z]|gtk/|glib|gio/)',path.read_text(encoding='utf-8')):
             errors.append('Desktop dependency in core: '+str(path.relative_to(root)))
 if errors:

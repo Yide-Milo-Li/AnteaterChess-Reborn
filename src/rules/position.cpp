@@ -122,10 +122,10 @@ static int same_move(AcMove a, AcMove b) {
 AcStatus ac_position_apply(AcPosition *p, AcMove m, AcUndo *u) {
     if (!p || !u)
         return AC_INVALID_ARGUMENT;
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     if (!list)
         return AC_OUT_OF_MEMORY;
-    AcStatus status = ac_generate_legal_moves_for_position(p, m.from, list);
+    AcStatus status = static_cast<AcStatus>(ac_generate_legal_moves_for_position(p, m.from, list));
     if (status != AC_OK) {
         free(list);
         return status;

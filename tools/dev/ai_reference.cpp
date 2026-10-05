@@ -27,7 +27,7 @@ static uint64_t signature(const AcMove *m) {
 }
 static int64_t now(void *unused) { (void)unused; return 0; }
 static void emit(const AcPosition *p, int index) {
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     if (!list || ac_generate_legal_moves(p, list)) exit(1);
     uint64_t see = UINT64_C(1469598103934665603);
     for (int i = 0; i < list->count; ++i) {
@@ -36,7 +36,7 @@ static void emit(const AcPosition *p, int index) {
     }
     AcSearchContext *ctx = ac_search_create();
     AcSearchOptions o = {{now, NULL}, 10000, 2, NULL, NULL, NULL, 0};
-    AcSearchResult r = {0};
+    AcSearchResult r = {};
     AcStatus s = ac_search(ctx, p, &o, &r);
     printf("%d hash=%" PRIu64 " absolute=%d relative=%d moves=%d see=%" PRIu64
            " status=%d depth=%d nodes=%d move=%" PRIu64 "\n", index, p->hash,
@@ -48,14 +48,14 @@ static void emit(const AcPosition *p, int index) {
 static void clear(AcPosition *p) {
     ac_position_init(p);
     for (int r = 0; r < AC_ROWS; ++r)
-        for (int c = 0; c < AC_COLS; ++c) ac_remove_piece(&p->board, (AcSquare){r,c});
+        for (int c = 0; c < AC_COLS; ++c) ac_remove_piece(&p->board, AcSquare{r,c});
 }
 static void put(AcPosition *p, int r, int c, AcPieceType t, AcColor color) {
-    ac_set_piece(&p->board, (AcSquare){r,c}, ac_create_piece(t, color));
+    ac_set_piece(&p->board, AcSquare{r,c}, ac_create_piece(t, color));
 }
 int main(void) {
     AcPosition p;
-    AcMoveList *moves = malloc(sizeof(*moves));
+    AcMoveList *moves = static_cast<AcMoveList *>(malloc(sizeof(*moves)));
     uint32_t seed = 0x41c0ffee;
     ac_position_init(&p);
     for (int i = 0; i < 24; ++i) {
@@ -79,7 +79,7 @@ int main(void) {
     clear(&p);
     put(&p,7,5,AC_KING,AC_WHITE); put(&p,0,5,AC_KING,AC_BLACK);
     put(&p,3,4,AC_ANT,AC_WHITE); put(&p,3,5,AC_ANT,AC_BLACK);
-    p.enPassant = (AcSquare){3,5}; p.hash = ac_position_hash(&p); emit(&p,26);
+    p.enPassant = AcSquare{3,5}; p.hash = ac_position_hash(&p); emit(&p,26);
     free(moves);
     return 0;
 }

@@ -327,8 +327,8 @@ int ac_ai_see_move_score(const AcPosition *state, const AcMove *move) {
     while (depth < (int)(sizeof(gain) / sizeof(gain[0]))) {
         // Successful lookup overwrites these outputs. Initialization also avoids
         // GCC 13 false positives after the private helper is inlined.
-        AcSquare from = {0};
-        AcPiece attacker = {0};
+        AcSquare from = {};
+        AcPiece attacker = {};
         int attackerValue = 0;
 
         // find the least valuable attacker

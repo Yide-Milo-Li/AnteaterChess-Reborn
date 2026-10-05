@@ -6,7 +6,7 @@
 static int terminal(const AcPosition *p, AcColor side, int check) {
     AcPosition copy = *p;
     copy.currentTurn = side;
-    AcMoveList *list = malloc(sizeof(*list));
+    AcMoveList *list = static_cast<AcMoveList *>(malloc(sizeof(*list)));
     assert(list);
     assert(!ac_generate_legal_moves(&copy, list));
     int none = !list->count;

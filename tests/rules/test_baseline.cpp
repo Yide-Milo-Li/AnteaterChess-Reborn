@@ -1,4 +1,4 @@
-#include "../fixtures/probe.h"
+#include "baseline_probe.hpp"
 #include "../fixtures/baseline.h"
 int main(void) {
     FILE *f = tmpfile();

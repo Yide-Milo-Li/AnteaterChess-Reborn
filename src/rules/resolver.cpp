@@ -97,7 +97,7 @@ static int resolve_with_workspace(const AcPosition *state, AcMoveRequest request
 }
 
 int ac_resolve_move_request(const AcPosition *s, AcMoveRequest r, AcMove *m) {
-    AcMoveList *l = malloc(sizeof(*l));
+    AcMoveList *l = static_cast<AcMoveList *>(malloc(sizeof(*l)));
     if (!l)
         return AC_OUT_OF_MEMORY;
     int result = resolve_with_workspace(s, r, m, l);

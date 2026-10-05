@@ -6,6 +6,13 @@ GCC/system Qt 6.4.2. Windows installs only a missing pinned component and refuse
 nonzero installer results, including restart-required 3010. Each job initializes
 its own process environment; developer paths are cleared for candidate startup.
 
+Qt 6.11 places archive metadata below a kit-specific repository subdirectory,
+which aqt 3.3 does not resolve. CI downloads the pinned MSVC kit, Shader Tools and
+Task Tree directly from that official Qt repository, checks each official SHA-1,
+records SHA-256 and extraction exits, and configures a relocatable qt.conf. It
+does not use personal Qt credentials. Installation is followed by the full native
+compile/run matrix and dependency provenance verification.
+
 Debug/Release desktop/core and Linux ASan/UBSan are separate presets. GUI checks
 also run with native Windows or Xvfb/xcb software rendering at 100/150/200%.
 CMake install, CPack and the candidate verifier produce runtime/source artifacts,

@@ -45,18 +45,10 @@ jobs:
             if ($process.ExitCode -ne 0) { throw "v143 installer exit $($process.ExitCode); 3010 requires a fresh post-reboot gate." }
           }
       - name: Install official Qt archive kit
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.2'
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          dir: 'C:\'
-          cache: false
+        run: python -X utf8 tools/native/install_ci_qt.py --evidence build/ci-evidence/qt-install
       - name: Initialize and verify native candidates
         run: |
-          . ./tools/native/Enter-NativeEnvironment.ps1 -QtRoot $env:QT_ROOT_DIR -RequireQt -RequirePython
+          . ./tools/native/Enter-NativeEnvironment.ps1 -RequireQt -RequirePython
           python -X utf8 tools/packaging/ci_checks.py windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4

@@ -79,6 +79,12 @@ concurrent logs, blocked logs, Linux symlinks and a source rebuild without Git.
 Windows startup clears developer Qt paths; this is local relocation evidence,
 not an independent clean Windows host.
 
+Unicode Windows source paths use a CMake-built adapter around the unmodified
+official qmlimportscanner. Qt 6.11 decodes response files using the local ANSI
+code page, while CMake writes UTF-8. The adapter expands those lines into a wide
+command line and returns the actual child exit. This keeps import scanning and
+deployment enabled without modifying the installed kit or system code page.
+
 ## CI and evidence
 
 CI uses native Windows v143 and official Qt archives, and Ubuntu GCC/system Qt,

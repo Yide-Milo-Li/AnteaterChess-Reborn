@@ -1,0 +1,88 @@
+// Qt 6.11 reads scanner response files with the Windows ANSI code page.
+// Expand CMake's UTF-8 lines into a wide command line for the unmodified tool.
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+static std::wstring decode(const std::string &line) {
+    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(),
+                                        static_cast<int>(line.size()), nullptr, 0);
+    if (!size)
+        throw std::runtime_error("Invalid UTF-8 scanner response file");
+    std::wstring wide(size, L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(),
+                       static_cast<int>(line.size()), wide.data(), size);
+    return wide;
+}
+
+static std::wstring quote(const std::wstring &argument) {
+    std::wstring result = L"\"";
+    size_t slashes = 0;
+    for (wchar_t character : argument) {
+        if (character == L'\\') {
+            ++slashes;
+            continue;
+        }
+        result.append(character == L'"' ? slashes * 2 + 1 : slashes, L'\\');
+        result += character;
+        slashes = 0;
+    }
+    result.append(slashes * 2, L'\\');
+    return result + L'"';
+}
+
+int wmain(int argc, wchar_t **argv) {
+    try {
+        const std::wstring scanner = LR"(@AC_QML_SCANNER@)";
+        std::vector<std::wstring> arguments;
+        for (int index = 1; index < argc; ++index) {
+            std::wstring argument = argv[index];
+            if (!argument.empty() && argument.front() == L'@') {
+                std::ifstream input(std::filesystem::path(argument.substr(1)), std::ios::binary);
+                if (!input)
+                    throw std::runtime_error("Cannot open scanner response file");
+                std::string line;
+                while (std::getline(input, line)) {
+                    const auto first = line.find_first_not_of(" \t\r\n");
+                    if (first != std::string::npos)
+                        arguments.push_back(decode(line.substr(first, line.find_last_not_of(" \t\r\n") - first + 1)));
+                }
+                if (input.bad())
+                    throw std::runtime_error("Cannot read scanner response file");
+            } else {
+                arguments.push_back(std::move(argument));
+            }
+        }
+        std::wstring command = quote(scanner);
+        for (const auto &argument : arguments)
+            command += L' ' + quote(argument);
+        if (command.size() >= 32767)
+            throw std::runtime_error("Expanded scanner command exceeds the Windows limit");
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        startup.dwFlags = STARTF_USESTDHANDLES;
+        startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(scanner.c_str(), command.data(), nullptr, nullptr, TRUE,
+                            CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+            throw std::runtime_error("Cannot launch the official QML scanner");
+        CloseHandle(process.hThread);
+        // Keep the child and its redirected handles alive until the real exit.
+        WaitForSingleObject(process.hProcess, INFINITE);
+        DWORD code = 1;
+        GetExitCodeProcess(process.hProcess, &code);
+        CloseHandle(process.hProcess);
+        return static_cast<int>(code);
+    } catch (const std::exception &error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}

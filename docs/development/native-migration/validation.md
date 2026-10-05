@@ -200,3 +200,29 @@ receipts. The external CURRENT.md and final artifact index will record formal
 candidate and remote CI outcomes after this source commit; this avoids changing
 the tested commit merely to embed its own generated checksums. Clean Windows and
 manual acceptance remain separate open gates. No Release is published.
+
+## Candidate and CI repair evidence
+
+The first clean-commit candidate pass stopped at Windows extraction because the
+verification directory nested long license filenames beyond the normal Windows
+path limit. The verifier now strips the known CPack root into short space/Unicode
+working names and accepts a separate bounded work directory. No system long-path
+or display configuration was changed. Native portable startup, concurrent logs,
+blocked logs and missing-DLL detection then passed.
+
+The Windows no-Git rebuild next exposed Qt 6.11's import-scanner response-file
+encoding: CMake writes UTF-8; Qt reads those lines using the local ANSI code page.
+A CMake-built wide-command-line adapter preserves the original official tool,
+public import/deployment graph and real child exit. Configure and the complete
+151-step Unicode source build passed with that repair. Final untouched source
+archives are rebuilt again after committing the adapter. Linux candidate startup,
+symlink placement and the canonical Windows-generated no-Git source archive
+already passed all 25 tests and the benchmark locally at the preceding commit.
+
+Remote Linux CI passed at commits 36dd983 and 53df4b2. Remote Windows first stopped
+on an unsupported installer --wait argument (87); setup.exe now uses PowerShell's
+process wait. The next attempt reached Qt installation, where aqt 3.3 could not
+resolve Qt 6.11's new kit-specific repository hierarchy. CI now reads the pinned
+official metadata directly, verifies archive checksums and records extraction
+results. Failed attempts remain attachments. Remote Windows acceptance is still
+pending until the repaired job completes for the final tested commit.

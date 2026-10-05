@@ -47,7 +47,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $acNativePython 'python.exe'))) {
         Where-Object { $_.Source -notmatch '(?i)msys|mingw|ucrt|WindowsApps' } | Select-Object -First 1
     $acNativePython = if ($acPythonCommand) { Split-Path -Parent $acPythonCommand.Source } else { $null }
 }
-if ($RequirePython -and -not $acNativePython) { throw 'Native Python is required for tests or development tools.' }
+if ($RequirePython -and -not $acNativePython) { throw 'Native Python is required for development or distribution tools.' }
 $acQt = $QtRoot
 foreach ($acExecutable in @((Join-Path $acNativeCMake 'cmake.exe'), (Join-Path $acNativeNinja 'ninja.exe'))) {
     if (-not (Test-Path -LiteralPath $acExecutable)) { throw ('Native tool is missing: ' + $acExecutable) }

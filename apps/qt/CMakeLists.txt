@@ -2,6 +2,7 @@ find_package(Qt6 6.4.2 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Svg
 if(WIN32 AND NOT Qt6_VERSION VERSION_EQUAL "6.11.2")
     message(FATAL_ERROR "Windows requires the official Qt 6.11.2 MSVC 2022 x64 kit.")
 endif()
+include("${CMAKE_SOURCE_DIR}/cmake/QtUtf8Scanner.cmake")
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 add_library(ac_desktop STATIC
@@ -59,6 +60,9 @@ add_executable(test_qml ${CMAKE_SOURCE_DIR}/tests/qt/test_qml.cpp $<TARGET_OBJEC
 target_sources(test_qml PRIVATE $<TARGET_OBJECTS:ac_test_diagnostics>)
 target_link_libraries(test_qml PRIVATE ac_desktop ac_desktopplugin Qt6::QuickTest Qt6::QuickControls2)
 target_compile_definitions(test_qml PRIVATE QUICK_TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}/tests/qt/qml")
-add_test(NAME test_qml COMMAND test_qml -o -,txt)
-set_tests_properties(test_qml PROPERTIES LABELS gui ENVIRONMENT "QT_QUICK_CONTROLS_STYLE=Basic")
+# Quick Test decodes sourceDir as local 8-bit. Keep its argument ASCII while
+# CTest sets the working directory through the native Unicode process API.
+add_test(NAME test_qml COMMAND test_qml -input . -o -,txt)
+set_tests_properties(test_qml PROPERTIES LABELS gui ENVIRONMENT "QT_QUICK_CONTROLS_STYLE=Basic"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/qt/qml")
 endif()

@@ -1,3 +1,24 @@
+# AnteaterChess Reborn 2.1.1
+
+A patch release addressing Anteater move resolution and multi-capture path ambiguity, dated 2026-10-05.
+
+[Download v2.1.1](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.1.1).
+Windows x64 is a portable ZIP with bundled runtime libraries; Ubuntu 24.04 x64
+is a TGZ using system Qt packages listed in INSTALL.md. A no-Git source archive
+and SHA-256 sidecars accompany the runtime packages. SOURCE_REVISION binds each
+archive to its exact release commit.
+
+## Changes in 2.1.1
+
+- **Anteater path ambiguity resolution**: Fixed an issue where selecting an Anteater destination with multiple candidate capture chains (such as direct 1-step capture vs. multi-step chain captures) caused `resolve_move_request` to return `Status::InvalidArgument`, rejecting valid moves (e.g. F3 to F2) despite the destination being highlighted as legal.
+- **Disambiguation policy**: Coordinate input now automatically resolves multiple non-promotion capture chains:
+  - For adjacent destinations, the direct 1-step capture (`captureCount == 1`) is prioritized.
+  - For distant destinations, the greedy path capturing the maximum number of Ants (`max captureCount`) is prioritized.
+- **Move validation**: Updated `validate_move` to accept simple Anteater moves when multiple candidate capture paths reach the target.
+- **Documentation & test coverage**: Updated user manual and software specification to document the Anteater disambiguation policy, added targeted unit tests in `test_move_resolver`, and verified replay of the reported match position.
+
+---
+
 # AnteaterChess Reborn 2.1.0
 
 The first release of the native **C++20 / Qt 6 + QML** implementation, dated

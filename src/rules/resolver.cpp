@@ -1,6 +1,7 @@
 #include "anteater/rules.hpp"
 #include "anteater/memory.hpp"
 
+#include <cmath>
 #include <stddef.h>
 
 namespace ac {
@@ -93,6 +94,53 @@ static Status resolve_with_workspace(const Position *state, MoveRequest request,
     if (nonPromotionCount == 1 && singleNonPromotionMove != NULL) {
         *resolvedMove = *singleNonPromotionMove;
         return Status::Ok;
+    }
+
+    if (nonPromotionCount > 1 && movingPiece.type == PieceType::Anteater) {
+        bool isAdjacent = (std::abs(request.from.row - request.to.row) <= 1 &&
+                           std::abs(request.from.col - request.to.col) <= 1);
+        Move *bestCandidate = nullptr;
+
+        if (isAdjacent) {
+            // Adjacent target: prioritize direct 1-step capture (captureCount == 1)
+            for (index = 0; index < get_move_count(candidates); ++index) {
+                Move *candidate = get_move(candidates, index);
+                if (candidate == NULL || !candidate_matches_request(*candidate, request, movingPiece)) {
+                    continue;
+                }
+                if (is_promotion_special_move(candidate->specialType)) {
+                    continue;
+                }
+                if (candidate->captureCount == 1) {
+                    bestCandidate = candidate;
+                    break;
+                }
+            }
+        }
+
+        // If not adjacent, or if no direct 1-step capture exists:
+        // Prioritize greedy maximal captures (highest captureCount)
+        if (bestCandidate == nullptr) {
+            int maxCaptures = -1;
+            for (index = 0; index < get_move_count(candidates); ++index) {
+                Move *candidate = get_move(candidates, index);
+                if (candidate == NULL || !candidate_matches_request(*candidate, request, movingPiece)) {
+                    continue;
+                }
+                if (is_promotion_special_move(candidate->specialType)) {
+                    continue;
+                }
+                if (candidate->captureCount > maxCaptures) {
+                    maxCaptures = candidate->captureCount;
+                    bestCandidate = candidate;
+                }
+            }
+        }
+
+        if (bestCandidate != nullptr) {
+            *resolvedMove = *bestCandidate;
+            return Status::Ok;
+        }
     }
 
     return Status::InvalidArgument;

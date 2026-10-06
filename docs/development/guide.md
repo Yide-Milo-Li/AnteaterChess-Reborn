@@ -1,10 +1,10 @@
 # Development and packaging
 
-Version 2.1.0 is the native C++20 / Qt 6 release line. The migration's original
+Version 2.1.1 is the native C++20 / Qt 6 release line. The migration's original
 local packages and remote CI passed at `cf2f30b`; clean-Windows/manual acceptance
 is complete per user confirmation. See the [native ledger](native-migration/validation.md)
 for evidence and its limits, and the [release notes](release-notes.md) for the
-2.1.0 delivery. The earlier published 2.0.1 contains C11/GTK.
+2.1.1 delivery. The earlier published 2.0.1 contains C11/GTK.
 
 Use one C++20 CMake >= 3.25/Ninja graph, CTest and CPack. Windows requires native
 v143 14.44 x64 and the official Qt 6.11.2 MSVC 2022 x64 kit with Shader Tools.

@@ -1,7 +1,7 @@
 # Documentation
 
 Current documentation describes the C++20 / Qt 6 native implementation in
-version **2.1.0**. The earlier published v2.0.1 contains the C11/GTK implementation.
+version **2.1.1**. The earlier published v2.0.1 contains the C11/GTK implementation.
 See [release notes](development/release-notes.md) for the delivery and use each
 archive's SOURCE_REVISION to identify its exact source.
 

@@ -8,7 +8,7 @@ files together and run from a writable directory. Logs are stored in `logs/`
 beside the actual executable.
 
 [VERSION](VERSION) is the application version. [SOURCE_REVISION](SOURCE_REVISION)
-identifies the exact source commit in this archive. Version 2.1.0 uses C++20/Qt;
+identifies the exact source commit in this archive. Version 2.1.1 uses C++20/Qt;
 the earlier 2.0.1 release uses C11/GTK. [FILES.sha256](FILES.sha256) covers the
 payload, and [DEPENDENCIES.json](DEPENDENCIES.json) records dependency origins,
 versions and licenses. Retain the included license notices.

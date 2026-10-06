@@ -93,7 +93,8 @@ int main(void) {
     MoveRequest req;
     Move chain;
     assert(!parse_move_request_fields("D4", "E5", PromotionChoice::None, &req));
-    assert(resolve_move_request(&p, req, &chain) != Status::Ok);
+    assert(resolve_move_request(&p, req, &chain) == Status::Ok);
+    assert(chain.captureCount == 1);
     assert(!generate_legal_moves_for_position(&p, parse_position("D4"), moves));
     int found = 0;
     for (int i = 0; i < moves->count; ++i)

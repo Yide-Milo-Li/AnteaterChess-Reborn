@@ -7,7 +7,7 @@ Supported native distribution targets are Windows x64 and Ubuntu 24.04 x64. Extr
 Pieces and icons are compiled into the program. Launching from another working directory is supported. Keep the Windows runtime libraries and their QML, plugins and configuration directories with the executable.
 
 The native C++20/Qt implementation can be identified by SOURCE_REVISION in its
-archive. Version 2.1.0 uses C++20/Qt; the older published v2.0.1 release uses
+archive. Version 2.1.1 uses C++20/Qt; the older published v2.0.1 release uses
 C11/GTK. In a source checkout, docs/development/release-notes.md records
 publication and acceptance status.
 
@@ -42,7 +42,7 @@ Files are A–J; ranks are 1–8. A1 is White's left corner; J8 is Black's right
 | King | One adjacent square, avoiding attack. Kings are checkmated, never captured. |
 | Anteater | One adjacent empty square, or captures an adjacent enemy Ant and may continue capturing orthogonally adjacent enemy Ants. It cannot capture any other piece and does not attack the king. |
 
-An Anteater's first capture can be diagonal or orthogonal; subsequent captures can turn but must be orthogonal. A chain stops after at most ten captures. Each available stopping point forms a candidate move. If different chains reach the same destination, coordinate input is ambiguous and is rejected; the interface has no path selector. AI can select a complete unambiguous move record internally.
+An Anteater's first capture can be diagonal or orthogonal; subsequent captures can turn but must be orthogonal. A chain stops after at most ten captures. Each available stopping point forms a candidate move. When multiple capture chains reach the same destination, coordinate input resolves automatically: for adjacent destinations, the direct 1-step capture is prioritized; for distant destinations, the greedy path capturing the maximum number of Ants is chosen. AI can also select a complete move record internally.
 
 **Castling:** from F1/F8 the king moves to H1/H8 (kingside) with the J-rook moving to G, or to D1/D8 (queenside) with the A-rook moving to E. King and chosen rook must retain their rights; intervening squares must be empty, and the king may not castle out of, through, or into check.
 
@@ -89,7 +89,7 @@ Earlier `%LOCALAPPDATA%/AnteaterChess-Reborn/logs`, Linux user-state logs and
 - Missing DLL: re-extract the whole Windows archive; do not copy the executable alone.
 - No display on Linux: run in a graphical session; automated tests use Xvfb.
 - Invalid timer: increase the turn duration or disable it.
-- Move rejected: verify side to move, blockers, check, and Anteater path ambiguity.
+- Move rejected: verify side to move, blockers, and check.
 - Hint unavailable: wait for the AI/previous hint, return to a human turn, and ensure the game is active.
 - Unwritable log: extract the program to a directory you can write to and check that `logs` is a directory.
 

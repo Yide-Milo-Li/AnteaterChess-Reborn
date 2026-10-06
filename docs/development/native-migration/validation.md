@@ -318,3 +318,9 @@ Release packages require a clean commit and a successful complete Windows/Linux
 CI run for that commit. CI artifacts contain command exits, archive checksums,
 candidate-verifier results and exact source identity. Public release assets are
 copied from that run; source-package identity is checked on both platforms.
+
+## Version 2.1.1 release preparation — 2026-10-05
+
+Resolved Anteater multi-path ambiguity in `src/rules/resolver.cpp` and `src/rules/validation.cpp`.
+Coordinate input now automatically prioritizes direct 1-step capture for adjacent targets and greedy
+maximal capture for distant targets. All 25/25 CTest suite tests passed. VERSION is now 2.1.1.

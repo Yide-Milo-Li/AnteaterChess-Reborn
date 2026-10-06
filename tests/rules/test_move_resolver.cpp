@@ -142,6 +142,58 @@ static void test_resolve_rejects_invalid_request(void) {
     assert(resolve_move_request(&state, request, &move) != Status::Ok);
 }
 
+static void test_resolve_anteater_adjacent_direct_capture(void) {
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
+
+    Square d4 = parse_position("D4");
+    Square e4 = parse_position("E4");
+    Square e5 = parse_position("E5");
+
+    set_piece(&state.board, d4, create_piece(PieceType::Anteater, Color::White));
+    set_piece(&state.board, e4, create_piece(PieceType::Ant, Color::Black));
+    set_piece(&state.board, e5, create_piece(PieceType::Ant, Color::Black));
+
+    assert(create_move_request(&request, d4, e5, PromotionChoice::None) == Status::Ok);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.captureCount == 1);
+    assert(position_equal(move.from, d4));
+    assert(position_equal(move.to, e5));
+    assert(position_equal(move.captures[0].pos, e5));
+
+    Move simpleMove = create_move(d4, e5, create_piece(PieceType::Anteater, Color::White));
+    assert(validate_move(&state, simpleMove) == 1);
+}
+
+static void test_resolve_anteater_distant_greedy_max_captures(void) {
+    Position state = fresh_empty_state(Color::White);
+    MoveRequest request;
+    Move move;
+
+    Square d4 = parse_position("D4");
+    Square e4 = parse_position("E4");
+    Square e5 = parse_position("E5");
+    Square e6 = parse_position("E6");
+
+    set_piece(&state.board, d4, create_piece(PieceType::Anteater, Color::White));
+    set_piece(&state.board, e4, create_piece(PieceType::Ant, Color::Black));
+    set_piece(&state.board, e5, create_piece(PieceType::Ant, Color::Black));
+    set_piece(&state.board, e6, create_piece(PieceType::Ant, Color::Black));
+
+    // D4 to E6 is distant (|row - row| = 2 > 1).
+    // D4 -> E5 -> E6 is 2 captures.
+    // D4 -> E4 -> E5 -> E6 is 3 captures.
+    assert(create_move_request(&request, d4, e6, PromotionChoice::None) == Status::Ok);
+    assert(resolve_move_request(&state, request, &move) == Status::Ok);
+    assert(move.captureCount == 3);
+    assert(position_equal(move.from, d4));
+    assert(position_equal(move.to, e6));
+
+    Move simpleMove = create_move(d4, e6, create_piece(PieceType::Anteater, Color::White));
+    assert(validate_move(&state, simpleMove) == 1);
+}
+
 int main(void) {
     test_resolve_simple_move();
     test_resolve_castling();
@@ -149,5 +201,7 @@ int main(void) {
     test_resolve_promotion_defaults_to_queen();
     test_resolve_explicit_promotion_choices();
     test_resolve_rejects_invalid_request();
+    test_resolve_anteater_adjacent_direct_capture();
+    test_resolve_anteater_distant_greedy_max_captures();
     return 0;
 }

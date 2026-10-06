@@ -12,7 +12,7 @@
 ![Qt 6 / QML](https://img.shields.io/badge/Qt_6-QML-31445b?style=flat-square)
 ![Platforms](https://img.shields.io/badge/platforms-Windows_%7C_Ubuntu-31445b?style=flat-square)
 
-[**Download v2.1.0**](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.1.0) · [How to play](docs/user/manual.md) · [Build from source](docs/development/guide.md) · [Release notes](docs/development/release-notes.md)
+[**Download v2.1.1**](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.1.1) · [How to play](docs/user/manual.md) · [Build from source](docs/development/guide.md) · [Release notes](docs/development/release-notes.md)
 
 </div>
 
@@ -23,7 +23,7 @@ Play a friend, challenge the AI, or watch two engines compete. An **8 × 10 boar
 adds room for Ants and Anteaters while keeping familiar pieces, castling, en
 passant and promotion.
 
-Version **2.1.0** brings the native **C++20 / Qt 6 + QML** implementation to the
+Version **2.1.1** is the latest patch of the native **C++20 / Qt 6 + QML**
 release line, with a Qt-independent core and reproducible CMake/CTest/CPack builds.
 The earlier [v2.0.1](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/tag/v2.0.1)
 contains the historical C11/GTK implementation.
@@ -32,9 +32,9 @@ contains the historical C11/GTK implementation.
 
 | Platform | Download | Start playing |
 | --- | --- | --- |
-| **Windows x64** | [Portable ZIP](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-windows-x64.zip) | Extract everything to a writable folder; launch `anteater-chess.exe`. |
-| **Ubuntu 24.04 x64** | [Linux TGZ](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-linux-x64.tar.gz) | Install the Qt packages in `INSTALL.md`; launch `./anteater-chess`. |
-| **Source** | [Source archive](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.0/AnteaterChess-Reborn-2.1.0-source.tar.gz) | Follow the [development guide](docs/development/guide.md). |
+| **Windows x64** | [Portable ZIP](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.1/AnteaterChess-Reborn-2.1.1-windows-x64.zip) | Extract everything to a writable folder; launch `anteater-chess.exe`. |
+| **Ubuntu 24.04 x64** | [Linux TGZ](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.1/AnteaterChess-Reborn-2.1.1-linux-x64.tar.gz) | Install the Qt packages in `INSTALL.md`; launch `./anteater-chess`. |
+| **Source** | [Source archive](https://github.com/Yide-Milo-Li/AnteaterChess-Reborn/releases/download/v2.1.1/AnteaterChess-Reborn-2.1.1-source.tar.gz) | Follow the [development guide](docs/development/guide.md). |
 
 Windows includes its required runtime libraries. Keep the DLLs, `plugins/`,
 `qml/` and `qt.conf` beside the executable. Ubuntu uses system Qt libraries and
@@ -54,7 +54,9 @@ sidecars are available with the downloads. See [package verification](docs/devel
 
 An Anteater captures **Ants only**. Its first capture may be diagonal; later
 captures in the same chain must be orthogonal. A chain can stop after any capture,
-up to ten. Coordinate input rejects ambiguous paths. The [manual](docs/user/manual.md#pieces-and-special-moves)
+up to ten. When multiple capture chains reach the same destination, coordinate input
+automatically resolves to the direct 1-step capture for adjacent targets, or the greedy
+maximal capture path for distant targets. The [manual](docs/user/manual.md#pieces-and-special-moves)
 explains the full rules, including the variant's castling positions and draw policies.
 
 ## Choose your game

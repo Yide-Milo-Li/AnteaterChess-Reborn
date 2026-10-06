@@ -129,6 +129,11 @@ static int resolve_with_workspace(const Position *state, Move move, MoveList *ca
         return 1;
     }
 
+    Piece movingPiece = get_piece(&state->board, move.from);
+    if (simpleMatchCount > 1 && movingPiece.type == PieceType::Anteater) {
+        return 1;
+    }
+
     return 0;
 }
 
